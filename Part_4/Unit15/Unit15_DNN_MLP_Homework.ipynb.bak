@@ -1,0 +1,539 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "5dad396f",
+   "metadata": {},
+   "source": [
+    "## Unit 15. DNN(MLP) 課堂作業\n",
+    "- 課程編號: CHEXXXX\n",
+    "- 學年度: 114下\n",
+    "- 上課時間: 每週四 09:00-12:00\n",
+    "-\n",
+    "- 指導教授: ＯＯＯ 教授\n",
+    "- 學生姓名: ＯＯＯ\n",
+    "- 學號: m12345678\n",
+    "- email帳號: fcu.m12345678@gmail.com"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "649d6ad6",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 環境設定"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "224c96ac",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "✓ 偵測到 Local 環境\n",
+      "\n",
+      "✓ Notebook工作目錄: d:\\MyGit\\CHE-AI-COURSE\\Part_4\\Unit15\n",
+      "✓ 數據來源目錄: d:\\MyGit\\CHE-AI-COURSE\\Part_4\\Unit15\\data\\HW\n",
+      "✓ 結果輸出目錄: d:\\MyGit\\CHE-AI-COURSE\\Part_4\\Unit15\\outputs\\P4_Unit15_HW\n",
+      "✓ 模型輸出目錄: d:\\MyGit\\CHE-AI-COURSE\\Part_4\\Unit15\\outputs\\P4_Unit15_HW\\models\n",
+      "✓ 圖檔輸出目錄: d:\\MyGit\\CHE-AI-COURSE\\Part_4\\Unit15\\outputs\\P4_Unit15_HW\\figs\n",
+      "\n",
+      "TensorFlow Version: 2.10.1\n",
+      "✓ 偵測到 GPU：/physical_device:GPU:0\n",
+      "  （訓練速度將明顯快於僅用 CPU）\n"
+     ]
+    }
+   ],
+   "source": [
+    "from pathlib import Path\n",
+    "import tensorflow as tf\n",
+    "import os\n",
+    "\n",
+    "# ========================================\n",
+    "# 路徑設定 (兼容 Colab 與 Local)\n",
+    "# ========================================\n",
+    "UNIT_OUTPUT_DIR = 'P4_Unit15_HW'\n",
+    "SOURCE_DATA_DIR = 'HW'\n",
+    "\n",
+    "try:\n",
+    "  from google.colab import drive\n",
+    "  IN_COLAB = True\n",
+    "  print(\"✓ 偵測到 Colab 環境，準備掛載 Google Drive...\")\n",
+    "  drive.mount('/content/drive', force_remount=True)\n",
+    "except ImportError:\n",
+    "  IN_COLAB = False\n",
+    "  print(\"✓ 偵測到 Local 環境\")\n",
+    "try:\n",
+    "  shortcut_path = '/content/CHE-AI-COURSE'\n",
+    "  os.remove(shortcut_path)\n",
+    "except FileNotFoundError:\n",
+    "  pass\n",
+    "\n",
+    "if IN_COLAB:\n",
+    "  source_path = Path('/content/drive/My Drive/Colab Notebooks/CHE-AI-COURSE')\n",
+    "  os.symlink(source_path, shortcut_path)\n",
+    "  shortcut_path = Path(shortcut_path)\n",
+    "  if source_path.exists():\n",
+    "    NOTEBOOK_DIR = shortcut_path / 'Part_4' / 'Unit15'\n",
+    "    OUTPUT_DIR = NOTEBOOK_DIR / 'outputs' / UNIT_OUTPUT_DIR\n",
+    "    DATA_DIR = NOTEBOOK_DIR / 'data' / SOURCE_DATA_DIR\n",
+    "    MODEL_DIR = OUTPUT_DIR / 'models'\n",
+    "    FIG_DIR = OUTPUT_DIR / 'figs'\n",
+    "  else:\n",
+    "    print(f\"⚠️ 找不到路徑雲端CHE-AI-COURSE路徑，請確認自己的雲端資料夾是否正確\")\n",
+    "  \n",
+    "else:\n",
+    "  NOTEBOOK_DIR = Path.cwd()\n",
+    "  OUTPUT_DIR = NOTEBOOK_DIR / 'outputs' / UNIT_OUTPUT_DIR\n",
+    "  DATA_DIR = NOTEBOOK_DIR / 'data' / SOURCE_DATA_DIR\n",
+    "  MODEL_DIR = OUTPUT_DIR / 'models'\n",
+    "  FIG_DIR = OUTPUT_DIR / 'figs'\n",
+    "\n",
+    "NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "OUTPUT_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "DATA_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "MODEL_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "FIG_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "\n",
+    "print(f\"\\n✓ Notebook工作目錄: {NOTEBOOK_DIR}\")\n",
+    "print(f\"✓ 數據來源目錄: {DATA_DIR}\")\n",
+    "print(f\"✓ 結果輸出目錄: {OUTPUT_DIR}\")\n",
+    "print(f\"✓ 模型輸出目錄: {MODEL_DIR}\")\n",
+    "print(f\"✓ 圖檔輸出目錄: {FIG_DIR}\")\n",
+    "\n",
+    "\n",
+    "# ========================================\n",
+    "# 檢查 GPU 狀態\n",
+    "# ========================================\n",
+    "print(f\"\\nTensorFlow Version: {tf.__version__}\")\n",
+    "gpus = tf.config.list_physical_devices('GPU')\n",
+    "if gpus:\n",
+    "    print(f\"✓ 偵測到 GPU：{gpus[0].name}\")\n",
+    "    print(\"  （訓練速度將明顯快於僅用 CPU）\")\n",
+    "    for gpu in gpus:\n",
+    "        tf.config.experimental.set_memory_growth(gpu, True)\n",
+    "else:\n",
+    "    print(\"△ 未偵測到 GPU。\")\n",
+    "    print(\"  訓練速度將使用 CPU（速度較慢但仍可完成）\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "610acba7",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### **I. 練習題: 建立一個DNN回歸模型**\n",
+    " - 使用下面化工製程模擬數據集。"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8a70284f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "\n",
+    "# 設定隨機種子\n",
+    "np.random.seed(42)\n",
+    "\n",
+    "# 生成特徵數據\n",
+    "n_samples = 2000\n",
+    "data = {\n",
+    "    '進料流量': np.random.uniform(10, 50, n_samples),\n",
+    "    '反應器溫度': np.random.uniform(150, 250, n_samples),\n",
+    "    '反應器壓力': np.random.uniform(5, 15, n_samples),\n",
+    "    '催化劑濃度': np.random.uniform(0.5, 5, n_samples),\n",
+    "    '攪拌速度': np.random.uniform(100, 500, n_samples),\n",
+    "    '冷卻水溫度': np.random.uniform(15, 35, n_samples),\n",
+    "    '原料純度': np.random.uniform(90, 99.5, n_samples),\n",
+    "    '停留時間': np.random.uniform(30, 120, n_samples)\n",
+    "}\n",
+    "\n",
+    "df = pd.DataFrame(data)\n",
+    "\n",
+    "# 生成目標變數(產品轉化率) - 複雜非線性關係\n",
+    "conversion_rate = (\n",
+    "    0.3 * df['反應器溫度'] +\n",
+    "    0.2 * df['催化劑濃度'] * df['停留時間'] +\n",
+    "    -0.15 * (df['進料流量'] - 30)**2 +\n",
+    "    0.1 * np.log(df['攪拌速度']) * df['反應器壓力'] +\n",
+    "    0.05 * df['原料純度'] * df['反應器溫度'] / 100 +\n",
+    "    np.random.normal(0, 5, n_samples)  # 添加噪音\n",
+    ")/2\n",
+    "\n",
+    "# 限制轉化率在合理範圍\n",
+    "conversion_rate = np.clip(conversion_rate, 0, 100)\n",
+    "\n",
+    "# 模型預測目標\n",
+    "df['產品轉化率'] = conversion_rate\n",
+    "\n",
+    "# 保存數據\n",
+    "df.to_csv(DATA_DIR/'reactor_data.csv', index=False, encoding='utf-8-sig')\n",
+    "print(f\"數據集已生成: {DATA_DIR}/reactor_data.csv\")\n",
+    "print(f\"數據形狀: {df.shape}\")\n",
+    "print(f\"\\n前5筆數據:\\n{df.head()}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "860a9c2c",
+   "metadata": {},
+   "source": [
+    "### **1. 數據準備與探索**\n",
+    "- 載入數據並檢查基本統計資訊\n",
+    "- 繪製目標變數分布圖\n",
+    "- 繪製至少3個特徵與目標變數的散點圖\n",
+    "- 數據分割:訓練集70%、驗證集15%、測試集15%\n",
+    "- **對X和Y都進行StandardScaler標準化**"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b4ccbc13",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5374e6f3",
+   "metadata": {},
+   "source": [
+    "### **2. 模型建立**\n",
+    "- 使用Sequential API建立DNN模型\n",
+    "- 加入隱藏層, 使用ReLU激活函數\n",
+    "- 加入Dropout層\n",
+    "- 使用`model.summary()`查看模型結構\n",
+    "- 使用`plot_model()`繪製模型架構圖"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6f2afa3a",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5bb335f2",
+   "metadata": {},
+   "source": [
+    "### **3. 模型編譯**\n",
+    "- 使用Adam優化器\n",
+    "- 設定損失函數\n",
+    "- 評估指標\n",
+    "- 說明為何選擇這些設定"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f1867564",
+   "metadata": {},
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "af08517c",
+   "metadata": {},
+   "source": [
+    "### **4. 模型訓練**\n",
+    "- 設定至少2個callbacks:\n",
+    "  - EarlyStopping\n",
+    "  - ModelCheckpoint\n",
+    "- 設定相關參數\n",
+    "- 使用validation_data進行驗證\n",
+    "- (可選)加入TensorBoard callback"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "98a8f3d3",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5341df35",
+   "metadata": {},
+   "source": [
+    "### **5. 訓練過程視覺化**\n",
+    "- 繪製訓練與驗證的Loss曲線\n",
+    "- 繪製訓練與驗證的MAE曲線\n",
+    "- 分析是否有過擬合或欠擬合現象"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "40a5acf0",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2ac348ea",
+   "metadata": {},
+   "source": [
+    "### **6. 模型評估與預測**\n",
+    "- **重要**: 對預測結果進行反標準化\n",
+    "- 在測試集上計算MAE、RMSE、R²\n",
+    "- 繪製實際值vs預測值散點圖\n",
+    "- 繪製殘差圖\n",
+    "- 分析模型性能"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b8e0bac4",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "32cca540",
+   "metadata": {},
+   "source": [
+    "### 7. 保存模型\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3b2c3b0c",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "abfc426a",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## II. 額外加分作業 (自由繳交)\n",
+    "- 學生可自由選擇是否繳交加分作業. (下週上課前完成email電子檔)\n",
+    "- 分數會加在最後總成績上, 每份作業加0.1 ~ 1.0分.\n",
+    "- 分數加的不多, 真的不一定要交加分作業, 正常出席上課做好期末報告即可.\n",
+    "- 加分作業不一定要全部都做完, 想繳交至少完成其中一項實驗即可.\n",
+    "- 請務必自行完成! 你可以問AI, 問同學, 問學長姊, 甚至參考以前別人的作業, 但一定要自行[吸收][執行][整理]結果!\n",
+    "- 不要貼AI的答案寄給老師看, 你自己看就好.\n",
+    "- 如果系統自動比對發現作業內容(與他人雷同, 原創性低, 抄襲比例過高), 作業的分數會0分.\n",
+    "- 如果你直接100%複製別人的作業繳交, 你會直接被當掉(提供作業給別人複製的也一樣).\n",
+    "- 老師看你作業要花時間, 真的有心想寫加分作業, 請好好自己做. "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "53c83a9b",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 使用課堂作業所提供的化工製程模擬數據集\n",
+    "- 嘗試修改生成模擬數據的程式\n",
+    "- 改變參數, 改變公式, 添加特徵 ... 等等.\n",
+    "- 產生獨一無二屬於你的數據集\n",
+    "- 建立 DNN 模型來預測產品品質指標\n",
+    "- 然後開始進行下面實驗"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cd83598c",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "496f8f1f",
+   "metadata": {},
+   "source": [
+    "### **實驗1: 網路深度影響**\n",
+    "\n",
+    "比較以下4種網路架構:\n",
+    "- **淺層網路**: 2層 [64, 32]\n",
+    "- **中層網路**: 3層 [128, 64, 32]\n",
+    "- **深層網路**: 4層 [256, 128, 64, 32]\n",
+    "- **自行設計**:\n",
+    "\n",
+    "**要求**:\n",
+    "- 其他參數保持一致\n",
+    "- 記錄每個模型的:\n",
+    "  - 訓練時間\n",
+    "  - 最佳驗證Loss\n",
+    "  - 測試集MAE、RMSE、R²\n",
+    "  - 總參數量(從model.summary()獲取)\n",
+    "- 製作比較表格\n",
+    "- **分析**: 哪種深度最適合?為什麼?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "33cbb018",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "474f8f7f",
+   "metadata": {},
+   "source": [
+    "### **實驗2: Dropout Rate影響**\n",
+    "\n",
+    "比較以下4種dropout rate:\n",
+    "- 0.0 (無dropout)\n",
+    "- 0.2\n",
+    "- 0.3\n",
+    "- 0.5\n",
+    "\n",
+    "**要求**:\n",
+    "- 使用相同的網路架構\n",
+    "- 記錄訓練與驗證Loss的差距\n",
+    "- 分析過擬合程度\n",
+    "- **分析**: 最佳dropout rate是多少?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "404630db",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7aec65fc",
+   "metadata": {},
+   "source": [
+    "### **實驗3: Batch Size影響**\n",
+    "\n",
+    "比較以下4種batch size:\n",
+    "- 16\n",
+    "- 32\n",
+    "- 64\n",
+    "- 128\n",
+    "\n",
+    "**要求**:\n",
+    "- 記錄每個epoch的訓練時間\n",
+    "- 記錄最終測試集性能\n",
+    "- 計算每個epoch的iterations數量\n",
+    "- **分析**: batch size如何影響訓練速度和模型性能?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ea1d7132",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6d216c85",
+   "metadata": {},
+   "source": [
+    "### **實驗4: 學習率影響**\n",
+    "\n",
+    "比較以下4種\"**固定**\"學習率:\n",
+    "- 0.0001\n",
+    "- 0.001\n",
+    "- 0.01\n",
+    "- 0.1\n",
+    "\n",
+    "**要求**:\n",
+    "- 觀察訓練曲線的收斂速度\n",
+    "- 記錄是否出現訓練不穩定\n",
+    "- **分析**: 最佳學習率是多少?學習率過大或過小會有什麼問題?\n",
+    "- 比較使用學習率自調諧衰減策略"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0de60ab8",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6a9f80be",
+   "metadata": {},
+   "source": [
+    "### 💭 思考題\n",
+    "\n",
+    "1. 為什麼在回歸任務中,Y數據也需要標準化?\n",
+    "2. 如果不進行反標準化直接計算評估指標,會有什麼問題?\n",
+    "3. 為什麼深層網路不一定比淺層網路好?\n",
+    "4. Dropout如何防止過擬合?它的工作原理是什麼?\n",
+    "5. 學習率過大和過小分別會導致什麼問題?\n",
+    "6. 在工業應用中,如何選擇合適的batch size?\n",
+    "7. 如果測試集性能遠差於驗證集,可能是什麼原因?"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "32692d28",
+   "metadata": {},
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f943779d",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "# 想對老師說的話"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2400a224",
+   "metadata": {},
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "PY310",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.19"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

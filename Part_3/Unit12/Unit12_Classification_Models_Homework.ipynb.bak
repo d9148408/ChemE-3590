@@ -1,0 +1,765 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "044d58e7",
+   "metadata": {},
+   "source": [
+    "# Unit 12. Classification Models 課堂作業\n",
+    "- 課程編號: CHE-AI-114\n",
+    "- 學年度: 114下\n",
+    "- 上課時間: 每週四 09:10-12:00\n",
+    "- 授課地點: 學思樓 705\n",
+    "- 指導教授: 莊曜禎 助理教授\n",
+    "- 學生姓名: ＯＯＯ\n",
+    "- 學號: m12345678\n",
+    "- email帳號: fcu.m12345678@gmail.com"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b23e994d",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 0. 環境設定"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d31d8e13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from pathlib import Path\n",
+    "import os\n",
+    "\n",
+    "# ========================================\n",
+    "# 路徑設定 (兼容 Colab 與 Local)\n",
+    "# ========================================\n",
+    "UNIT_OUTPUT_DIR = 'P3_Unit12_HW'\n",
+    "SOURCE_DATA_DIR = 'winequality'\n",
+    "\n",
+    "try:\n",
+    "  from google.colab import drive\n",
+    "  IN_COLAB = True\n",
+    "  print(\"✓ 偵測到 Colab 環境，準備掛載 Google Drive...\")\n",
+    "  drive.mount('/content/drive', force_remount=True)\n",
+    "except ImportError:\n",
+    "  IN_COLAB = False\n",
+    "  print(\"✓ 偵測到 Local 環境\")\n",
+    "try:\n",
+    "  shortcut_path = '/content/CHE-AI-COURSE'\n",
+    "  os.remove(shortcut_path)\n",
+    "except FileNotFoundError:\n",
+    "  pass\n",
+    "\n",
+    "if IN_COLAB:\n",
+    "  source_path = Path('/content/drive/My Drive/Colab Notebooks/CHE-AI-COURSE')\n",
+    "  os.symlink(source_path, shortcut_path)\n",
+    "  shortcut_path = Path(shortcut_path)\n",
+    "  if source_path.exists():\n",
+    "    NOTEBOOK_DIR = shortcut_path / 'Part_3' / 'Unit12'\n",
+    "    OUTPUT_DIR = NOTEBOOK_DIR / 'outputs' / UNIT_OUTPUT_DIR\n",
+    "    DATA_DIR = NOTEBOOK_DIR / 'data' / SOURCE_DATA_DIR\n",
+    "    MODEL_DIR = OUTPUT_DIR / 'models'\n",
+    "    FIG_DIR = OUTPUT_DIR / 'figs'\n",
+    "  else:\n",
+    "    print(f\"⚠️ 找不到路徑雲端CHE-AI-COURSE路徑，請確認自己的雲端資料夾是否正確\")\n",
+    "  \n",
+    "else:\n",
+    "  NOTEBOOK_DIR = Path.cwd()\n",
+    "  OUTPUT_DIR = NOTEBOOK_DIR / 'outputs' / UNIT_OUTPUT_DIR\n",
+    "  DATA_DIR = NOTEBOOK_DIR / 'data' / SOURCE_DATA_DIR\n",
+    "  MODEL_DIR = OUTPUT_DIR / 'models'\n",
+    "  FIG_DIR = OUTPUT_DIR / 'figs'\n",
+    "\n",
+    "NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "OUTPUT_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "DATA_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "MODEL_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "FIG_DIR.mkdir(parents=True, exist_ok=True)\n",
+    "\n",
+    "print(f\"\\n✓ Notebook工作目錄: {NOTEBOOK_DIR}\")\n",
+    "print(f\"✓ 數據來源目錄: {DATA_DIR}\")\n",
+    "print(f\"✓ 結果輸出目錄: {OUTPUT_DIR}\")\n",
+    "print(f\"✓ 模型輸出目錄: {MODEL_DIR}\")\n",
+    "print(f\"✓ 圖檔輸出目錄: {FIG_DIR}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f24a6f8e",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 數據下載"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4dcc792d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 數據來源: Wine Quality Dataset\n",
+    "# https://www.kaggle.com/datasets/yasserh/wine-quality-dataset/\n",
+    "\n",
+    "import requests\n",
+    "import zipfile\n",
+    "\n",
+    "# 設定路徑與 URL\n",
+    "url = \"https://www.kaggle.com/api/v1/datasets/download/yasserh/wine-quality-dataset\"\n",
+    "zip_path = DATA_DIR / \"wine-quality-dataset.zip\"\n",
+    "data_file = DATA_DIR / \"WineQT.csv\"\n",
+    "\n",
+    "def download_and_extract():\n",
+    "    # --- 步驟 A: 下載檔案 ---\n",
+    "    print(f\"正在從 {url} 下載...\")\n",
+    "    try:\n",
+    "        # allow_redirects=True 處理 Kaggle 的重導向\n",
+    "        response = requests.get(url, allow_redirects=True, stream=True)\n",
+    "        response.raise_for_status() # 若下載失敗會拋出異常\n",
+    "        \n",
+    "        with open(zip_path, 'wb') as f:\n",
+    "            for chunk in response.iter_content(chunk_size=8192):\n",
+    "                f.write(chunk)\n",
+    "        print(f\"下載成功，檔案儲存於: {zip_path}\")\n",
+    "\n",
+    "        # --- 步驟 B: 解壓縮檔案 ---\n",
+    "        if zipfile.is_zipfile(zip_path):\n",
+    "            print(f\"正在解壓縮至: {DATA_DIR}...\")\n",
+    "            with zipfile.ZipFile(zip_path, 'r') as zip_ref:\n",
+    "                zip_ref.extractall(DATA_DIR)\n",
+    "            print(\"解壓縮完成！\")\n",
+    "        else:\n",
+    "            print(\"錯誤：下載的檔案不是有效的 ZIP 格式。\")\n",
+    "            \n",
+    "    except Exception as e:\n",
+    "        print(f\"發生錯誤: {e}\")\n",
+    "        print(\"\\n⚠️ Kaggle API 下載需要認證，請手動下載數據集：\")\n",
+    "        print(\"1. 前往: https://www.kaggle.com/datasets/yasserh/wine-quality-dataset/\")\n",
+    "        print(f\"2. 下載 WineQT.csv 並放置於: {DATA_DIR}\")\n",
+    "\n",
+    "if __name__ == \"__main__\" and not data_file.exists():\n",
+    "    download_and_extract()\n",
+    "else:\n",
+    "    print(f\"✓ 檔案已存在於: {data_file}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fdc2211f",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 載入相關套件"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "dc48ed03",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 基礎套件\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import warnings\n",
+    "warnings.filterwarnings('ignore')\n",
+    "\n",
+    "# sklearn 套件\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.preprocessing import StandardScaler\n",
+    "from sklearn.metrics import (\n",
+    "    accuracy_score, precision_score, recall_score, f1_score,\n",
+    "    confusion_matrix, classification_report, \n",
+    "    roc_auc_score, roc_curve\n",
+    ")\n",
+    "\n",
+    "# 分類模型\n",
+    "from sklearn.linear_model import LogisticRegression\n",
+    "from sklearn.tree import DecisionTreeClassifier\n",
+    "from sklearn.ensemble import GradientBoostingClassifier\n",
+    "from sklearn.svm import SVC\n",
+    "from sklearn.naive_bayes import GaussianNB\n",
+    "\n",
+    "# 設定隨機種子以確保結果可重現\n",
+    "SEED = 42\n",
+    "np.random.seed(SEED)\n",
+    "\n",
+    "# 設定 matplotlib 中文顯示\n",
+    "plt.rcParams['axes.unicode_minus'] = False\n",
+    "\n",
+    "print(\"✓ 套件載入完成\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "520e5c87",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## I. 練習題: 紅酒品質分類預測\n",
+    "\n",
+    "### 數據集說明\n",
+    "本作業使用 **Wine Quality Dataset**，包含紅酒的物理化學特性與品質評分。\n",
+    "\n",
+    "**特徵說明** (共 11 個):\n",
+    "- `fixed acidity`: 固定酸度\n",
+    "- `volatile acidity`: 揮發性酸度\n",
+    "- `citric acid`: 檸檬酸含量\n",
+    "- `residual sugar`: 殘糖量\n",
+    "- `chlorides`: 氯化物含量\n",
+    "- `free sulfur dioxide`: 游離二氧化硫\n",
+    "- `total sulfur dioxide`: 總二氧化硫\n",
+    "- `density`: 密度\n",
+    "- `pH`: 酸鹼值\n",
+    "- `sulphates`: 硫酸鹽含量\n",
+    "- `alcohol`: 酒精濃度\n",
+    "\n",
+    "**目標變數**:\n",
+    "- `quality`: 品質評分 (3-9分，本作業將轉換為二元分類)\n",
+    "  - **高品質 (1)**: quality >= 7\n",
+    "  - **低品質 (0)**: quality < 7\n",
+    "\n",
+    "### 作業目標\n",
+    "使用本單元學習的 5 種分類模型，建立紅酒品質預測模型，並進行綜合比較分析。"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d5d1cd02",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 1. 數據準備與探索性分析 (EDA)\n",
+    "\n",
+    "**要求**:\n",
+    "1. 載入數據並檢查基本資訊\n",
+    "2. 檢查缺失值與異常值\n",
+    "3. 將 `quality` 轉換為二元分類 (0: 低品質, 1: 高品質)\n",
+    "4. 計算類別分布，檢查是否有類別不平衡問題\n",
+    "5. 繪製至少 3 個特徵的分布圖 (直方圖或箱型圖)\n",
+    "6. 繪製相關性熱力圖 (correlation heatmap)\n",
+    "7. 選擇至少 2 個重要特徵繪製散點圖，並用顏色區分類別"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b71edbbb",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d9946c8f",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 2. 數據預處理\n",
+    "\n",
+    "**要求**:\n",
+    "1. 分離特徵 (X) 與目標變數 (y)\n",
+    "2. 數據分割: 訓練集 70%、測試集 30% (`random_state=42`)\n",
+    "3. 使用 `StandardScaler` 對特徵進行標準化\n",
+    "   - **注意**: 僅對 X 進行標準化，y 不需標準化\n",
+    "   - 先 fit 訓練集，再分別 transform 訓練集和測試集\n",
+    "4. 顯示標準化前後的數據範圍變化"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6aadf854",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "09226e3e",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 3. 建立所有分類模型\n",
+    "\n",
+    "**要求**: 建立並訓練以下 5 種分類模型\n",
+    "\n",
+    "#### 3.1 Logistic Regression (邏輯迴歸)\n",
+    "- 使用預設參數\n",
+    "- 或自行調整 `C`, `penalty`, `solver` 等參數"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fc42d096",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "814303f9",
+   "metadata": {},
+   "source": [
+    "#### 3.2 Decision Tree Classifier (決策樹分類)\n",
+    "- 設定 `max_depth`, `min_samples_split` 等參數\n",
+    "- 或使用預設參數"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7940b530",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9d3fed6a",
+   "metadata": {},
+   "source": [
+    "#### 3.3 Gradient Boosting Classifier (梯度提升分類)\n",
+    "- 設定 `n_estimators`, `learning_rate`, `max_depth` 等參數\n",
+    "- 或使用預設參數"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6c30b0d9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "37c37986",
+   "metadata": {},
+   "source": [
+    "#### 3.4 Support Vector Classification (支持向量分類)\n",
+    "- 設定 `C`, `kernel`, `gamma` 等參數\n",
+    "- 建議使用 `kernel='rbf'` 或 `'linear'`"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0b14668f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a0861588",
+   "metadata": {},
+   "source": [
+    "#### 3.5 Gaussian Naive Bayes (高斯貝氏分類器)\n",
+    "- 使用預設參數即可"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "644da4a8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7d5c09fb",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 4. 模型評估與比較\n",
+    "\n",
+    "**要求**:\n",
+    "1. 對所有 5 個模型計算以下指標:\n",
+    "   - Accuracy (準確率)\n",
+    "   - Precision (精確率)\n",
+    "   - Recall (召回率)\n",
+    "   - F1-Score\n",
+    "   - ROC-AUC\n",
+    "   \n",
+    "2. 製作比較表格，顯示所有模型的性能指標\n",
+    "\n",
+    "3. 繪製比較圖:\n",
+    "   - 5 個模型的 Accuracy 比較 (長條圖)\n",
+    "   - 5 個模型的 F1-Score 比較 (長條圖)\n",
+    "   \n",
+    "4. 選擇表現最佳的模型，繪製:\n",
+    "   - Confusion Matrix (混淆矩陣)\n",
+    "   - ROC Curve (ROC 曲線)\n",
+    "   - Classification Report (分類報告)\n",
+    "\n",
+    "5. **分析與討論**:\n",
+    "   - 哪個模型表現最好？為什麼？\n",
+    "   - 哪個模型表現最差？可能的原因？\n",
+    "   - 是否有類別不平衡問題？如何影響模型性能？\n",
+    "   - 在實際應用中，你會選擇哪個模型？理由是什麼？"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "52989e5f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "74148893",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 5. 模型保存\n",
+    "\n",
+    "**要求**:\n",
+    "- 保存表現最佳的模型 (使用 `joblib` 或 `pickle`)\n",
+    "- 保存 StandardScaler (用於未來預測時的標準化)\n",
+    "- 顯示保存的檔案路徑"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8d0df7f9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b9f91b88",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## II. 額外加分作業 (自由繳交)\n",
+    "\n",
+    "- 學生可自由選擇是否繳交加分作業 (下週上課前完成 email 電子檔)\n",
+    "- 分數會加在最後總成績上，每份作業加 0.1 ~ 1.0 分\n",
+    "- 分數加的不多，真的不一定要交加分作業，正常出席上課做好期末報告即可\n",
+    "- 加分作業不一定要全部都做完，想繳交至少完成其中一項實驗即可\n",
+    "- 請務必自行完成！你可以問 AI、問同學、問學長姊，甚至參考以前別人的作業，但一定要自行 [吸收][執行][整理] 結果！\n",
+    "- 不要貼 AI 的答案寄給老師看，你自己看就好\n",
+    "- 如果系統自動比對發現作業內容 (與他人雷同、原創性低、抄襲比例過高)，作業的分數會 0 分\n",
+    "- 如果你直接 100% 複製別人的作業繳交，你會直接被當掉 (提供作業給別人複製的也一樣)\n",
+    "- 老師看你作業要花時間，真的有心想寫加分作業，請好好自己做"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "86ae7702",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 實驗1: 超參數調整 (Hyperparameter Tuning)\n",
+    "\n",
+    "選擇 **至少 2 個模型** 進行超參數調整\n",
+    "\n",
+    "**要求**:\n",
+    "1. 使用 `GridSearchCV` 或 `RandomizedSearchCV`\n",
+    "2. 定義參數網格 (parameter grid)\n",
+    "3. 使用交叉驗證 (至少 3-fold CV)\n",
+    "4. 記錄:\n",
+    "   - 最佳參數組合\n",
+    "   - 調整前後的性能比較\n",
+    "   - 訓練時間\n",
+    "5. **分析**: 超參數調整帶來多少改善？是否值得額外的計算成本？\n",
+    "\n",
+    "**建議調整的參數**:\n",
+    "- **Gradient Boosting**: `n_estimators`, `learning_rate`, `max_depth`, `subsample`\n",
+    "- **Decision Tree**: `max_depth`, `min_samples_split`, `min_samples_leaf`, `criterion`\n",
+    "- **SVC**: `C`, `gamma`, `kernel`\n",
+    "- **Logistic Regression**: `C`, `penalty`, `solver`"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1064c424",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c93418f6",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 實驗2: 處理類別不平衡 (Class Imbalance)\n",
+    "\n",
+    "如果數據集存在類別不平衡問題，嘗試以下方法\n",
+    "\n",
+    "**要求**: 至少嘗試 2 種方法\n",
+    "\n",
+    "**方法1: SMOTE (合成少數過採樣)**\n",
+    "```python\n",
+    "from imblearn.over_sampling import SMOTE\n",
+    "smote = SMOTE(random_state=42)\n",
+    "X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)\n",
+    "```\n",
+    "\n",
+    "**方法2: 類別權重 (Class Weight)**\n",
+    "```python\n",
+    "# 在模型中設定 class_weight='balanced'\n",
+    "model = GradientBoostingClassifier(random_state=42)\n",
+    "# 注意: GradientBoostingClassifier 不直接支援 class_weight 參數\n",
+    "# 可使用 LogisticRegression 或 DecisionTreeClassifier\n",
+    "model = LogisticRegression(class_weight='balanced', random_state=42)\n",
+    "```\n",
+    "\n",
+    "**方法3: 欠採樣 (Under-sampling)**\n",
+    "```python\n",
+    "from imblearn.under_sampling import RandomUnderSampler\n",
+    "rus = RandomUnderSampler(random_state=42)\n",
+    "X_train_resampled, y_train_resampled = rus.fit_resample(X_train_scaled, y_train)\n",
+    "```\n",
+    "\n",
+    "**分析**:\n",
+    "1. 比較各方法對模型性能的影響\n",
+    "2. 重點觀察 Recall 和 F1-Score 的變化\n",
+    "3. 哪種方法最適合這個數據集？"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0f80ce8a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "592e797f",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 實驗3: 特徵工程 (Feature Engineering)\n",
+    "\n",
+    "嘗試創建新特徵或選擇重要特徵來改善模型性能\n",
+    "\n",
+    "**方法1: 特徵重要性分析**\n",
+    "1. 使用 Gradient Boosting 或 Decision Tree 的 `feature_importances_`\n",
+    "2. 繪製特徵重要性圖\n",
+    "3. 選擇 top-k 重要特徵重新訓練模型\n",
+    "4. 比較使用全部特徵 vs. 選擇特徵的性能差異\n",
+    "\n",
+    "**範例程式碼**:\n",
+    "```python\n",
+    "# 使用 Gradient Boosting 分析特徵重要性\n",
+    "gb_model = GradientBoostingClassifier(random_state=42)\n",
+    "gb_model.fit(X_train_scaled, y_train)\n",
+    "\n",
+    "# 獲取特徵重要性\n",
+    "importances = gb_model.feature_importances_\n",
+    "feature_names = X.columns  # 假設 X 是 DataFrame\n",
+    "indices = np.argsort(importances)[::-1]\n",
+    "\n",
+    "# 繪製特徵重要性圖\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "plt.bar(range(len(importances)), importances[indices])\n",
+    "plt.xticks(range(len(importances)), [feature_names[i] for i in indices], rotation=90)\n",
+    "plt.xlabel('Features')\n",
+    "plt.ylabel('Importance')\n",
+    "plt.title('Feature Importance')\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "```\n",
+    "\n",
+    "**方法2: 多項式特徵**\n",
+    "```python\n",
+    "from sklearn.preprocessing import PolynomialFeatures\n",
+    "poly = PolynomialFeatures(degree=2, include_bias=False)\n",
+    "X_train_poly = poly.fit_transform(X_train_scaled)\n",
+    "X_test_poly = poly.transform(X_test_scaled)\n",
+    "```\n",
+    "\n",
+    "**方法3: 特徵交互作用**\n",
+    "- 創建有意義的特徵組合 (例如: `alcohol * pH`, `citric_acid / fixed_acidity`)\n",
+    "- 測試這些新特徵是否改善模型性能\n",
+    "\n",
+    "**分析**:\n",
+    "- 哪些特徵最重要？\n",
+    "- 特徵工程帶來多少改善？\n",
+    "- 新特徵是否過擬合？"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0ceb4826",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "be465568",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 實驗4: 集成學習 (Ensemble Learning)\n",
+    "\n",
+    "結合多個模型來改善預測性能\n",
+    "\n",
+    "**方法1: Voting Classifier (投票分類器)**\n",
+    "```python\n",
+    "from sklearn.ensemble import VotingClassifier\n",
+    "\n",
+    "# 硬投票 (hard voting)\n",
+    "voting_clf = VotingClassifier(\n",
+    "    estimators=[\n",
+    "        ('lr', LogisticRegression(random_state=42)),\n",
+    "        ('dt', DecisionTreeClassifier(random_state=42)),\n",
+    "        ('gb', GradientBoostingClassifier(random_state=42))\n",
+    "    ],\n",
+    "    voting='hard'\n",
+    ")\n",
+    "\n",
+    "# 軟投票 (soft voting) - 使用機率\n",
+    "voting_clf_soft = VotingClassifier(\n",
+    "    estimators=[\n",
+    "        ('lr', LogisticRegression(random_state=42)),\n",
+    "        ('gb', GradientBoostingClassifier(random_state=42)),\n",
+    "        ('svc', SVC(probability=True, random_state=42))\n",
+    "    ],\n",
+    "    voting='soft'\n",
+    ")\n",
+    "```\n",
+    "\n",
+    "**方法2: Stacking Classifier (堆疊分類器)**\n",
+    "```python\n",
+    "from sklearn.ensemble import StackingClassifier\n",
+    "\n",
+    "stacking_clf = StackingClassifier(\n",
+    "    estimators=[\n",
+    "        ('dt', DecisionTreeClassifier(random_state=42)),\n",
+    "        ('gb', GradientBoostingClassifier(random_state=42)),\n",
+    "        ('svc', SVC(probability=True, random_state=42))\n",
+    "    ],\n",
+    "    final_estimator=LogisticRegression(),\n",
+    "    cv=5\n",
+    ")\n",
+    "```\n",
+    "\n",
+    "**要求**:\n",
+    "1. 至少實現 1 種集成方法\n",
+    "2. 比較集成模型與單一模型的性能\n",
+    "3. **分析**: 集成學習是否帶來改善？為什麼？"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d9cf6dd3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 請在此撰寫程式碼\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6dd48e3e",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### 💭 思考題\n",
+    "\n",
+    "請在完成作業後，思考並回答以下問題：\n",
+    "\n",
+    "1. **為什麼分類問題的 y 不需要標準化，但 X 需要？**\n",
+    "\n",
+    "2. **Accuracy 和 F1-Score 有什麼差別？什麼情況下應該優先考慮 F1-Score？**\n",
+    "\n",
+    "3. **如果你是酒廠的品質控制經理，你會選擇 Precision 高的模型還是 Recall 高的模型？為什麼？**\n",
+    "\n",
+    "4. **為什麼 Gradient Boosting 通常比 Decision Tree 表現更好？**\n",
+    "\n",
+    "5. **SVM 的訓練時間比其他模型長很多，在實際應用中有什麼限制？**\n",
+    "\n",
+    "6. **如果測試集的 Accuracy 遠低於訓練集，可能是什麼原因？如何改善？**\n",
+    "\n",
+    "7. **Logistic Regression 是線性模型，但為什麼可以用於分類問題？**\n",
+    "\n",
+    "8. **在這個紅酒品質預測案例中，False Positive 和 False Negative 哪個更嚴重？為什麼？**\n",
+    "\n",
+    "9. **如果未來要預測白酒品質，可以直接使用這個模型嗎？為什麼？**\n",
+    "\n",
+    "10. **除了調整超參數，還有哪些方法可以改善模型性能？**"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8ff72551",
+   "metadata": {},
+   "source": [
+    "**請在此回答思考題**\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c3644f00",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 想對老師說的話"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "82cc6588",
+   "metadata": {},
+   "source": [
+    "\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "name": "python"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

@@ -15,7 +15,7 @@
 
 - **課程名稱**：AI在化工上之應用
 - **課程製作**：逢甲大學 化工系 智慧程序系統工程實驗室
-- **授課教師**：莊曜禎 助理教授  
+- **授課教師**：[莊曜禎 助理教授](https://sites.google.com/thaiche.tw/ipse/)
 - **適合對象**：化工系大三、大四及研究所學生
 - **前置課程**：建議已完成 Python程式設計(大一)、電腦在化工上的應用(大二)課程
 - **課程授權**：[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
@@ -208,7 +208,7 @@
 ## 📂 資料夾結構
 
 ```
-CHE-AI-COURSE/
+ChemE-3590/
 │
 ├── Part_0/                    # Python學習環境設定
 │   ├── README.md
@@ -280,8 +280,8 @@ CHE-AI-COURSE/
 
 ```powershell
 # 複製專案
-git clone https://github.com/fcuycchuang/CHE-AI-COURSE.git
-cd CHE-AI-COURSE
+git clone https://github.com/fcuycchuang/ChemE-3590.git
+cd ChemE-3590
 
 # 建立 Python 3.10 虛擬環境
 conda env create -f Part_0/PY310_environment.yml
