@@ -141,14 +141,16 @@ Google Colab提供了免費的雲端運算資源與GPU加速，適合快速開�
 **內容說明**：
 - Python 3.10 基礎環境
 - **數值運算**：numpy, scipy
-- **資料處理**：pandas
+- **資料處理**：pandas, openpyxl（Excel 支援）
 - **視覺化**：matplotlib, seaborn, kaleido
 - **機器學習**：scikit-learn, imbalanced-learn, mlxtend
-- **進階演算法**：xgboost, lightgbm, catboost
+- **進階演算法**：py-xgboost-gpu（GPU版XGBoost）, lightgbm, catboost
 - **降維與分群**：umap-learn
-- **深度學習**：tensorflow, tensorboard
-- **開發工具**：jupyterlab, notebook, ipykernel
-- **GPU支援**：cudatoolkit, cudnn（選配）
+- **網路分析**：networkx, pydot
+- **深度學習**：tensorflow==2.10.1, tensorboard==2.10.1
+- **TF生態系**：tensorflow-datasets, tensorflow-metadata, protobuf
+- **開發工具**：jupyterlab, notebook, ipykernel, ipywidgets
+- **GPU支援**：cudatoolkit=11.2, cudnn=8.1（已內建於環境）
 
 **使用方式**：
 ```powershell
@@ -699,10 +701,10 @@ gc.collect()
 
 完成環境設定後，您已準備好開始：
 
-- **Part 1 - Unit01**：[AI與機器學習概論](../../Part_1/Unit01/README.md)
-- **Part 1 - Unit02**：[Python程式語言基礎](../../Part_1/Unit02/README.md)
-- **Part 1 - Unit03**：[NumPy與Pandas模組](../../Part_1/Unit03/README.md)
-- **Part 1 - Unit04**：[Matplotlib與Seaborn視覺化](../../Part_1/Unit04/README.md)
+- **Part 1 - Unit01**：[AI與機器學習概論](../Part_1/Unit01/README.md)
+- **Part 1 - Unit02**：[Python程式語言基礎](../Part_1/Unit02/README.md)
+- **Part 1 - Unit03**：[NumPy與Pandas模組](../Part_1/Unit03/README.md)
+- **Part 1 - Unit04**：[Matplotlib與Seaborn視覺化](../Part_1/Unit04/README.md)
 
 **重要提醒**：
 - 每次開始工作前，記得啟動環境：`conda activate PY310`
@@ -736,11 +738,11 @@ gc.collect()
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Part 0 學習環境設定
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-02-26
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

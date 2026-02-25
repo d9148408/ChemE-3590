@@ -322,7 +322,7 @@ exponent = a ** b       # 1000 (次方)
 # 理想氣體方程式： $PV = nRT$
 pressure = 1.0        # atm
 volume = 22.4         # L
-R = 0.0821            # L·atm/(mol·K)
+R = 0.0821            # L*atm/(mol*K)
 temperature = 273.15  # K
 
 moles = (pressure * volume) / (R * temperature)
@@ -718,7 +718,7 @@ def ideal_gas_law(P=None, V=None, n=None, T=None, R=0.0821):
     T : float, optional
         溫度 (K)
     R : float, default=0.0821
-        氣體常數 (L·atm/(mol·K))
+        氣體常數 (L*atm/(mol*K))
     
     Returns:
     --------
@@ -786,7 +786,7 @@ def heat_capacity(T, a, b, c, d=0):
     Returns:
     --------
     float
-        熱容 (J/(mol·K))
+        熱容 (J/(mol*K))
     """
     Cp = a + b*T + c*T**2 + d*T**3
     return Cp
@@ -794,7 +794,7 @@ def heat_capacity(T, a, b, c, d=0):
 # 水的熱容（簡化範例）
 T = 373.15  # K
 Cp = heat_capacity(T, a=75.3, b=0.0, c=0.0)
-print(f"水在 {T} K 的熱容： {Cp:.2f} J/(mol·K)")
+print(f"水在 {T} K 的熱容： {Cp:.2f} J/(mol*K)")
 ```
 
 ### 5.5 Lambda 函式
@@ -910,7 +910,7 @@ def calculate_selectivity(target_product, total_products):
     return target_product / total_products
 
 # 模組級常數
-R_GAS = 8.314  # J/(mol·K)
+R_GAS = 8.314  # J/(mol*K)
 AVOGADRO = 6.022e23  # 1/mol
 ```
 
@@ -927,7 +927,7 @@ print(f"轉化率： {conversion:.2%}")
 from reactor_utils import calculate_conversion, R_GAS
 
 conversion = calculate_conversion(1.0, 0.2)
-print(f"氣體常數： {R_GAS} J/(mol·K)")
+print(f"氣體常數： {R_GAS} J/(mol*K)")
 ```
 
 ---
@@ -973,13 +973,15 @@ else:
     print(f"計算成功： {result}")
 
 # finally：無論是否發生例外都會執行
+file = None
 try:
     file = open("data.txt", "r")
     data = file.read()
 except FileNotFoundError:
     print("檔案不存在")
 finally:
-    file.close()  # 確保檔案被關閉
+    if file:
+        file.close()  # 確保檔案被關閉
 ```
 
 ### 7.3 拋出例外
@@ -1208,7 +1210,7 @@ from scipy.optimize import curve_fit
 
 # Arrhenius 方程式： $k = A \exp(-E_a / RT)$
 def arrhenius(T, A, Ea):
-    R = 8.314  # J/(mol·K)
+    R = 8.314  # J/(mol*K)
     return A * np.exp(-Ea / (R * T))
 
 # 實驗數據
@@ -1281,7 +1283,7 @@ def mccabe_thiele_stages(xF, xD, xB, R, q, alpha):
     
     def operating_line_stripping(x):
         slope = (R + 1) / (R + 1 - q)
-        intercept = (xB - slope * xF)
+        intercept = xB * (1 - slope)  # 確保操作線通過 (xB, xB) 點
         return slope * x + intercept
     
     # 平衡線方程
@@ -1430,7 +1432,7 @@ import numpy as np
 import pandas as pd
 
 # 2. 常數定義
-R_GAS = 8.314  # J/(mol·K)
+R_GAS = 8.314  # J/(mol*K)
 AVOGADRO = 6.022e23
 
 # 3. 函式定義
