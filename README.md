@@ -268,6 +268,28 @@ ChemE-3590/
 - 無需安裝，瀏覽器即可使用
 - 適合快速學習與原型開發
 
+### 課程資料下載
+```python
+# 連結個人Google Drive
+from google.colab import drive
+drive.mount('/content/drive', force_remount=True)
+
+# 複製課程資料
+%cd "/content/drive/MyDrive/Colab Notebooks"
+!git clone https://github.com/d9148408/ChemE-3590.git
+```
+
+### 更新課程資料
+```python
+# 連結個人Google Drive
+from google.colab import drive
+drive.mount('/content/drive', force_remount=True)
+
+# 更新課程資料
+!git fetch origin
+!git reset --hard origin/master
+```
+
 ---
 
 ### 方法二：本地環境設定 (推薦長期學習)
