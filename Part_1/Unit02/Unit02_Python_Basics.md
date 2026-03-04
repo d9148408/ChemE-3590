@@ -27,6 +27,90 @@ Python 是目前資料科學、機器學習與人工智慧領域最受歡迎的�
 
 ## 1. Python 基本語法
 
+### 1.0 print() 函式
+
+`print()` 是 Python 中最常用的輸出函式，用於將資料顯示到畫面上。本課程的範例程式碼大量使用 `print()`，理解其語法能有效提升程式碼閱讀能力。
+
+**基本語法：**
+
+```
+print(value1, value2, ..., sep=' ', end='\n')
+```
+
+| 參數 | 預設值 | 說明 |
+|------|--------|------|
+| `value` | — | 要輸出的值，可同時傳入多個 |
+| `sep` | `' '`（空格）| 多個值之間的分隔符號 |
+| `end` | `'\n'`（換行）| 輸出結尾符號，預設換行 |
+
+#### 1.4.1 基本用法
+
+```python
+# 最基本的輸出
+print("Hello, World!")      # Hello, World!
+
+# 輸出數值與變數
+temperature = 350.0
+print(temperature)           # 350.0
+print(type(temperature))     # <class 'float'>
+
+# 同時輸出多個值（預設以空格分隔）
+print("溫度：", temperature, "°C")   # 溫度：  350.0 °C
+```
+
+#### 1.4.2 sep 與 end 參數
+
+```python
+# sep 參數：指定多個值之間的分隔符號
+print("2026", "03", "04", sep="-")     # 2026-03-04
+print("T", "P", "F", sep=" | ")        # T | P | F
+
+# end 參數：指定輸出結尾（預設為換行 \n）
+print("載入中", end="")
+print(" ... 完成")    # 兩個 print 在同一行：載入中 ... 完成
+
+# 同時使用 sep 和 end
+print("A", "B", "C", sep=",", end=";\n")   # A,B,C;
+```
+
+#### 1.4.3 f-string 格式化輸出
+
+f-string（格式化字串）是本課程最常用的輸出方式，在字串前加上 `f`，用 `{}` 包住變數即可嵌入數值。
+
+```python
+name = "CSTR"
+temp = 375.2
+pressure = 10.5
+
+# 基本 f-string
+print(f"反應器類型：{name}")         # 反應器類型：CSTR
+print(f"溫度：{temp} °C")            # 溫度：375.2 °C
+
+# 在 {} 內使用格式規範 :.Nf 控制小數位數
+print(f"溫度：{temp:.1f} °C")        # 溫度：375.2 °C
+print(f"溫度：{temp:.4f} °C")        # 溫度：375.2000 °C
+
+# :.2% 輸出百分比
+conversion = 0.857
+print(f"轉化率：{conversion:.2%}")   # 轉化率：85.70%
+
+# :>10.2f 指定欄寬與對齊（右對齊）
+print(f"溫度：{temp:>10.2f} °C")     # 溫度：    375.20 °C
+```
+
+#### 1.4.4 常見格式規範速查
+
+| 格式符 | 範例 | 輸出 | 說明 |
+|--------|------|------|------|
+| `:.2f` | `f"{3.14159:.2f}"` | `3.14` | 固定 2 位小數 |
+| `:.4f` | `f"{1.5:.4f}"` | `1.5000` | 固定 4 位小數 |
+| `:.2e` | `f"{12345.6:.2e}"` | `1.23e+04` | 科學記號 |
+| `:.2%` | `f"{0.856:.2%}"` | `85.60%` | 百分比 |
+| `:d` | `f"{42:d}"` | `42` | 整數 |
+| `:>8.2f` | `f"{3.14:>8.2f}"` | `    3.14` | 右對齊，欄寬 8 |
+| `:<8.2f` | `f"{3.14:<8.2f}"` | `3.14    ` | 左對齊，欄寬 8 |
+
+
 ### 1.1 註解 (Comments)
 
 註解是程式碼中不會被執行的文字，用於說明程式碼的功能。良好的註解習慣能讓您和其他人更容易理解程式碼。
@@ -319,7 +403,7 @@ modulus = a % b         # 1  (取餘數)
 exponent = a ** b       # 1000 (次方)
 
 # 化工應用範例
-# 理想氣體方程式： $PV = nRT$
+# 理想氣體方程式： PV = nRT
 pressure = 1.0        # atm
 volume = 22.4         # L
 R = 0.0821            # L*atm/(mol*K)
@@ -533,6 +617,8 @@ while count < 5:
     count += 1
 
 # 化工應用：批次反應器模擬
+import math
+
 time = 0.0        # 時間 (小時)
 concentration = 1.0  # 濃度 (mol/L)
 k = 0.1           # 反應速率常數 (1/hr)
@@ -544,7 +630,7 @@ while concentration > 0.1:
     print(f"{time:6.1f}    {concentration:8.4f}")
     # 一階反應動力學： $C(t) = C_0 \exp(-kt)$
     time += 0.5
-    concentration = 1.0 * (2.71828 ** (-k * time))
+    concentration = 1.0 * math.exp(-k * time)
 
 print(f"{time:6.1f}    {concentration:8.4f}")
 print(f"\n反應達到目標濃度所需時間： {time:.1f} 小時")
@@ -980,7 +1066,7 @@ try:
 except FileNotFoundError:
     print("檔案不存在")
 finally:
-    if file:
+    if file is not None:
         file.close()  # 確保檔案被關閉
 ```
 
@@ -1283,7 +1369,7 @@ def mccabe_thiele_stages(xF, xD, xB, R, q, alpha):
     
     def operating_line_stripping(x):
         slope = (R + 1) / (R + 1 - q)
-        intercept = xB * (1 - slope)  # 確保操作線通過 (xB, xB) 點
+        intercept = (xB - slope * xF)
         return slope * x + intercept
     
     # 平衡線方程
@@ -1466,7 +1552,7 @@ if __name__ == "__main__":
 
 在本單元中，我們學習了 Python 程式語言的核心概念：
 
-1. **基本語法**：註解、縮排、程式碼執行順序
+1. **基本語法**：列印、註解、縮排、程式碼執行順序
 2. **變數與資料型態**：數值、字串、布林值、串列、元組、字典、集合
 3. **運算子**：算術、比較、邏輯、賦值運算子
 4. **控制流程**：條件語句（if-elif-else）、迴圈（for、while）
@@ -1543,11 +1629,11 @@ Python 在化工領域有廣泛的應用前景：
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：電腦在化工上之應用
 - 課程單元：Unit 02 Python 程式語言基礎
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-02-23
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
