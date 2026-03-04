@@ -275,7 +275,7 @@ from google.colab import drive
 drive.mount('/content/drive', force_remount=True)
 
 # 複製課程資料
-%cd "/content/drive/MyDrive/Colab Notebooks"
+%cd "/content/drive/My Drive/Colab Notebooks"
 !git clone https://github.com/d9148408/ChemE-3590.git
 ```
 
