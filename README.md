@@ -290,6 +290,7 @@ drive.mount('/content/drive', force_remount=True)
 !git fetch origin
 !git reset --hard origin/main
 ```
+更新課程資料程式運行完畢請稍等幾分鐘，確保你的雲端資料都已經更新完成。
 
 ---
 
