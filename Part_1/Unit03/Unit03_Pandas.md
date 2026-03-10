@@ -454,11 +454,11 @@ print(data_with_nan.fillna(0))
 print()
 
 print("用前一個值填補（forward fill）：")
-print(data_with_nan.fillna(method='ffill'))
+print(data_with_nan.ffill())
 print()
 
 print("用後一個值填補（backward fill）：")
-print(data_with_nan.fillna(method='bfill'))
+print(data_with_nan.bfill())
 print()
 
 print("用平均值填補：")
@@ -554,7 +554,7 @@ print(df_str[df_str['Name'].str.contains('reactor', case=False)])
 print()
 
 # 字串取代
-df_str['Name_replaced'] = df_str['Name'].str.replace('reactor', 'Tank', case=False)
+df_str['Name_replaced'] = df_str['Name'].str.replace('reactor', 'Tank', case=False, regex=True)
 print("取代後：")
 print(df_str[['Name', 'Name_replaced']])
 ```
@@ -569,7 +569,6 @@ print(df_str[['Name', 'Name_replaced']])
 
 ```python
 import pandas as pd
-from datetime import datetime, timedelta
 
 # 建立單一日期時間
 dt1 = pd.Timestamp('2024-01-01 10:30:00')
@@ -580,7 +579,7 @@ print()
 date_range = pd.date_range(
     start='2024-01-01',
     end='2024-01-10',
-    freq='D'  # 'D'=日, 'h'=小時, 'min'=分鐘, 'S'=秒
+    freq='D'  # 'D'=日, 'h'=小時, 'min'=分鐘, 's'=秒
 )
 print("日期範圍（每日）：")
 print(date_range)
@@ -664,7 +663,7 @@ hourly_data = pd.DataFrame({
     'Value': [10, 20, 30, 40, 50]
 }).set_index('Time')
 
-minute_interp = hourly_data.resample('30min').interpolate(method='linear')
+minute_interp = hourly_data.resample('30min').asfreq().interpolate(method='linear')
 print("線性插值至 30 分鐘：")
 print(minute_interp)
 ```
@@ -948,7 +947,7 @@ reactor_long = pd.melt(
     var_name='Reactor',
     value_name='Conversion'
 )
-reactor_long['Reactor'] = reactor_long['Reactor'].str.replace('_Conv', '')
+reactor_long['Reactor'] = reactor_long['Reactor'].str.replace('_Conv', '', regex=False)
 
 print("長格式數據：")
 print(reactor_long.head())
@@ -1082,7 +1081,7 @@ df_clean = df.dropna()  # 回傳新 DataFrame
 - 課程單元：Unit03 Pandas資料處理與分析
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-03-06
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

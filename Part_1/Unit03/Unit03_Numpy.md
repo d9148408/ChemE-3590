@@ -1,4 +1,4 @@
-# Unit03 Numpy 數值計算基礎
+# Unit03 NumPy 數值計算基礎
 
 ## 課程簡介
 
@@ -127,10 +127,10 @@ full_array = np.full((3, 3), 7.5)
 print(full_array)
 ```
 
-**等差數列與等比數列**
+**等差數列、均勻數列與等比數列**
 
 ```python
-# np.arange：類似 Python 的 range
+# np.arange：類似 Python 的 range，產生等差數列
 # arange(start, stop, step)
 arr_range = np.arange(0, 10, 2)
 print(arr_range)  # [0 2 4 6 8]
@@ -139,6 +139,11 @@ print(arr_range)  # [0 2 4 6 8]
 # linspace(start, stop, num)
 arr_linspace = np.linspace(0, 1, 5)
 print(arr_linspace)  # [0.   0.25 0.5  0.75 1.  ]
+
+# np.logspace：在對數尺度上產生等比數列
+# logspace(start, stop, num)，start 與 stop 為 10 的指數
+arr_logspace = np.logspace(0, 3, 4)  # 10^0 到 10^3，4 個點
+print(arr_logspace)  # [   1.   10.  100. 1000.]
 
 # 化工應用：建立溫度範圍
 temperature = np.linspace(25, 100, 11)  # 25°C 到 100°C，11個點
@@ -233,8 +238,8 @@ print(arr_2d[0:2, 1:3])  # [[2 3]
 
 # 化工應用：提取製程數據的特定時段與變數
 # 假設 arr_2d 每列代表一個時間點，每欄代表一個變數
-time_slice = arr_2d[5:10, :]    # 第 5-9 個時間點的所有變數
-variable_2_and_3 = arr_2d[:, 1:3]  # 所有時間點的變數 2 和 3
+time_slice = arr_2d[0:2, :]       # 第 0-1 個時間點的所有變數
+variable_2_and_3 = arr_2d[:, 1:3] # 所有時間點的變數 2 和 3
 ```
 
 ### 3.3 布林索引
@@ -302,7 +307,7 @@ arr2 = np.array([5, 6, 7, 8])
 print(arr1 + arr2)  # [ 6  8 10 12]
 print(arr1 - arr2)  # [-4 -4 -4 -4]
 print(arr1 * arr2)  # [ 5 12 21 32]
-print(arr1 / arr2)  # [0.2   0.333 0.428 0.5]
+print(arr1 / arr2)  # [0.2    0.3333 0.4286 0.5   ]
 print(arr1 ** 2)    # [ 1  4  9 16]
 
 # 與純量運算
@@ -359,7 +364,7 @@ print(np.cos(angles))
 # k = A * exp(-Ea / (R * T))
 A = 1e10              # 頻率因子
 Ea = 50000            # 活化能 (J/mol)
-R = 8.314             # 氣體常數 (J/mol·K)
+R = 8.314             # 氣體常數 (J/mol/K)
 T = np.array([300, 350, 400, 450, 500])  # 溫度 (K)
 
 k = A * np.exp(-Ea / (R * T))
@@ -498,7 +503,7 @@ print(f"標準差: {data.std()}")        # 2.872
 # 最大值、最小值與範圍
 print(f"最大值: {data.max()}")        # 10
 print(f"最小值: {data.min()}")        # 1
-print(f"範圍: {data.ptp()}")          # peak to peak = 9
+print(f"範圍: {data.max() - data.min()}")  # peak to peak = 9
 
 # 最大值與最小值的索引位置
 print(f"最大值索引: {data.argmax()}") # 9
@@ -738,7 +743,7 @@ ln_C0 = ln_C[0]
 k = -np.sum(time * ln_C) / np.sum(time ** 2)
 
 print(f"反應速率常數 k: {k:.6f} min⁻¹")
-print(f"半生期 $t_{{1/2}}$ : {np.log(2) / k:.2f} min")
+print(f"半衰期 t(1/2): {np.log(2) / k:.2f} min")
 
 # 計算預測值與誤差
 ln_C_pred = ln_C0 - k * time
@@ -879,11 +884,14 @@ print(f"Float64 記憶體: {sensor_data_64.nbytes / 1024:.2f} KB")
 ```python
 # 錯誤範例
 try:
-    A = np.array([[1, 2, 3]])  # shape: (1, 3)
-    B = np.array([[1], [2]])   # shape: (2, 1)
+    A = np.array([[1, 2, 3],   # shape: (2, 3)
+                  [4, 5, 6]])
+    B = np.array([[1, 2],      # shape: (2, 2)
+                  [3, 4]])
     result = A + B
 except ValueError as e:
     print(f"錯誤: {e}")
+    # operands could not be broadcast together with shapes (2,3) (2,2)
 
 # 正確做法：確保形狀相容
 A = np.array([[1, 2, 3]])  # (1, 3)
@@ -895,17 +903,16 @@ print(result)
 ### 11.2 整數除法陷阱
 
 ```python
-# Python 3 中已解決，但仍需注意 NumPy 行為
+# Python 2 中整數除法會截斷小數（Python 3 已改善）
 arr_int = np.array([1, 2, 3], dtype=int)
 
-# 整數陣列除法會截斷小數部分
-result_int = arr_int / 2
-print(result_int)  # [0.5 1.  1.5]（自動轉為 float）
+# NumPy 整數陣列使用 / 除法，結果自動轉為浮點數（不截斷）
+result_div = arr_int / 2
+print(result_div)  # [0.5 1.  1.5]（自動轉為 float）
 
-# 確保使用浮點數運算
-arr_float = arr_int.astype(float)
-result_float = arr_float / 2
-print(result_float)
+# 注意：使用 // 整除運算子才會截斷小數（這才是真正的陷阱）
+result_floor = arr_int // 2
+print(result_floor)  # [0 1 1]（截斷小數，可能造成計算錯誤）
 ```
 
 ### 11.3 複製 vs 視圖
@@ -971,7 +978,7 @@ print(original)  # [1 2 3 4 5]（原陣列未變）
 ### 基礎練習
 
 1. 建立一個 5×5 的隨機矩陣，並計算其平均值、標準差與最大值
-2. 使用 `linspace` 建立 0 到 2π 的 100 個點，計算 sin 與 cos 值
+2. 使用 `linspace` 建立 0 到 $2\pi$ 的 100 個點，計算 sin 與 cos 值
 3. 建立一個 4×4 矩陣，提取其對角線元素
 
 ### 進階練習
@@ -999,7 +1006,7 @@ print(original)  # [1 2 3 4 5]（原陣列未變）
 - 課程單元：Unit03 NumPy 數值計算基礎
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-03-06
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
