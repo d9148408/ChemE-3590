@@ -145,7 +145,7 @@ Seaborn 的圖表可以分為以下幾大類：
 
 ## 4. 分佈圖 (Distribution Plots)
 
-分佈圖用於探索單變數或多變數的數據分佈特性。
+本章介紹直方圖與 KDE 圖（Seaborn 分佈圖）以及箱型圖與小提琴圖。需注意：`boxplot()` 與 `violinplot()` 在 Seaborn 官方 API 中歸屬於**類別圖 (Categorical Plots)**（見第 3.3 節），但因這兩種圖表非常適合呈現與比較各組數據的分佈形狀，教學上通常與直方圖、KDE 圖一併介紹。
 
 ### 4.1 直方圖 (Histogram)
 
@@ -205,6 +205,28 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![產品純度分佈比較](outputs/P1_Unit04_Seaborn/figs/histogram_purity.png)
+
+**討論與分析：**
+
+| 批次 | 平均純度 | 標準差 | 規格通過率 (≥98%) |
+|------|---------|--------|-----------------|
+| Batch 1 | 98.434% | 0.751% | 111/150 (74.0%) |
+| Batch 2 | 97.885% | 1.222% | 74/150 (49.3%) |
+
+- **Batch 1** 的平均純度 (98.434%) 高於規格下限 (98.0%)，標準差較小 (0.751%)，分佈集中，74.0% 的樣本符合規格。
+- **Batch 2** 的平均純度 (97.885%) 略低於規格下限，且標準差較大 (1.222%)，代表批次控制穩定性較差，僅 49.3% 的樣本符合規格。
+- KDE 曲線清楚呈現 Batch 1 的分佈較窄（製程穩定），Batch 2 的分佈較寬且中心偏低，兩者的規格通過率差異相差 24.7 個百分點。
+- **改善建議**：針對 Batch 2，應檢查原料品質、操作溫度控制及純化步驟，以提升批次一致性。
+
+---
 
 ### 4.2 核密度估計圖 (KDE Plot)
 
@@ -291,8 +313,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 模擬四個反應器的產率數據
-np.random.seed(42)
+# 模擬四個反應器的產率數據（延續 Notebook 的全域種子設定）
 n_samples = 30
 
 data = pd.DataFrame({
@@ -317,6 +338,30 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![反應器批次產率比較](outputs/P1_Unit04_Seaborn/figs/boxplot_reactors.png)
+
+**討論與分析：**
+
+| 反應器 | 平均產率 | 標準差 | 達到目標 (≥85%) 比例 |
+|--------|---------|--------|---------------------|
+| R1 | 85.85% | 2.33% | 19/30 (63.3%) |
+| R2 | 87.17% | 2.69% | 23/30 (76.7%) |
+| R3 | 83.14% | 4.96% | 9/30 (30.0%) |
+| R4 | 90.07% | 2.51% | 30/30 (100.0%) |
+
+- **R4** 表現最佳，平均產率達 90.07%，標準差僅 2.51%，所有樣本均達目標，代表製程高度穩定且高效。
+- **R2** 次之，平均 87.17%，76.7% 的批次達標，但變異度略高於 R4，顯示仍有進一步穩定化空間。
+- **R1** 的平均產率 85.85% 剛超過目標值 85%，63.3% 的批次達標；整體偏移不大，但中位數接近目標線，存在下偏風險。
+- **R3** 的平均產率 83.14% 低於目標，僅 30.0% 的批次達標，且標準差最大 (4.96%)，製程波動最為明顯，需要優先改善。
+- 箱型圖的鬚線長度和蜂群點的分散程度直觀呈現各反應器的離散度；R3 的箱體最寬、散點最分散，而 R4 的分佈最集中。
+- **建議**：可參考 R4 的操作條件，優先對 R3 進行根本原因分析，並同步提升 R1 的平均產率水準。
 
 ### 4.4 小提琴圖 (Violin Plot)
 
@@ -349,8 +394,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 模擬不同溫度條件下的產品品質數據
-np.random.seed(42)
+# 模擬不同溫度條件下的產品品質數據（延續 Notebook 的全域種子設定）
 n = 100
 
 data = pd.DataFrame({
@@ -372,6 +416,28 @@ plt.ylabel('Quality Score', fontsize=12)
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![產品品質小提琴圖](outputs/P1_Unit04_Seaborn/figs/violinplot_quality.png)
+
+**討論與分析：**
+
+| 操作溫度 | 平均品質分數 | 標準差 |
+|---------|------------|--------|
+| Low | 74.47 | 8.42 |
+| Medium | 84.81 | 4.94 |
+| High | 79.49 | 10.50 |
+
+- **Medium 溫度**條件下的產品品質最高（均值 84.81），且標準差最小（4.94），小提琴圖呈現較集中且對稱的形狀，代表製程在此溫度下最穩定。
+- **High 溫度**的均值（79.49）高於 Low 但低於 Medium，且標準差最大（10.50），小提琴圖最寬，代表品質波動最大，可能出現過反應或副產物形成。
+- **Low 溫度**品質最差（均值 74.47），可能因反應不完全導致轉化率低。
+- 小提琴圖中的四分位線（inner='quartile'）清楚顯示各溫度條件下的 Q1、Q2（中位數）、Q3，可快速比較分佈的對稱性與偏態。
+- **建議**：操作溫度應優先選用 Medium 條件，以獲得品質最高且最穩定的產品。
 
 ---
 
@@ -437,7 +503,7 @@ n = 20
 
 data = pd.DataFrame({
     'Catalyst': ['Cat-A']*60 + ['Cat-B']*60 + ['Cat-C']*60,
-    'Temperature': ['Low', 'Medium', 'High']*60,
+    'Temperature': (['Low']*n + ['Medium']*n + ['High']*n) * 3,
     'Conversion (%)': np.concatenate([
         # Cat-A
         np.random.normal(70, 3, n), np.random.normal(85, 3, n), np.random.normal(78, 4, n),
@@ -542,7 +608,7 @@ plt.show()
 
 ## 6. 關係圖 (Relational Plots)
 
-關係圖用於探索兩個或多個連續變數之間的關係。
+本章介紹散佈圖與折線圖（Seaborn 關係圖）以及回歸圖。需注意：`regplot()` 在 Seaborn 官方 API 中歸屬於**回歸圖 (Regression Plots)**（見第 3.4 節），但因回歸圖與散佈圖在探索變數間關係上的目的高度相似，教學上通常一併介紹。
 
 ### 6.1 散佈圖 (Scatter Plot)
 
@@ -580,6 +646,22 @@ plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![製程參數關係散佈圖](outputs/P1_Unit04_Seaborn/figs/scatterplot_parameters.png)
+
+**討論與分析：**
+
+- 散佈圖同時呈現四個維度的資訊：**溫度** (橫軸)、**產率** (縱軸)、**催化劑 A/B/C** (顏色) 和**壓力** (點的大小)。
+- 此類多維散佈圖可用於觀察：在相同溫度下，不同催化劑類型是否對產率呈現系統性差異，進而評估催化劑配方的影響程度。
+- 點的大小代表壓力大小，可藉此檢視高壓力樣本的產率分佈，評估壓力是否為顯著的影響因子。
+- 該圖表是探索性分析 (EDA) 的高效工具，可快速識別多個影響因素之間的交互作用。
+- **建議**：若實際數據中發現特定催化劑（如催化劑 C）的產率明顯劣於其他組，應進一步分析其配方並尋找改善方向。
 
 **參數說明：**
 - `hue`：用顏色區分類別
@@ -665,8 +747,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 模擬濃度與反應速率數據
-np.random.seed(42)
+# 模擬濃度與反應速率數據（延續 Notebook 的全域種子設定）
 concentration = np.linspace(0.1, 2.0, 50)
 rate = 5 * concentration + np.random.normal(0, 0.5, 50)
 
@@ -687,6 +768,28 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![濃度與反應速率回歸圖](outputs/P1_Unit04_Seaborn/figs/regplot_concentration.png)
+
+**討論與分析：**
+
+| 回歸參數 | 數值 |
+|---------|------|
+| 斜率 (slope) | $4.9241\ \mathrm{min}^{-1}$ |
+| 截距 (intercept) | 0.1895 mol/L/min |
+| 決定係數 $R^2$ | **0.9667** |
+
+- $R^2 = 0.9667$ 表示濃度可解釋反應速率 96.67% 的變異，線性關係就此實驗而言非常顯著。
+- 回歸方程式： $\mathrm{Rate} = 4.924 \times \mathrm{Concentration} + 0.190$ 與理論一階反應動力學 $r = k[A]$ 大致一致，估計速率常數 $k \approx 4.924\ \mathrm{min}^{-1}$ 。
+- 散點分佈隨機均勻分佈在回歸線兩側，無明顯殘差趨勢，模型適配良好。
+- 陰影區域代表 95% 信賴區間，可為實驗設計提供不確定性評估。
+- **建議**：可進一步進行非線性擬合（如 Michaelis-Menten 動力學），以評估是否存在飽和效應。
 
 ---
 
@@ -737,8 +840,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 模擬製程數據
-np.random.seed(42)
+# 模擬製程數據（延續 Notebook 的全域種子設定）
 n = 100
 
 data = pd.DataFrame({
@@ -769,6 +871,32 @@ plt.title('Process Parameters Correlation Matrix', fontsize=14, fontweight='bold
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![製程參數相關性熱力圖](outputs/P1_Unit04_Seaborn/figs/heatmap_correlation.png)
+
+**討論與分析：**
+
+相關係數矩陣（以產率 Yield (%) 為目標變數）：
+
+| 變數 | 與產率之相關係數 |
+|------|--------------|
+| Temperature (°C) | **+0.63** |
+| Pressure (bar) | +0.16 |
+| Flow Rate (L/min) | +0.13 |
+| Catalyst Conc (%) | +0.11 |
+| Residence Time (min) | +0.06 |
+
+- **溫度**是影響產率最強的單一因子（ $r = +0.63$ ），正相關顯示提高溫度有助於提升產率，這與大多數動力學活化能理論一致。
+- **壓力**（ $r = +0.16$ ）與**催化劑濃度**（ $r = +0.11$ ）雖已納入產率公式（係數分別為 0.2 與 0.15），但其數值範圍（壓力 1–5 bar、催化劑 0.5–2%）遠小於溫度（60–100°C），對產率方差的實際貢獻量較小，故相關係數偏低；**流量**（ $r = +0.13$ ）未納入此產率模型，其弱相關主要來自有限樣本下的隨機波動。
+- **滯留時間**（Residence Time） $r = +0.06$ 亦未納入此產率模型，與產率的關聯最弱，接近零相關，不宜過度解讀。
+- coolwarm 色彩方案（正值紅色、負值藍色）直觀呈現相關方向，中心 = 0 的設定確保顏色對稱；本例所有非對角元素均呈弱相關，顯示各製程變數的獨立性良好。
+- **建議**：可進一步進行多元回歸分析，量化各製程變數對產率的獨立貢獻量，並探索是否存在交互作用效應。
 
 ### 7.3 遮罩三角熱力圖
 
@@ -879,16 +1007,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 模擬反應條件數據
-np.random.seed(42)
-n = 150
+# 模擬反應條件數據（延續 Notebook 的全域種子設定）
+n = 100
+quality_order = ['Low', 'Medium', 'High']
 
 data = pd.DataFrame({
     'Temperature': np.random.uniform(60, 100, n),
     'Pressure': np.random.uniform(1, 5, n),
     'Catalyst': np.random.uniform(0.5, 2, n),
-    'Yield': np.random.uniform(70, 95, n),
-    'Quality': np.random.choice(['Low', 'Medium', 'High'], n)
 })
 
 # 加入變數間的關聯
@@ -897,8 +1023,11 @@ data['Yield'] = (0.4 * data['Temperature'] +
                  10 * data['Catalyst'] + 
                  np.random.normal(0, 5, n))
 
+# 品質分類（以三分位數為基準，確保每類均有足夠資料且與 Yield 有意義的對應關係）
+data['Quality'] = pd.qcut(data['Yield'], q=3, labels=quality_order)
+
 # 繪製配對圖
-sns.pairplot(data, hue='Quality', palette='viridis',
+sns.pairplot(data, hue='Quality', hue_order=quality_order, palette='viridis',
              diag_kind='kde', plot_kws={'alpha':0.5, 's':30},
              corner=True)
 
@@ -906,6 +1035,28 @@ plt.suptitle('Process Parameters Pair Plot', fontsize=14, fontweight='bold', y=1
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 圖表已儲存
+```
+
+![反應條件多參數配對圖](outputs/P1_Unit04_Seaborn/figs/pairplot_parameters.png)
+
+**討論與分析：**
+
+| 品質等級 | 平均產率 | 樣本數 |
+|---------|---------|--------|
+| Low | 48.64 | 34 |
+| Medium | 59.97 | 33 |
+| High | 71.12 | 33 |
+
+- 配對圖（下三角）一次呈現 **Temperature、Pressure、Catalyst、Yield** 四個變數兩兩之間的散佈關係，對角線則顯示各自的 KDE 分佈。
+- **Yield vs Temperature** 散佈圖呈現明顯正斜率，再次確認溫度是影響產率的主要因子（模型方程式中溫度係數為 +0.4）。
+- **Yield vs Catalyst** 散佈圖顯示正相關，與設計方程式一致（催化劑係數為 +10）。
+- 三種品質等級 (Low / Medium / High) 以 `pd.qcut()` 依產率三分位數決定，樣本數各約 33–34 筆，呈均衡分配。從配對圖中可觀察到 High 組（高產率）在 Yield 軸上集中於較高區域，Low 組則集中於較低區域，對角線 KDE 曲線亦呈現明顯的三組分離，印證品質分類具有統計意義。
+- **建議**：搭配 `corner=True` 避免上三角重複，節省視覺空間；若需要雙向檢視，可設定 `corner=False`。
 
 **參數說明：**
 - `hue`：用顏色區分類別
@@ -1200,10 +1351,13 @@ data['Yield (%)'] = (0.5 * data['Temperature (°C)'] +
                      0.3 * data['Residence_Time (min)'] + 
                      np.random.normal(0, 5, n))
 
-# 品質分類
-data['Quality'] = pd.cut(data['Yield (%)'], 
-                         bins=[0, 75, 85, 100], 
-                         labels=['Low', 'Medium', 'High'])
+# 品質分類（以三分位數為基準，確保每類均有足夠資料）
+data['Quality'] = pd.qcut(data['Yield (%)'], q=3, labels=['Low', 'Medium', 'High'])
+
+# 品質順序與顏色設定
+quality_order = ['Low', 'Medium', 'High']
+reactor_order = ['R1', 'R2', 'R3']
+quality_palette = {'Low': '#e05c5c', 'Medium': '#4a90d9', 'High': '#4caf50'}
 
 # 建立綜合分析圖表
 fig = plt.figure(figsize=(18, 12))
@@ -1217,16 +1371,20 @@ ax1.set_title('Yield Distribution', fontsize=12, fontweight='bold')
 # 2. 不同反應器的產率比較
 ax2 = plt.subplot(2, 3, 2)
 sns.boxplot(data=data, x='Reactor', y='Yield (%)', 
-            palette='Set2', ax=ax2)
+            hue='Reactor', palette='Set2', legend=False, ax=ax2,
+            order=reactor_order)
 sns.swarmplot(data=data, x='Reactor', y='Yield (%)', 
-              color='black', alpha=0.3, size=3, ax=ax2)
+              color='black', alpha=0.3, size=3, ax=ax2,
+              order=reactor_order)
 ax2.set_title('Yield by Reactor', fontsize=12, fontweight='bold')
 
 # 3. 溫度與產率關係
 ax3 = plt.subplot(2, 3, 3)
 sns.scatterplot(data=data, x='Temperature (°C)', y='Yield (%)', 
-                hue='Quality', palette='RdYlGn', s=60, alpha=0.7, ax=ax3)
+                hue='Quality', hue_order=quality_order,
+                palette=quality_palette, s=60, alpha=0.7, ax=ax3)
 ax3.set_title('Temperature vs Yield', fontsize=12, fontweight='bold')
+ax3.legend(title='Quality', loc='upper left')
 
 # 4. 相關性矩陣
 ax4 = plt.subplot(2, 3, 4)
@@ -1239,16 +1397,15 @@ ax4.set_title('Correlation Matrix', fontsize=12, fontweight='bold')
 
 # 5. 多參數點圖
 ax5 = plt.subplot(2, 3, 5)
-quality_order = ['Low', 'Medium', 'High']
 sns.pointplot(data=data, x='Quality', y='Yield (%)', hue='Reactor',
               palette='Set1', markers=['o', 's', '^'], ax=ax5,
-              order=quality_order)
+              order=quality_order, hue_order=reactor_order)
 ax5.set_title('Yield by Quality and Reactor', fontsize=12, fontweight='bold')
 
 # 6. 小提琴圖
 ax6 = plt.subplot(2, 3, 6)
-sns.violinplot(data=data, x='Quality', y='Yield (%)', 
-               palette='muted', inner='quartile', ax=ax6,
+sns.violinplot(data=data, x='Quality', y='Yield (%)', hue='Quality',
+               palette='muted', inner='quartile', legend=False, ax=ax6,
                order=quality_order)
 ax6.set_title('Yield Distribution by Quality', fontsize=12, fontweight='bold')
 
@@ -1257,6 +1414,53 @@ plt.suptitle('Process Optimization: Comprehensive Data Analysis',
 plt.tight_layout()
 plt.show()
 ```
+
+**執行結果：**
+
+```
+✓ 綜合分析圖表已儲存
+```
+
+![製程優化綜合分析](outputs/P1_Unit04_Seaborn/figs/comprehensive_analysis.png)
+
+**討論與分析：**
+
+本綜合分析圖表包含 6 個子圖，完整呈現 200 筆製程批次數據的多面向分析：
+
+**① Yield Distribution（左上）**
+
+產率分佈直方圖顯示整體產率介於 71.34% ～ 113.17%，均值為 90.84%，標準差 8.86%，大致呈常態分佈。右尾延伸較明顯，表示部分批次在高效操作條件下可達到超過 100% 的模擬產率值。
+
+**② Yield by Reactor（中上）**
+
+| 反應器 | 平均產率 | 標準差 | 批次數 |
+|--------|---------|--------|--------|
+| R1 | 91.62% | 8.31% | 65 |
+| R2 | 90.59% | 8.73% | 64 |
+| R3 | 90.36% | 9.51% | 71 |
+
+三台反應器的產率均值相近（差距約 1.3%），R3 批次數最多但均值最低，R2 批次數最少，R1 均值最高。箱型圖疊加蜂群圖顯示三台反應器的分佈高度重疊，代表反應器型號並非主導產率差異的關鍵因子。
+
+**③ Temperature vs Yield（右上）**
+
+散佈圖以 Low/Medium/High 品質等級著色（品質等級由 `pd.qcut` 依產率三分位數決定），High 組樣本呈現於高產率區域，Low 組集中於低產率區域，顏色分層清晰；點雲仍有明顯垂直散布，代表壓力、催化劑與停留時間也同時影響結果。
+
+**④ Correlation Matrix（左下）**
+
+製程參數相關性矩陣顯示 **Pressure (bar)** 與 Yield (%) 呈最強正相關（ $r=+0.53$ ），其次為 **Temperature (°C)** ( $r=+0.36$ ) 與 **Catalyst (%)** ( $r=+0.35$ )；Residence_Time (min) 亦有正相關（ $r=+0.24$ ）。各操作因子相互間的相關係數整體不高，表示這組模擬資料保有良好的獨立性。
+
+**⑤ Yield by Quality and Reactor（中下）**
+
+點圖 (pointplot) 顯示三台反應器在不同品質等級下皆呈現 Low < Medium < High 的一致趨勢，且三台反應器的符號線段高度重合，代表品質等級（產率三分位數）是主要的分層因子，反應器類型對均值無系統性差異。
+
+**⑥ Yield Distribution by Quality（右下）**
+
+小提琴圖顯示三個品質等級的產率分佈形狀：Low 組 (81.01 ± 3.39%)、Medium 組 (90.66 ± 2.62%)、High 組 (100.85 ± 4.30%)，各組各約 67、66、67 筆，分佈均勻。Medium 組的標準差最小，分佈最集中，而 High 組雖均值最高但其標準差大於 Low 組，顯示高產率區間仍具一定操作變異。
+
+**總結建議：**
+1. 優先控制壓力與催化劑濃度（溫度亦相近），關鍵製程變數與產率的相關係數為 Pressure $r=+0.53$ 、Temperature $r=+0.36$ 、Catalyst $r=+0.35$ ，可作為品質管制的優先監控項目
+2. 三台反應器表現接近，可依產能需求調度；應持續監控各反應器的波動幅度是否出現下降趨勢
+3. 品質分級採用 `pd.qcut()` 可確保各等級樣本數均衡，適合教學展示；實際工程應用中應依物性規格設定固定閾值
 
 ---
 
@@ -1323,11 +1527,11 @@ plt.show()
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
-- 課程單元：Unit04 - Seaborn 統計視覺化工具
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
+- 課程單元：Unit04 - Seaborn 統計資料視覺化
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-03-11
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

@@ -91,6 +91,12 @@ plt.plot(x, y)
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Simple Line Plot](./outputs/P1_Unit04_Matplotlib/figs/plot_01_simple_line.png)
+
+> **說明：** 這是 Matplotlib 最精簡的繪圖示範。以 `plt.plot(x, y)` 搭配 `plt.show()` 即可產生一張折線圖，不需要任何額外設定。圖中呈現 X 軸（1–5）與 Y 軸（2–10）之間的線性遞增關係（斜率 = 2），所有樣式均使用預設值（藍色實線）。這是學習 Matplotlib 的最小可用範例，後續章節將逐步加入標題、標籤、圖例等元素，使圖表更專業完整。
+
 ### 3.2 完整的繪圖流程
 
 ```python
@@ -102,7 +108,7 @@ x = np.linspace(0, 10, 100)
 y = np.sin(x)
 
 # 2. 建立圖表
-plt.figure(figsize=(8, 5))
+plt.figure(figsize=(10, 6))
 
 # 3. 繪製數據
 plt.plot(x, y, label='sin(x)', color='blue', linewidth=2)
@@ -120,6 +126,12 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Sine Wave Function](./outputs/P1_Unit04_Matplotlib/figs/plot_02_sine_wave.png)
+
+> **說明：** 此圖示範完整的六步驟繪圖流程。圖中繪製正弦函數 $y = \sin(x)$ ，X 軸範圍 0 至 10（使用 `np.linspace` 產生 100 個等間距點）。可觀察到：(1) 標題 `Sine Wave Function` 以粗體顯示於頂端；(2) X/Y 軸標籤清楚標示（英文）；(3) 圖例位於右上方；(4) 虛線網格輔助讀取數值；(5) 線條以藍色寬度 2 呈現，整體美觀度明顯優於 3.1 的最簡範例。此六步驟流程是所有後續 Matplotlib 繪圖的標準框架。
 
 **重要提醒：** 根據專案規範，所有圖表的標題、軸標籤必須使用英文，以確保相容性與清晰度。
 
@@ -153,6 +165,12 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Temperature Variation Over 24 Hours](./outputs/P1_Unit04_Matplotlib/figs/plot_03_temp_24h.png)
+
+> **說明：** 此圖展示 24 小時溫度變化趨勢。溫度以一日（24 小時）的正弦週期循環，最高值為 30°C、最低值為 20°C，日平均 25°C。圖中重點示範多種折線圖樣式自訂能力：`color='red'` 設定紅色線條、`linewidth=2` 加寬線條、`linestyle='-'` 指定實線、`marker='o'` 在每個數據點添加圓點標記、`markersize=3` 設定標記大小。X 軸標籤為 `Time (hours)`，Y 軸標籤為 `Temperature (°C)`，均使用英文。此類折線圖適用於化工製程中感測器數據的時序視覺化。
+
 **線條樣式參數：**
 - `color`：顏色（'red', 'blue', '#FF5733' 等）
 - `linewidth` 或 `lw`：線寬
@@ -184,6 +202,18 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Reactor Temperature Monitoring](./outputs/P1_Unit04_Matplotlib/figs/plot_04_reactor_temp.png)
+
+> **說明：** 此圖模擬化工領域常見的反應器溫度監控情境。可觀察到：
+> - **橙紅色線條**：反應器溫度從啟動時約 100°C（遵循指數衰減 $e^{-0.5t}$ ）逐漸趨近目標溫度 80°C。
+> - **綠色虛線**：目標溫度 80°C，以 `axhline` 水平參考線標示。
+> - **淡綠色帶狀區域**：75–85°C 的安全操作範圍以 `fill_between` + 半透明帶狀陰影明確標示。
+> - **隨機擾動**：加入 `np.random.normal(0, 1, 100)` 使曲線更接近真實訊號。
+> 
+> 此圖綜合展示三個圖層：實際溫度線、目標溫度線、安全帶狀區域，是化工製程監控的典型範例。
+
 ### 4.2 散佈圖 (Scatter Plot)
 
 散佈圖用於顯示兩個變數之間的關係，適合探索相關性。
@@ -210,6 +240,12 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Scatter Plot Example](./outputs/P1_Unit04_Matplotlib/figs/plot_05_scatter_basic.png)
+
+> **說明：** 此基本散佈圖展示 100 個樣本點的分布相關性。資料以 $Y = 2X + \epsilon$ 產生，其中 $\epsilon \sim \mathcal{N}(0, 0.5^2)$ ，因此兩變數具有強正相關性（皮爾遜相關係數 $r \approx 0.97$ ）。圖中點小、藍色填充、黑色邊框，透明度 0.6 避免點點重疊時失去資訊。
+
 **參數說明：**
 - `c`：顏色（可以是單一顏色或數組）
 - `s`：點的大小
@@ -221,12 +257,13 @@ plt.show()
 
 ```python
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 
 # 模擬數據：反應溫度 vs 產率
 np.random.seed(42)
 temperature = np.random.uniform(60, 100, 50)
-yield_rate = 30 + 0.8 * temperature + np.random.normal(0, 5, 50)
+yield_rate = 40 + 0.5 * temperature + np.random.normal(0, 3, 50)
 
 # 根據產率分組著色
 colors = ['red' if y < 70 else 'yellow' if y < 85 else 'green' for y in yield_rate]
@@ -234,19 +271,38 @@ colors = ['red' if y < 70 else 'yellow' if y < 85 else 'green' for y in yield_ra
 plt.figure(figsize=(10, 6))
 plt.scatter(temperature, yield_rate, c=colors, s=100, alpha=0.7, edgecolors='black', linewidth=1)
 
-# 添加趨勢線
+# 添加趨勢線（排序 x 值確保連線正確）
+sorted_temp = np.sort(temperature)
 z = np.polyfit(temperature, yield_rate, 1)
 p = np.poly1d(z)
-plt.plot(temperature, p(temperature), "b--", linewidth=2, label='Trend Line')
+plt.plot(sorted_temp, p(sorted_temp), "b--", linewidth=2)
 
+plt.ylim(60, 100)
 plt.title('Reaction Temperature vs Yield Rate', fontsize=14, fontweight='bold')
 plt.xlabel('Temperature (°C)', fontsize=12)
 plt.ylabel('Yield Rate (%)', fontsize=12)
-plt.legend()
+
+# 自訂圖例
+patch_red = mpatches.Patch(color='red', label='Low Yield (<70%)')
+patch_yellow = mpatches.Patch(color='yellow', label='Medium Yield (70-85%)')
+patch_green = mpatches.Patch(color='green', label='High Yield (>85%)')
+line_blue = plt.Line2D([0], [0], color='blue', linestyle='--', linewidth=2, label='Trend Line')
+plt.legend(handles=[line_blue, patch_red, patch_yellow, patch_green], loc='upper left')
+
 plt.grid(True, linestyle=':', alpha=0.5)
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Reaction Temperature vs Yield Rate](./outputs/P1_Unit04_Matplotlib/figs/plot_06_yield_scatter.png)
+
+> **說明：** 此圖展示反應溫度（60–100°C）對產率的影響，共 50 個模擬資料點。資料以 $\text{Yield} = 40 + 0.5 \times T + \mathcal{N}(0, 3^2)$ 產生，對應產率 60–100\% 的物理合理範圍。圖中重點分析：
+> - **點的顏色分組**：紅色（產率 < 70\%）、黃色（70–85\%）、綠色（> 85\%），直覺呈現製程性能分布。
+> - **藍色虛線趨勢線**：以一階多項式擬合，顯示溫度越高則產率趨勢越高的正相關趨勢。
+> - **圖例包含 4 個項目**：趨勢線 + 三種顏色分組標籤，使用 `matplotlib.patches.Patch` 自訂圖例。
+> - **Y 軸限定 60–100\%**：確保產率數據在物理合理範圍內，避免超過 100\% 的不合理數值。
 
 ### 4.3 長條圖 (Bar Chart)
 
@@ -272,6 +328,12 @@ plt.grid(axis='y', linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Bar Chart Example](./outputs/P1_Unit04_Matplotlib/figs/plot_07_bar_basic.png)
+
+> **說明：** 最基本的長條圖，展示 A–E 五個類別的數值比較（分別為 23、45、56、78、32）。所有長條以鋼藍色（steelblue）填充、黑色邊框，Y 軸沿虛線輔助讀取。D 類別數值最高（78），A 最低（23）。
 
 **水平長條圖：**
 
@@ -315,6 +377,16 @@ ax.grid(axis='y', linestyle=':', alpha=0.5)
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Catalyst Performance Comparison](./outputs/P1_Unit04_Matplotlib/figs/plot_08_catalyst_bar.png)
+
+> **說明：** 此分組長條圖對 Cat-A 至 Cat-E 五種催化劑進行轉化率與選擇性的雙屬性比較。圖中視覺化分析：
+> - **Cat-C 綜合表現最優**：轉化率 92% + 選擇性 90%，兩項指標為五種催化劑中最高；其轉化率（92%）略高於選擇性（90%），顯示極高的原料轉化效率。
+> - **Cat-A 表現最差**：轉化率僅 78%，選擇性 82%，需改進或替換。
+> - **轉化率 vs 選擇性 差異**：Cat-A、Cat-B、Cat-E 的選擇性高於轉化率，暗示這些催化劑在減少副產物上表現良好；Cat-C 與 Cat-D 的轉化率則高於選擇性（Cat-D：轉化率 88% vs 選擇性 85%）。
+> - **長條頂端數值標籤**：每條數字清楚呈現各催化劑性能，方便比較評估。
 
 ### 4.4 直方圖 (Histogram)
 
@@ -369,6 +441,16 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Product Particle Size Distribution](./outputs/P1_Unit04_Matplotlib/figs/plot_09_histogram.png)
+
+> **說明：** 此圖展示以對數常態分布（`np.random.lognormal(3, 0.5, 1000)`）模擬的產品粒徑分布，共 1000 個樣本。從圖中可觀察到：
+> - **右偏分布（Right-skewed）**：大量粒子集中在 10–30 μm，少數大粒子分布至 140 μm 以上，符合真實粉體製程的典型分布特徵。
+> - **均值 > 中位數**（22.9 μm > 20.3 μm）：右偏統計特性在圖中清楚呈現，以紅色虛線（Mean）和藍色虛線（Median）標示。
+> - **50 個等寬 bins**：足夠的分組數量使分布曲線平滑，不會因分組過少而遺失細節。
+> - **化工意義**：粒徑分布是粉體製程品質控制的關鍵指標，此類圖可快速識別產品規格是否符合標準（如 D50、D90 等）。
+
 ### 4.5 圓餅圖 (Pie Chart)
 
 圓餅圖用於顯示各部分佔整體的比例。
@@ -422,6 +504,17 @@ plt.axis('equal')
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Production Cost Structure](./outputs/P1_Unit04_Matplotlib/figs/plot_10_pie_cost.png)
+
+> **說明：** 此圓餅圖呈現化工生產成本五大構成比例。從圖中可清楚看出：
+> - **原料 A（35%）+ 原料 B（28%）= 63%**：兩種原料佔總成本超過六成，是降低生產成本的優先目標。
+> - **催化劑（15%）**：雖比例居中，但催化劑性能對產率影響大，替換更高效催化劑可帶來更大經濟效益。
+> - **溶劑（12%）與其他（10%）**：比例較小，但溶劑回收再利用可進一步降低此部分成本。
+> - **白色百分比標籤**：使用 `set_color('white')` + 粗體字，在彩色扇形上清楚可讀。
+> - **圖例外標籤**：各項目名稱標示於圓餅外側，避免圓餅過小時標籤擁擠。
 
 ---
 
@@ -581,6 +674,18 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![2x2 Subplots](./outputs/P1_Unit04_Matplotlib/figs/plot_11_subplots_2x2.png)
+
+> **說明：** 此圖展示 `plt.subplots(2, 2)` 建立的 2×2 子圖排版，同一畫布上同時顯示四種數學函數（X 軸 0–10）：
+> - **sin(x)**（左上，紅色）：週期性正弦波，振幅 ±1，週期 $2\pi \approx 6.28$ 。
+> - **cos(x)**（右上，藍色）：餘弦波，與 sin(x) 相位差 $\pi/2$ 。
+> - **tan(x)**（左下，綠色）：具有無窮大的不連續性（在 $\pi/2, 3\pi/2, 5\pi/2$ 等處，即 x ≈ 1.57, 4.71, 7.85），Y 軸限制於 ±5 以利顯示。
+> - **exp(-x/5)**（右下，洋紅色）：指數衰減函數，從 x=0 時 y=1 衰減至 x=10 時 y≈0.13。
+>
+> 此排版技術廣泛用於化工製程監控中同步顯示多個製程變數。
+
 ### 6.2 化工應用範例：反應器多參數監控
 
 ```python
@@ -597,44 +702,67 @@ concentration = 0.8 + 0.1 * np.exp(-time/10) + np.random.normal(0, 0.01, 200)
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
 # 溫度
-axes[0, 0].plot(time, temperature, color='orangered', linewidth=1.5)
-axes[0, 0].axhline(y=80, color='green', linestyle='--', linewidth=2, alpha=0.7)
-axes[0, 0].fill_between(time, 75, 85, color='green', alpha=0.1)
+axes[0, 0].plot(time, temperature, color='orangered', linewidth=1.5, label='Temperature')
+axes[0, 0].axhline(y=80, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Target (80°C)')
+axes[0, 0].fill_between(time, 75, 85, color='green', alpha=0.1, label='Safe Range (75-85°C)')
 axes[0, 0].set_title('Temperature Monitoring', fontsize=13, fontweight='bold')
 axes[0, 0].set_xlabel('Time (hours)', fontsize=11)
 axes[0, 0].set_ylabel('Temperature (°C)', fontsize=11)
+axes[0, 0].legend(loc='upper right', fontsize=9)
 axes[0, 0].grid(True, linestyle=':', alpha=0.5)
 
 # 壓力
-axes[0, 1].plot(time, pressure, color='steelblue', linewidth=1.5)
-axes[0, 1].axhline(y=2.5, color='green', linestyle='--', linewidth=2, alpha=0.7)
-axes[0, 1].fill_between(time, 2.2, 2.8, color='green', alpha=0.1)
+axes[0, 1].plot(time, pressure, color='steelblue', linewidth=1.5, label='Pressure')
+axes[0, 1].axhline(y=2.5, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Target (2.5 bar)')
+axes[0, 1].fill_between(time, 2.2, 2.8, color='green', alpha=0.1, label='Safe Range (2.2-2.8 bar)')
 axes[0, 1].set_title('Pressure Monitoring', fontsize=13, fontweight='bold')
 axes[0, 1].set_xlabel('Time (hours)', fontsize=11)
 axes[0, 1].set_ylabel('Pressure (bar)', fontsize=11)
+axes[0, 1].legend(loc='upper right', fontsize=9)
 axes[0, 1].grid(True, linestyle=':', alpha=0.5)
 
 # 流量
-axes[1, 0].plot(time, flow_rate, color='forestgreen', linewidth=1.5)
-axes[1, 0].axhline(y=100, color='red', linestyle='--', linewidth=2, alpha=0.7)
-axes[1, 0].fill_between(time, 90, 110, color='yellow', alpha=0.1)
+axes[1, 0].plot(time, flow_rate, color='forestgreen', linewidth=1.5, label='Flow Rate')
+axes[1, 0].axhline(y=100, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Target (100 L/min)')
+axes[1, 0].fill_between(time, 90, 110, color='yellow', alpha=0.1, label='Safe Range (90-110 L/min)')
 axes[1, 0].set_title('Flow Rate Monitoring', fontsize=13, fontweight='bold')
 axes[1, 0].set_xlabel('Time (hours)', fontsize=11)
 axes[1, 0].set_ylabel('Flow Rate (L/min)', fontsize=11)
+axes[1, 0].legend(loc='upper right', fontsize=9)
 axes[1, 0].grid(True, linestyle=':', alpha=0.5)
 
 # 濃度
-axes[1, 1].plot(time, concentration, color='purple', linewidth=1.5)
-axes[1, 1].axhline(y=0.8, color='orange', linestyle='--', linewidth=2, alpha=0.7)
+axes[1, 1].plot(time, concentration, color='purple', linewidth=1.5, label='Concentration')
+axes[1, 1].axhline(y=0.8, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='Target (0.8 mol/L)')
 axes[1, 1].set_title('Concentration Monitoring', fontsize=13, fontweight='bold')
 axes[1, 1].set_xlabel('Time (hours)', fontsize=11)
 axes[1, 1].set_ylabel('Concentration (mol/L)', fontsize=11)
+axes[1, 1].legend(loc='upper right', fontsize=9)
 axes[1, 1].grid(True, linestyle=':', alpha=0.5)
 
 fig.suptitle('Reactor Multi-Parameter Monitoring Dashboard', fontsize=16, fontweight='bold', y=0.995)
 plt.tight_layout()
 plt.show()
 ```
+
+**▌ 範例演練結果**
+
+![Reactor Multi-Parameter Monitoring Dashboard](./outputs/P1_Unit04_Matplotlib/figs/plot_12_dashboard.png)
+
+> **說明：** 此四象限監控儀表板同時顯示反應器 24 小時的四個關鍵製程參數（200 個數據點）：
+>
+> | 子圖 | 參數 | 範圍 | 目標值 | 安全帶 |
+> |------|------|------|--------|--------|
+> | 左上 | 溫度 | 74–86°C | 80°C | 75–85°C（綠色帶） |
+> | 右上 | 壓力 | 2.0–3.0 bar | 2.5 bar | 2.2–2.8 bar（綠色帶） |
+> | 左下 | 流量 | 88–112 L/min | 100 L/min | 90–110 L/min（黃色帶） |
+> | 右下 | 濃度 | 0.79–0.91 mol/L | 0.8 mol/L | — |
+>
+> **重要觀察：**
+> - 溫度與壓力呈現以 12 小時為週期的正弦振盪，代表反應器的週期性操作特性。
+> - 流量以 8 小時為週期振盪，與溫度/壓力週期不同步，模擬多個控制系統的獨立作動。
+> - 濃度呈現指數衰減趨勢（從約 0.91 → 0.80 mol/L），代表批次操作末期原料消耗。
+> - 每個子圖均設置圖例，明確標示各線條含義，符合化工製程監控儀表板的標準設計。
 
 ### 6.3 不規則佈局
 
@@ -720,6 +848,17 @@ plt.tight_layout()
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+![Reactor Temperature and Conversion Rate](./outputs/P1_Unit04_Matplotlib/figs/plot_13_dual_yaxis.png)
+
+> **說明：** 此雙 Y 軸圖同時展示反應器溫度（左軸，紅色實線）與轉化率（右軸，藍色虛線）在 24 小時內的動態關係。
+> - **左 Y 軸（溫度，紅色）**：以 12 小時為週期在 70–90°C 之間振盪，模擬週期性加熱冷卻製程。
+> - **右 Y 軸（轉化率，藍色虛線）**：從 50% 逐漸趨近上限約 80%，遵循 $\text{Conversion} = 50 + 30(1 - e^{-t/5})$ 的一階動力學關係。
+> - **雙 Y 軸設計**：兩個 Y 軸使用對應顏色（`labelcolor`），直覺對應各線條，避免混淆。
+> - **合併圖例**：透過 `ax1.get_legend_handles_labels()` + `ax2.get_legend_handles_labels()` 將兩軸圖例合併至左上角，是標準的雙軸圖例處理方式。
+> - **化工意義**：此類圖在化工製程分析中用於探索「操作條件（溫度）」與「製程結果（轉化率）」之間的動態相關性。
+
 ---
 
 ## 8. 圖表儲存與輸出
@@ -745,6 +884,20 @@ plt.savefig('sample_plot.png', dpi=300, bbox_inches='tight')
 plt.show()
 ```
 
+**▌ 範例演練結果**
+
+```
+✓ 圖表已儲存至: d:\MyGit\ChemE-3590\Part_1\Unit04\outputs\P1_Unit04_Matplotlib\figs\sample_plot.png
+```
+
+![Sample Plot for Saving](./outputs/P1_Unit04_Matplotlib/figs/plot_14_save_demo.png)
+
+> **說明：** 此範例展示完整的圖表儲存流程。以 sin(x) 正弦波（X 軸 0–10）作為示範圖表，執行 `plt.savefig()` 後圖檔以 300 DPI 高解析度儲存至指定路徑。主要重點：
+> - **`dpi=300`**：論文/報告級解析度，圖片清晰銳利，zoom in 後不模糊。
+> - **`bbox_inches='tight'`**：自動裁切圖表周圍多餘空白，使輸出圖片更緊湊專業。
+> - **路徑使用 `Path` 物件**：`FIG_DIR / 'sample_plot.png'` 自動處理 Windows/Linux 路徑分隔符問題。
+> - 儲存後圖檔位於 `outputs/P1_Unit04_Matplotlib/figs/sample_plot.png`，可直接用於報告或簡報。
+
 ### 8.2 儲存參數說明
 
 ```python
@@ -762,6 +915,37 @@ plt.savefig('output.png',
 - **簡報投影**：dpi=150
 - **論文發表**：dpi=300
 - **印刷品質**：dpi=600
+
+### 8.3 儲存多種格式（範例演練結果）
+
+```python
+# 儲存為多種格式
+formats = ['png', 'pdf', 'svg']
+for fmt in formats:
+    save_path = FIG_DIR / f'multi_format_plot.{fmt}'
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"✓ 已儲存 {fmt.upper()} 格式: {save_path}")
+```
+
+**▌ 範例演練結果**
+
+```
+✓ 已儲存 PNG 格式: d:\MyGit\ChemE-3590\Part_1\Unit04\outputs\P1_Unit04_Matplotlib\figs\multi_format_plot.png
+✓ 已儲存 PDF 格式: d:\MyGit\ChemE-3590\Part_1\Unit04\outputs\P1_Unit04_Matplotlib\figs\multi_format_plot.pdf
+✓ 已儲存 SVG 格式: d:\MyGit\ChemE-3590\Part_1\Unit04\outputs\P1_Unit04_Matplotlib\figs\multi_format_plot.svg
+```
+
+![Multiple Format Example](./outputs/P1_Unit04_Matplotlib/figs/plot_15_multi_format.png)
+
+> **說明：** 此圖展示同一張圖表（sin(x) 藍色實線 vs cos(x) 紅色虛線）以三種格式輸出的完整示範。執行後三個檔案均已成功儲存至 `outputs/P1_Unit04_Matplotlib/figs/`：
+>
+> | 格式 | 適用場合 | 特點 |
+> |------|---------|------|
+> | **PNG** | 報告、簡報、網頁 | 點陣格式（300 DPI），壓縮小、相容性高 |
+> | **PDF** | 論文附圖、正式文件 | 向量格式，可無損縮放，可嵌入 LaTeX |
+> | **SVG** | 網頁、互動式應用 | 向量格式，可用程式碼編輯，縮放不失真 |
+>
+> **最佳實踐：** 學術論文建議使用 PDF 或 SVG（向量格式），報告簡報建議 PNG（dpi=300）。同時儲存多種格式是專業工作流程的標準做法。
 
 ---
 
@@ -938,7 +1122,7 @@ plot_reactor_temperature(time, temp, save_path='reactor_temp.png')
 - 課程單元：Unit 04 Matplotlib 基本圖表繪製與應用
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-03-11
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
