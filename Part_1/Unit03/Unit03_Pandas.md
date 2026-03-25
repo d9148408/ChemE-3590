@@ -559,6 +559,149 @@ print("取代後：")
 print(df_str[['Name', 'Name_replaced']])
 ```
 
+### 5.5 時間字串格式化轉換（pd.to_datetime）
+
+從 CSV 或 Excel 讀入的時間欄位預設為**字串 (object) 型態**，必須透過 `pd.to_datetime()` 轉換成 Pandas 的 `datetime64` 型態，才能進行時間序列運算、過濾與重採樣等操作。
+
+#### 5.5.1 基本用法
+
+```python
+import pandas as pd
+
+# 模擬從 CSV 讀入的 DataFrame（時間欄為字串）
+df_csv = pd.DataFrame({
+    'timestamp': ['2024-01-01 08:00:00', '2024-01-01 09:00:00',
+                  '2024-01-01 10:00:00', '2024-01-01 11:00:00'],
+    'temp_C': [350.1, 352.3, 355.0, 354.2],
+    'press_bar': [2.01, 2.05, 2.10, 2.08]
+})
+
+print("讀入前的資料型態：")
+print(df_csv.dtypes)
+print()
+
+# 使用 pd.to_datetime() 轉換
+df_csv['timestamp'] = pd.to_datetime(df_csv['timestamp'])
+
+print("轉換後的資料型態：")
+print(df_csv.dtypes)
+print()
+print(df_csv)
+```
+
+#### 5.5.2 指定 format 格式字串
+
+當時間字串格式非標準 ISO 8601 時（如 `dd/mm/yyyy`），必須使用 `format` 參數明確指定格式，以提升解析速度並避免歧義。
+
+常用格式代碼：
+
+| 代碼 | 說明 | 範例 |
+|------|------|------|
+| `%Y` | 四位西元年 | `2024` |
+| `%m` | 兩位月份 | `01`~`12` |
+| `%d` | 兩位日期 | `01`~`31` |
+| `%H` | 24小時制小時 | `00`~`23` |
+| `%M` | 分鐘 | `00`~`59` |
+| `%S` | 秒數 | `00`~`59` |
+
+```python
+# 非標準格式範例：dd/mm/yyyy HH:MM
+df_fmt = pd.DataFrame({
+    'time_str': ['01/01/2024 08:00', '01/01/2024 09:30',
+                 '02/01/2024 10:00', '02/01/2024 14:15'],
+    'value': [88.5, 90.1, 87.3, 91.0]
+})
+
+# 指定 format 進行解析
+df_fmt['time'] = pd.to_datetime(df_fmt['time_str'], format='%d/%m/%Y %H:%M')
+
+print("指定 format 轉換結果：")
+print(df_fmt[['time_str', 'time']])
+print()
+print(df_fmt.dtypes)
+```
+
+#### 5.5.3 處理多種格式與錯誤值
+
+實際資料可能含有無法解析的字串，可使用 `errors='coerce'` 將錯誤值轉為 `NaT`（Not a Time），避免整批資料轉換失敗。
+
+```python
+# 包含無效時間字串的資料
+df_mixed = pd.DataFrame({
+    'time_str': ['2024-01-01 08:00', '2024-01-01 09:00',
+                 'N/A', 'ERROR', '2024-01-01 11:00'],
+    'sensor': [23.1, 24.0, 22.5, 25.3, 23.8]
+})
+
+# errors='coerce'：無法解析的值轉為 NaT
+df_mixed['time'] = pd.to_datetime(df_mixed['time_str'], errors='coerce')
+
+print("含無效時間字串的轉換結果：")
+print(df_mixed[['time_str', 'time']])
+print()
+
+# 統計 NaT 數量
+nat_count = df_mixed['time'].isna().sum()
+print(f"無效時間筆數 (NaT): {nat_count}")
+print()
+
+# 刪除無效時間列
+df_clean = df_mixed.dropna(subset=['time'])
+print("清除無效列後：")
+print(df_clean[['time_str', 'time']])
+```
+
+#### 5.5.4 搭配 pd.read_csv / pd.read_excel 的完整流程
+
+```python
+# ── 方法 1：在 read_csv 時直接解析 ──
+# parse_dates 參數可自動呼叫 pd.to_datetime
+df_auto = pd.read_csv(
+    'process_data.csv',
+    parse_dates=['Date'],   # 指定欄位名稱，自動轉換為 datetime
+    encoding='utf-8'
+)
+print("read_csv 自動解析時間欄：")
+print(df_auto.dtypes)
+print()
+
+# ── 方法 2：讀入後手動轉換（適合非標準格式）──
+df_manual = pd.read_csv('process_data.csv', encoding='utf-8')
+df_manual['Date'] = pd.to_datetime(df_manual['Date'], format='%Y-%m-%d')
+print("手動轉換時間欄：")
+print(df_manual.dtypes)
+print()
+
+# ── Excel 讀入後手動轉換 ──
+# df_excel = pd.read_excel('data.xlsx')
+# df_excel['Date'] = pd.to_datetime(df_excel['Date'], format='%Y/%m/%d')
+```
+
+#### 5.5.5 提取日期時間屬性
+
+轉換完成後，可透過 `.dt` 存取器提取各時間元件。
+
+```python
+# 建立已轉換的時間欄
+df_attr = pd.DataFrame({
+    'timestamp': pd.to_datetime([
+        '2024-01-15 08:30:00', '2024-03-22 14:45:00',
+        '2024-07-04 23:10:00', '2024-11-30 06:00:00'
+    ]),
+    'value': [100, 200, 300, 400]
+})
+
+# 使用 .dt 存取器提取屬性
+df_attr['year']    = df_attr['timestamp'].dt.year
+df_attr['month']   = df_attr['timestamp'].dt.month
+df_attr['day']     = df_attr['timestamp'].dt.day
+df_attr['hour']    = df_attr['timestamp'].dt.hour
+df_attr['weekday'] = df_attr['timestamp'].dt.day_name()
+
+print("提取時間屬性：")
+print(df_attr)
+```
+
 ---
 
 ## 6. 時間序列資料處理
