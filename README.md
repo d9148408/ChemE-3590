@@ -279,19 +279,30 @@ drive.mount('/content/drive', force_remount=True)
 !git clone https://github.com/d9148408/ChemE-3590.git
 ```
 
-### 更新課程資料
+### 更新全部課程資料
 ```python
 # 連結個人Google Drive
 from google.colab import drive
 drive.mount('/content/drive', force_remount=True)
 
-# 更新課程資料
+# 更新全部課程資料
 %cd "/content/drive/My Drive/Colab Notebooks/ChemE-3590/"
 !git fetch origin
 !git reset --hard origin/main
 ```
-更新課程資料程式運行完畢請稍等幾分鐘，確保你的雲端資料都已經更新完成。
+更新全部課程資料程式運行完畢請稍等幾分鐘，確保你的雲端資料都已經更新完成。
 
+### 更新某個單元課程資料
+```python
+# 連結個人Google Drive
+from google.colab import drive
+drive.mount('/content/drive', force_remount=True)
+
+# 更新某個單元課程資料, ex: "Part_1/Unit03"
+%cd "/content/drive/My Drive/Colab Notebooks/ChemE-3590/"
+!git fetch origin
+!git checkout origin/main -- "Part_1/Unit03"
+```
 ---
 
 ### 方法二：本地環境設定 (推薦長期學習)
