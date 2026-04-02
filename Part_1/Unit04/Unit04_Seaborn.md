@@ -327,7 +327,7 @@ data = pd.DataFrame({
 })
 
 plt.figure(figsize=(12, 7))
-sns.boxplot(data=data, x='Reactor', y='Yield (%)', palette='pastel', linewidth=2)
+sns.boxplot(data=data, x='Reactor', y='Yield (%)', hue='Reactor', palette='pastel', linewidth=2, legend=False)
 sns.swarmplot(data=data, x='Reactor', y='Yield (%)', color='black', alpha=0.5, size=3)
 
 plt.axhline(y=85, color='red', linestyle='--', linewidth=2, label='Target Yield')
@@ -396,6 +396,7 @@ import matplotlib.pyplot as plt
 
 # 模擬不同溫度條件下的產品品質數據（延續 Notebook 的全域種子設定）
 n = 100
+temp_order = ['Low', 'Medium', 'High']
 
 data = pd.DataFrame({
     'Temperature': ['Low']*n + ['Medium']*n + ['High']*n,
@@ -407,8 +408,9 @@ data = pd.DataFrame({
 })
 
 plt.figure(figsize=(12, 7))
-sns.violinplot(data=data, x='Temperature', y='Quality Score', 
-               palette='Set3', inner='quartile', linewidth=2)
+sns.violinplot(data=data, x='Temperature', y='Quality Score', hue='Temperature',
+               palette='Set3', inner='quartile', linewidth=2, legend=False,
+               order=temp_order)
 
 plt.title('Product Quality Distribution by Temperature', fontsize=14, fontweight='bold')
 plt.xlabel('Operating Temperature', fontsize=12)
@@ -1447,7 +1449,7 @@ plt.show()
 
 **④ Correlation Matrix（左下）**
 
-製程參數相關性矩陣顯示 **Pressure (bar)** 與 Yield (%) 呈最強正相關（ $r=+0.53$ ），其次為 **Temperature (°C)** ( $r=+0.36$ ) 與 **Catalyst (%)** ( $r=+0.35$ )；Residence_Time (min) 亦有正相關（ $r=+0.24$ ）。各操作因子相互間的相關係數整體不高，表示這組模擬資料保有良好的獨立性。
+製程參數相關性矩陣顯示 **Pressure (bar)** 與 Yield (%) 呈最強正相關（ $r=+0.57$ ），其次為 **Catalyst (%)** ( $r=+0.42$ ) 與 **Temperature (°C)** ( $r=+0.33$ )；Residence_Time (min) 亦有正相關（ $r=+0.26$ ）。各操作因子相互間的相關係數整體不高，表示這組模擬資料保有良好的獨立性。
 
 **⑤ Yield by Quality and Reactor（中下）**
 
@@ -1458,7 +1460,7 @@ plt.show()
 小提琴圖顯示三個品質等級的產率分佈形狀：Low 組 (81.01 ± 3.39%)、Medium 組 (90.66 ± 2.62%)、High 組 (100.85 ± 4.30%)，各組各約 67、66、67 筆，分佈均勻。Medium 組的標準差最小，分佈最集中，而 High 組雖均值最高但其標準差大於 Low 組，顯示高產率區間仍具一定操作變異。
 
 **總結建議：**
-1. 優先控制壓力與催化劑濃度（溫度亦相近），關鍵製程變數與產率的相關係數為 Pressure $r=+0.53$ 、Temperature $r=+0.36$ 、Catalyst $r=+0.35$ ，可作為品質管制的優先監控項目
+1. 優先控制壓力與催化劑濃度，關鍵製程變數與產率的相關係數為 Pressure $r=+0.57$ 、Catalyst $r=+0.42$ 、Temperature $r=+0.33$ ，可作為品質管制的優先監控項目
 2. 三台反應器表現接近，可依產能需求調度；應持續監控各反應器的波動幅度是否出現下降趨勢
 3. 品質分級採用 `pd.qcut()` 可確保各等級樣本數均衡，適合教學展示；實際工程應用中應依物性規格設定固定閾值
 
