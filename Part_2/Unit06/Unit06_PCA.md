@@ -49,7 +49,7 @@
 PCA 在化工領域有廣泛且重要的應用：
 
 1. **製程監控與故障診斷**：
-   - 建立 Hotelling's T² 和 SPE (Q統計量) 控制圖
+   - 建立 Hotelling's $T^2$ 和 SPE (Q統計量) 控制圖
    - 即時監控製程是否偏離正常操作
    - 透過貢獻圖 (Contribution Plot) 找出故障變數
    - 實現多變數統計製程控制 (MSPC)
@@ -256,7 +256,7 @@ $$
 - Score Plot 常用於製程監控
 
 **化工應用**：
-- T² Score Plot：監控製程是否正常
+- $T^2$ Score Plot：監控製程是否正常
 - Score Trajectory：追蹤批次製程演化
 - Score Clustering：識別操作模式
 
@@ -281,7 +281,7 @@ $$
 **意義**：
 - SPE 衡量樣本是否偏離 PCA 模型
 - 用於製程監控：SPE 過大表示異常
-- 補充 T² 統計量，監控模型外的變異
+- 補充 $T^2$ 統計量，監控模型外的變異
 
 ---
 
@@ -351,11 +351,11 @@ $$
 
 ## 5. PCA 在製程監控的應用
 
-### 5.1 Hotelling's T² 統計量
+### 5.1 Hotelling's $T^2$ 統計量
 
 **定義**：
 
-Hotelling's T² 統計量衡量樣本在主成分空間內的距離：
+Hotelling's $T^2$ 統計量衡量樣本在主成分空間內的距離：
 
 $$
 T^2_i = \mathbf{z}_i^T \mathbf{\Lambda}^{-1} \mathbf{z}_i = \sum_{j=1}^{k}\frac{z_{ij}^2}{\lambda_j}
@@ -401,13 +401,86 @@ $$
 - $\text{SPE} > \text{SPE}_{\text{limit}}$ 表示製程出現異常變異（PCA 模型外）
 - 適合監控新型態故障或未知擾動
 
-### 5.3 貢獻圖 (Contribution Plot)
+### 5.3 $T^2$ 與 SPE 的差異與互補
+
+兩個統計量從**不同投影空間**監控製程，互相補充，缺一不可。
+
+| 比較維度 | Hotelling's $T^2$ | SPE（Q 統計量）|
+|---------|------------------|----------------|
+| **監控目標** | 主成分空間內的偏離 | PCA 模型外的殘差 |
+| **幾何意義** | 樣本在 PC 子空間中的馬氏距離 | 樣本偏離 PC 子空間的垂直距離 |
+| **異常類型** | 系統性漂移或偏移（已知變異模式） | 新型態故障或未知擾動（模型外變異）|
+| **控制限依據** | F 分布 | $\chi^2$ 分布（矩估計近似）|
+| **典型觸發情境** | 反應器溫度/壓力整體偏高 | 感測器故障、未知原料批次異常 |
+| **PCA 能解釋？** | ✅ 可解釋（位於 PC 空間內） | ✗ 無法解釋（超出 PC 子空間） |
+
+**幾何直觀（二維示意）**：
+
+```
+          ↑ PC₂
+          |   ●  ← 正常樣本
+          |  /
+          | / PC 子空間
+    ──────●────────────→ PC₁
+          |
+      x * |           ← 高 T²（遠離原點，仍在子空間內）
+          |
+      y * ← 高 SPE（偏離子空間，有殘差分量）
+```
+
+- 樣本 **x**：$T^2$ 超限，SPE 正常 → 在正常變異模式內但幅度過大（系統性偏移）
+- 樣本 **y**：$T^2$ 正常，SPE 超限 → 出現 PCA 模型未見過的新型態變異
+
+**實務判斷邏輯**：
+
+| $T^2$ | SPE | 製程狀態 | 建議行動 |
+|-------|-----|---------|---------|
+| ✅ 正常 | ✅ 正常 | 製程正常 | 持續監控 |
+| 🔴 超限 | ✅ 正常 | 系統性偏移 | 檢查主要溫度/壓力控制迴路 |
+| ✅ 正常 | 🔴 超限 | 新型態故障 | 排查感測器、原料、新操作模式 |
+| 🔴 超限 | 🔴 超限 | 嚴重複合異常 | 立即停機檢查，優先排查 SPE 貢獻變數 |
+
+> **設計原則**：$T^2$ 和 SPE 控制圖必須同時使用，單獨使用任一指標都可能漏報異常。
+
+**從物理與工程角度理解兩者差異**：
+
+$T^2$ 和 SPE 的根本區別在於：**製程變化是否符合建模時學到的「正常共變異結構」**。
+
+> 以化工反應器為例，PCA 建模時學到：「正常操作下，反應器溫度升高時，夾套溫度和反應器壓力也會同步升高（三者高度相關）。」
+
+| 情境 | $T^2$ | SPE | 工程解釋 |
+|------|-------|-----|---------|
+| **正常操作** | 低 | 低 | 三個溫度/壓力變數協同變化，符合正常共變異結構 |
+| **均勻升溫（整體偏高）** | 🔴 高 | 低 | 三個變數**仍然**同步升高，結構正常但幅度超出正常範圍 → $T^2$ 捕捉 |
+| **感測器故障（單一異常）** | 低 | 🔴 高 | 只有單一感測器異常，打破了原有協同關係 → PCA 無法重建 → SPE 捕捉 |
+| **全新操作條件** | 低 | 🔴 高 | 操作模式完全不同，PCA 模型未學過，殘差很大 |
+
+**類比說明**：
+
+想像 PCA 模型是一位**資深工廠操作員**，他熟悉所有「正常操作模式」：
+
+- **$T^2$ 高**：操作員說：「我知道這種情況（例如整體升溫），但今天升得太高了！」→ 熟悉的異常，只是程度超標
+- **SPE 高**：操作員說：「我從沒見過這種狀況，這不像任何正常操作！」→ 陌生的異常，屬於模型外變異
+
+**在化工製程中，兩者分別對應不同的故障機制**：
+
+| 故障機制 | 觸發指標 | 典型案例 |
+|---------|---------|---------|
+| 控制迴路飽和、設定點大幅偏移 | $T^2$ 超限 | 溫控 PID 失調 → 反應器整體升溫 |
+| 感測器漂移或突變 | SPE 超限 | 單一熱電偶失效 → 與其他溫度不協調 |
+| 原料批次異常（成分改變）| SPE 超限 | 新批次反應物濃度偏離歷史值 |
+| 設備老化（磨損/結垢）| $T^2$ 超限 | 泵效率緩慢下降 → 整體流量/壓力漸移 |
+| 製程工況切換（升降產）| $T^2$ + SPE 同時升高 | 操作點從低負載切換至高負載 |
+
+---
+
+### 5.4 貢獻圖 (Contribution Plot)
 
 **原理**：
 - 當 $T^2$ 或 SPE 超出控制限時，分析各變數對異常的貢獻
 - 找出導致異常的根本原因變數
 
-**T² 貢獻**：
+**$T^2$ 貢獻**：
 
 $$
 \text{Cont}_{T^2}(j) = \sum_{i=1}^{k}\frac{w_{ji}z_i}{\lambda_i} \cdot x_j
@@ -484,7 +557,7 @@ $$
 ### 6.3 何時使用 PCA
 
 **適合使用 PCA 的情況**：
-- 特徵數量遠大於樣本數量
+- 特徵維度較高（通常 ≥ 10 個變數）且存在冗餘
 - 特徵間存在高度共線性
 - 需要視覺化高維數據
 - 製程監控與故障診斷
@@ -840,8 +913,8 @@ X_pca_full = pca_full.fit_transform(X_train_scaled)
 - **直觀解讀**：PC3是保留主成分的理想截止點
 
 **右圖：Cumulative Variance Explained（累積變異數圖）**
-- **90% 閾值（紅線）**：需要3個主成分達成
-- **95% 閾值（橙線）**：需要5個主成分達成
+- **90% 閾值（紅線）**：需要4個主成分達成（PC4累積：93.44%）
+- **95% 閾值（橙線）**：需要5個主成分達成（PC5累積：96.70%）
 - **曲線形態**：PC3後斜率趨緩，表示後續成分貢獻有限
 
 **主成分數量決策**：
@@ -898,55 +971,52 @@ Loadings 顯示每個原始特徵對主成分的貢獻，幫助我們理解主�
 
 **圖表分析：特徵對主成分的貢獻模式**
 
-**PC1（35.50%變異數）：溫度主導軸**
-- 🔴 **強正貢獻**：
-  - Reactor_Temp（+0.410）：反應器溫度
-  - Jacket_Temp（+0.373）：夾套溫度
-  - Product_Temp（+0.304）：產品溫度
-  - Reactor_Pressure（+0.337）：反應器壓力
-- **物理解釋**：PC1代表**溫度與壓力耦合軸**，反映反應器的熱力學狀態
+**PC1（35.50%變異數）：壓力與溫度耦合軸**
+- 🔴 **強正貢獻（Top 3）**：
+  - Reactor_Pressure（+0.505）：反應器壓力
+  - Reactor_Temp（+0.445）：反應器溫度
+  - Jacket_Temp（+0.444）：夾套溫度
+- **物理解釋**：PC1代表**壓力與溫度耦合軸**，反映反應器的熱力學狀態
 
-**PC2（31.10%變異數）：流量與濃度軸**
-- 🔴 **強正貢獻**：
-  - Feed_Flow（+0.407）：進料流量
-  - Coolant_Flow（+0.364）：冷卻水流量
-  - Feed_Pressure（+0.364）：進料壓力
-  - Reactant_A_Conc（+0.321）：反應物A濃度
-- **物理解釋**：PC2代表**流量與濃度控制軸**，體現原料供給與冷卻需求
+**PC2（31.10%變異數）：進料壓力與流量軸**
+- 🔴 **強正貢獻（Top 3）**：
+  - Feed_Pressure（+0.491）：進料壓力
+  - Feed_Flow（+0.439）：進料流量
+  - Coolant_Flow（+0.432）：冷卻水流量
+- **物理解釋**：PC2代表**進料壓力與流量控制軸**，體現原料供給與冷卻需求
 
-**PC3（18.66%變異數）：濃度平衡軸**
-- 🔴 **強正貢獻**：
-  - Reactant_A_Conc（+0.531）：反應物A濃度
-  - Reactant_B_Conc（+0.430）：反應物B濃度
-- 🔵 **強負貢獻**：
-  - Coolant_Flow（-0.336）：冷卻水流量
-  - Feed_Flow（-0.308）：進料流量
-- **物理解釋**：PC3代表**反應物濃度與流量制衡**，反映濃度調控邏輯
+**PC3（18.66%變異數）：濃度主導軸**
+- 🔴 **強正貢獻（Top 3）**：
+  - Reactant_B_Conc（+0.624）：反應物B濃度
+  - Reactant_A_Conc（+0.619）：反應物A濃度
+- 🔵 **負貢獻**：
+  - Coolant_Flow（-0.307）：冷卻水流量
+- **物理解釋**：PC3代表**反應物濃度主導軸**，反映兩種反應物濃度的協同變化
 
 **執行結果：各主成分的主要貢獻變數（Top 3）**
 ```
 PC1 (解釋 35.5% 變異數):
-  Reactor_Temp        : +0.410
-  Jacket_Temp         : +0.373
-  Reactor_Pressure    : +0.337
+  Reactor_Pressure    : +0.505
+  Reactor_Temp        : +0.445
+  Jacket_Temp         : +0.444
 
 PC2 (解釋 31.1% 變異數):
-  Feed_Flow           : +0.407
-  Coolant_Flow        : +0.364
-  Feed_Pressure       : +0.364
+  Feed_Pressure       : +0.491
+  Feed_Flow           : +0.439
+  Coolant_Flow        : +0.432
 
 PC3 (解釋 18.7% 變異數):
-  Reactant_A_Conc     : +0.531
-  Reactant_B_Conc     : +0.430
-  pH                  : -0.395
+  Reactant_B_Conc     : +0.624
+  Reactant_A_Conc     : +0.619
+  Coolant_Flow        : -0.307
 
 ✓ Loadings 分析完成
 ```
 
 **化工製程意義總結**：
-- **PC1** = 熱力學狀態（溫度+壓力）
-- **PC2** = 流量控制（進料+冷卻）
-- **PC3** = 濃度平衡（反應物A/B）
+- **PC1** = 熱力學狀態（壓力+溫度耦合）
+- **PC2** = 進料控制（進料壓力+流量+冷卻）
+- **PC3** = 濃度狀態（反應物A/B濃度）
 
 這三個主成分完整描述了化工反應器的關鍵操作維度。
 
@@ -999,13 +1069,13 @@ PC3 (解釋 18.7% 變異數):
    - 箭頭長度：特徵的重要性
 
 **異常樣本標記**：
-- 🔴 **紅色星號（Max T²）**：Sample 209
+- 🔴 **紅色星號（Max $T^2$）**：Sample 209
   - 位置：PC1正向極端區域
   - 意義：溫度/壓力系統性偏高
   
 - 🟠 **橙色菱形（Max SPE）**：Sample 194
-  - 位置：PC2正向但PC1接近中心
-  - 意義：流量異常但溫度正常
+  - 位置：PC1接近中心、PC2正向偏移
+  - 意義：主成分空間位置尚在正常範圍（$T^2$=3.406），但 PCA 模型殘差極大（SPE=9.063），主因為 pH 出現模型未見過的離群偏移
 
 **製程解釋示例**：
 - 樣本若位於 **Reactor_Temp箭頭方向** → 該批次反應溫度偏高
@@ -1022,7 +1092,7 @@ PC3 (解釋 18.7% 變異數):
 ```
 
 **視覺標記系統說明**：
-- 🔴 **紅色星號 (⭐)**：T² 最大異常樣本（主成分空間內系統性偏移）
+- 🔴 **紅色星號 (⭐)**： $T^2$ 最大異常樣本（主成分空間內系統性偏移）
 - 🟠 **橙色菱形 (◆)**：SPE 最大異常樣本（PCA 模型外的新型態變異）
 - 此標記系統將貫穿所有後續視覺化圖表，方便追蹤異常樣本
 
@@ -1040,7 +1110,7 @@ PC3 (解釋 18.7% 變異數):
   - PC1方向：樣本沿溫度/壓力軸擴散
   - PC2方向：樣本沿流量/濃度軸擴散
 - **異常樣本**：
-  - 🔴 Max T²（Sample 209）：PC1正向極端
+  - 🔴 Max $T^2$（Sample 209）：PC1正向極端
   - 🟠 Max SPE（Sample 194）：PC2正向偏離
 
 **右圖：PC1 vs PC3（54.16%總變異數）**
@@ -1062,15 +1132,35 @@ PC3 (解釋 18.7% 變異數):
 
 ---
 
-### 8.5 製程監控：T² 和 SPE 控制圖
+### 8.5 製程監控： $T^2$ 和 SPE 控制圖
 
-建立 Hotelling's T² 和 SPE (Q) 統計量控制圖，用於即時監控製程是否偏離正常操作。
+建立 Hotelling's $T^2$ 和 SPE (Q) 統計量控制圖，用於即時監控製程是否偏離正常操作。
 
 #### 8.5.1 統計量計算與控制限設定
 
 ```python
-# 建立監控系統
-monitor = PCAMonitoring(pca, X_train_scaled, alpha=0.05)
+# === 計算 T² 和 SPE 統計量 ===
+def compute_T2(scores, eigenvalues):
+    """計算 Hotelling's T² 統計量"""
+    return np.sum((scores ** 2) / eigenvalues, axis=1)
+
+def compute_SPE(X_original, X_reconstructed):
+    """計算 SPE (Squared Prediction Error)"""
+    residuals = X_original - X_reconstructed
+    return np.sum(residuals ** 2, axis=1)
+
+alpha = 0.05
+n, k = len(X_train_scaled), pca.n_components_
+
+# 計算訓練集統計量
+X_reconstructed = pca.inverse_transform(X_pca)
+T2_train  = compute_T2(X_pca, pca.explained_variance_)
+SPE_train = compute_SPE(X_train_scaled, X_reconstructed)
+
+# 控制限
+from scipy.stats import f as f_dist
+T2_limit  = (k*(n-1)/(n-k)) * f_dist.ppf(1-alpha, k, n-k)   # Hotelling T²（F分布）
+SPE_limit = np.percentile(SPE_train, 95)                      # SPE（訓練集第95百分位數）
 ```
 
 **執行結果：控制限計算**
@@ -1082,17 +1172,17 @@ SPE (Q) 控制限 (α=0.050): 4.289
 ```
 
 **控制限意義**：
-- **T² Control Limit = 7.900**（α=0.05）
+- **$T^2$ Control Limit = 7.900**（α=0.05）
   - 基於F分布計算： $T^2 \sim \frac{(n-1)k}{n-k}F_{k, n-k, \alpha}$
-  - 其中 $k=3$ （主成分數）， $n=400$ （訓練樣本數）
-  - 95% 正常樣本的 T² 值應 ≤ 7.900
+  - 其中 $k=3$ （主成分數）， $n=500$ （訓練樣本數）
+  - 95% 正常樣本的 $T^2$ 值應 ≤ 7.900
   
 - **SPE Control Limit = 4.289**（α=0.05）
-  - 基於卡方分布近似計算
+  - 基於訓練集 SPE 分布的第95百分位數（empirical percentile）
   - 95% 正常樣本的 SPE 值應 ≤ 4.289
 
 **監控雙軌制**：
-1. **T² 監控**：檢測主成分空間內的系統性偏移
+1. **$T^2$ 監控**：檢測主成分空間內的系統性偏移
 2. **SPE 監控**：檢測PCA模型無法解釋的新型態變異
 
 ---
@@ -1100,22 +1190,25 @@ SPE (Q) 控制限 (α=0.050): 4.289
 #### 8.5.2 訓練集監控結果
 
 ```python
-# 計算訓練集統計量
-train_stats = monitor.compute_statistics(X_train_scaled)
+# 異常檢測
+anomalies_T2  = np.where(T2_train  > T2_limit)[0]
+anomalies_SPE = np.where(SPE_train > SPE_limit)[0]
+max_T2_idx  = np.argmax(T2_train)
+max_SPE_idx = np.argmax(SPE_train)
 ```
 
 **執行結果**：
 ```
 訓練集統計量計算完成
-  樣本數: 400
+  樣本數: 500
   
 T² 統計量:
   最大值: 23.389 (樣本 #209)
-  違規樣本數: 16 (4.0%)
+  違規樣本數: 20 (4.0%)
   
 SPE 統計量:
   最大值: 9.063 (樣本 #194)
-  違規樣本數: 20 (5.0%)
+  違規樣本數: 25 (5.0%)
 
 ✓ 訓練集監控分析完成
 ```
@@ -1124,16 +1217,16 @@ SPE 統計量:
 
 | 統計量 | 控制限 | 最大值 | 違規數 | 違規率 | 評估 |
 |--------|--------|--------|--------|--------|------|
-| **T²** | 7.900 | 23.389 | 16/400 | 4.0% | ✅ 接近α=5%理論值 |
-| **SPE** | 4.289 | 9.063 | 20/400 | 5.0% | ✅ 等於α=5%理論值 |
+| **$T^2$** | 7.900 | 23.389 | 20/500 | 4.0% | ✅ 接近α=5%理論值 |
+| **SPE** | 4.289 | 9.063 | 25/500 | 5.0% | ✅ 等於α=5%理論值 |
 
 **關鍵發現**：
 1. **違規率符合預期**：4-5% 接近設定的α=5%顯著水準
-2. **T² 最大異常**：Sample 209（T²=23.389，是控制限的2.96倍）
+2. **$T^2$ 最大異常**：Sample 209（ $T^2$ =23.389，是控制限的2.96倍）
    - 屬於系統性偏離，在主成分空間內極端
 3. **SPE 最大異常**：Sample 194（SPE=9.063，是控制限的2.11倍）
    - 屬於新型態變異，PCA模型無法充分解釋
-4. **兩個最大異常樣本不同** → T²和SPE檢測的異常類型互補
+4. **兩個最大異常樣本不同** → $T^2$ 和SPE檢測的異常類型互補
 
 ---
 
@@ -1143,33 +1236,31 @@ SPE 統計量:
 
 **圖表分析：PCA 監控控制圖**
 
-**上圖：Hotelling's T² Control Chart**
-- **藍色線（T² 統計量）**：400個訓練樣本的 T² 值
+**上圖：Hotelling's $T^2$ Control Chart**
+- **藍色線（$T^2$ 統計量）**：500個訓練樣本的 $T^2$ 值
 - **紅色虛線（控制限）**：UCL = 7.900
 - **黃色填充區**：警告區域（>UCL）
 - **標記點**：
-  - 🔴 **紅色星號**：Sample 209（Max T²=23.389）
+  - 🔴 **紅色星號**：Sample 209（Max $T^2$ =23.389）
     - 遠超控制限，位於圖表頂部
     - 主成分空間系統性嚴重偏離
-  - 其他16個違規點也清晰可見
+  - 其他19個違規點也清晰可見
 
 **下圖：SPE (Q-Statistic) Control Chart**
-- **藍色線（SPE 統計量）**：400個樣本的 SPE 值
+- **藍色線（SPE 統計量）**：500個樣本的 SPE 值
 - **紅色虛線（控制限）**：UCL = 4.289
 - **黃色填充區**：警告區域（>UCL）
 - **標記點**：
   - 🟠 **橙色菱形**：Sample 194（Max SPE=9.063）
-    - SPE最大異常，但T²未突出
+  - SPE最大異常，但 $T^2$ 未突出
     - 表示新型態變異，非系統性偏移
 
 **控制圖診斷**：
 
-| 樣本編號 | T² 值 | SPE 值 | 診斷結果 |
+| 樣本編號 | $T^2$ 值 | SPE 值 | 診斷結果 |
 |---------|-------|--------|---------|
-| **#209** | 23.389 🔴 | 3.245 ✅ | 系統性偏移（溫度/壓力異常） |
-| **#194** | 6.892 ✅ | 9.063 🟠 | 新型態變異（流量模式異常） |
-| #176 | 18.234 🔴 | 2.156 ✅ | 系統性偏移 |
-| #342 | 5.678 ✅ | 7.234 🟠 | 新型態變異 |
+| **#209** | 23.389 🔴 | 0.723 ✅ | 系統性偏移（壓力/溫度異常） |
+| **#194** | 3.406 ✅ | 9.063 🟠 | 新型態變異（pH異常）|
 
 執行結果：
 ```
@@ -1181,9 +1272,9 @@ SPE 統計量:
 ```
 
 **監控實務應用**：
-1. **即時監控**：新批次數據計算 T²/SPE → 判斷是否超出控制限
+1. **即時監控**：新批次數據計算 $T^2$/SPE → 判斷是否超出控制限
 2. **異常分類**：
-   - T² 超限 → 製程漂移（溫度/壓力/流量系統性變化）
+   - $T^2$ 超限 → 製程漂移（溫度/壓力/流量系統性變化）
    - SPE 超限 → 未知干擾（設備故障、原料品質問題）
 3. **預防維護**：連續多點接近控制限 → 預警製程劣化
 
@@ -1193,50 +1284,50 @@ SPE 統計量:
 
 當控制圖顯示異常時，Contribution Plot 幫助我們找出**哪些變數**導致異常。
 
-#### 8.6.1 Sample 209 診斷（Max T² 異常）
+#### 8.6.1 Sample 209 診斷（Max $T^2$ 異常）
 
 ![Contribution Plot Sample 209](outputs/P2_Unit06_PCA/figs/contribution_plot_sample_209.png)
 
-**圖表分析：T² 最大異常樣本的變數貢獻**
+**圖表分析： $T^2$ 最大異常樣本的變數貢獻**
 
-**左圖：SPE Contribution（SPE=3.245，未違規）**
-- 所有變數貢獻均 < 1.0
-- Reactor_Temp 貢獻最高（≈0.9）但仍在合理範圍
+**左圖：SPE Contribution（SPE=0.723，未違規）**
+- 所有變數貢獻均 < 0.5
+- pH 貢獻最高（≈0.37）但仍在合理範圍
 - **結論**：此樣本的 SPE 正常，表示其變異可被PCA模型解釋
 
-**右圖：T² Contribution（T²=23.389，嚴重違規）**
+**右圖：$T^2$ Contribution（$T^2$=23.389，嚴重違規）**
 - **Top 3 異常貢獻變數**：
-  1. 🔴 **Reactor_Temp（反應器溫度）**：貢獻 ≈ 8.5
-     - 遠超其他變數，是主要異常來源
-  2. 🟠 **Jacket_Temp（夾套溫度）**：貢獻 ≈ 5.2
-     - 與Reactor_Temp聯動異常
-  3. 🟡 **Reactor_Pressure（反應器壓力）**：貢獻 ≈ 4.8
-     - 溫度升高導致壓力上升（熱力學耦合）
+  1. 🔴 **Reactor_Pressure（反應器壓力）**：貢獻 ≈ 5.52
+     - 遠超控制限，是主要異常來源
+  2. 🟠 **Reactor_Temp（反應器溫度）**：貢獻 ≈ 4.31
+     - 與壓力聯動異常，反映熱力學耦合
+  3. 🟡 **Jacket_Temp（夾套溫度）**：貢獻 ≈ 4.28
+     - 夾套溫度隨反應器溫度同步升高
 
 **根本原因診斷**：
 ```
-異常類型：系統性溫度/壓力偏高
+異常類型：系統性壓力/溫度偏高
 根本原因：
-  1. 反應器溫度控制失效（主因）
-  2. 夾套冷卻不足（次因）
-  3. 壓力隨溫度上升（連帶影響）
+  1. 反應器壓力異常升高（主因）
+  2. 反應器溫度同步上升（次因）
+  3. 夾套溫度隨反應器溫度升高（連帶影響）
   
 建議措施：
-  → 檢查溫度控制器 PID 參數
+  → 檢查壓力控制閥及管路是否堵塞
+  → 確認溫度控制器 PID 參數
   → 確認夾套冷卻水流量與溫度
-  → 檢視反應熱是否異常
 ```
 
 執行結果：
 ```
 樣本 #209 貢獻度分析：
-  SPE: 3.245 (✓ 未違規)
+  SPE: 0.723 (✓ 未違規)
   T²: 23.389 (✗ 違規，控制限=7.900)
 
 T² 主要貢獻變數:
-  Reactor_Temp    : 8.52 🔴
-  Jacket_Temp     : 5.18 🟠
-  Reactor_Pressure: 4.76 🟡
+  Reactor_Pressure: 5.52 🔴
+  Reactor_Temp    : 4.31 🟠
+  Jacket_Temp     : 4.28 🟡
   
 ✓ 異常診斷完成（Sample 209）
 ```
@@ -1251,34 +1342,34 @@ T² 主要貢獻變數:
 
 **左圖：SPE Contribution（SPE=9.063，嚴重違規）**
 - **Top 3 異常貢獻變數**：
-  1. 🔴 **Feed_Flow（進料流量）**：貢獻 ≈ 3.8
-     - SPE貢獻最高，表示流量模式與正常不同
-  2. 🟠 **Coolant_Flow（冷卻水流量）**：貢獻 ≈ 2.6
-     - 流量控制聯動異常
-  3. 🟡 **Reactant_A_Conc（反應物A濃度）**：貢獻 ≈ 2.1
-     - 進料流量變化影響濃度
+  1. 🔴 **pH（酸鹼值）**：貢獻 ≈ 8.03
+     - SPE貢獻極高，是主要異常來源
+  2. 🟠 **Feed_Pressure（進料壓力）**：貢獻 ≈ 0.37
+     - 進料側壓力出現異常波動
+  3. 🟡 **Reactor_Pressure（反應器壓力）**：貢獻 ≈ 0.27
+     - 壓力系統連帶受影響
 
-**右圖：T² Contribution（T²=6.892，未違規）**
-- 所有變數貢獻 < 3.0
+**右圖：$T^2$ Contribution（$T^2$=3.406，未違規）**
+- 所有變數貢獻 < 2.0
 - 分布較均勻，無明顯突出變數
-- **結論**：此樣本的 T² 正常，表示其在主成分空間內位置合理
+- **結論**：此樣本的 $T^2$ 正常，表示其在主成分空間內位置合理
 
 **根本原因診斷**：
 ```
-異常類型：新型態流量控制異常
+異常類型：新型態 pH 異常
 根本原因：
-  1. 進料流量出現非典型波動模式（主因）
-  2. 冷卻水流量未按既有邏輯調控（次因）
-  3. 導致濃度控制偏離（連帶影響）
+  1. pH 出現極端偏離（主因）
+  2. 進料壓力出現異常波動（次因）
+  3. 反應器壓力連帶受影響（連帶影響）
   
 特徵：
-  → PCA 模型未見過此流量控制模式（SPE高）
+  → PCA 模型未見過此 pH 偏離模式（SPE高）
   → 但主成分空間位置不極端（T²正常）
-  → 可能是新操作員的控制策略差異
+  → 可能是進料組成或pH控制失效
   
 建議措施：
-  → 檢查進料泵是否有間歇性故障
-  → 確認流量控制器是否被手動介入
+  → 檢查 pH 感測器是否正常
+  → 確認進料組成是否有異常批次
   → 評估是否需更新PCA模型涵蓋此模式
 ```
 
@@ -1286,12 +1377,12 @@ T² 主要貢獻變數:
 ```
 樣本 #194 貢獻度分析：
   SPE: 9.063 (✗ 違規，控制限=4.289)
-  T²: 6.892 (✓ 未違規)
+  T²: 3.406 (✓ 未違規)
 
 SPE 主要貢獻變數:
-  Feed_Flow       : 3.82 🔴
-  Coolant_Flow    : 2.64 🟠
-  Reactant_A_Conc : 2.11 🟡
+  pH              : 8.03 🔴
+  Feed_Pressure   : 0.37 🟠
+  Reactor_Pressure: 0.27 🟡
   
 ✓ 異常診斷完成（Sample 194）
 ```
@@ -1300,13 +1391,13 @@ SPE 主要貢獻變數:
 
 #### 8.6.3 兩個異常樣本的對比
 
-| 比較項目 | Sample 209 (Max T²) | Sample 194 (Max SPE) |
+| 比較項目 | Sample 209 (Max $T^2$) | Sample 194 (Max SPE) |
 |---------|---------------------|---------------------|
-| **T² 值** | 23.389 🔴 (超限2.96倍) | 6.892 ✅ (正常) |
-| **SPE 值** | 3.245 ✅ (正常) | 9.063 🟠 (超限2.11倍) |
+| **$T^2$ 值** | 23.389 🔴 (超限2.96倍) | 3.406 ✅ (正常) |
+| **SPE 值** | 0.723 ✅ (正常) | 9.063 🟠 (超限2.11倍) |
 | **異常類型** | 系統性偏移 | 新型態變異 |
-| **主要異常變數** | Reactor_Temp, Jacket_Temp, Pressure | Feed_Flow, Coolant_Flow, Conc |
-| **物理意義** | 溫度/壓力控制失效 | 流量控制異常模式 |
+| **主要異常變數** | Reactor_Pressure, Reactor_Temp, Jacket_Temp | pH, Feed_Pressure, Reactor_Pressure |
+| **物理意義** | 壓力/溫度控制失效 | pH異常或感測器故障 |
 | **PCA解釋力** | ✅ 可解釋（在PC空間內極端） | ✗ 無法解釋（模型外變異） |
 | **處理優先級** | 🔥 高（系統性偏離嚴重） | 🟡 中（需評估是否正常操作） |
 
@@ -1323,44 +1414,36 @@ SPE 主要貢獻變數:
 ### 8.7 模型儲存與部署
 
 ```python
-# 儲存模型與設定
-save_dir = Path('outputs/P2_Unit06_PCA')
-save_dir.mkdir(parents=True, exist_ok=True)
-
-# 儲存 PCA 模型
-joblib.dump(pca, save_dir / 'pca_model.pkl')
+# 儲存模型與控制限
+MODEL_DIR = Path('outputs/P2_Unit06_PCA/models')
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 # 儲存 StandardScaler
-joblib.dump(scaler, save_dir / 'scaler.pkl')
+joblib.dump(scaler, MODEL_DIR / 'scaler.pkl')
 
-# 儲存監控系統
-joblib.dump(monitor, save_dir / 'monitoring_system.pkl')
+# 儲存 PCA 模型
+joblib.dump(pca, MODEL_DIR / 'pca_model.pkl')
 
-# 儲存控制限
-limits = {
-    'T2_limit': monitor.T2_limit,
-    'SPE_limit': monitor.SPE_limit,
-    'alpha': monitor.alpha
+# 儲存控制限（T² 和 SPE 控制限）
+control_limits = {
+    'T2_limit': T2_limit,
+    'SPE_limit': SPE_limit,
+    'alpha': alpha
 }
-with open(save_dir / 'control_limits.json', 'w', encoding='utf-8') as f:
-    json.dump(limits, f, indent=4, ensure_ascii=False)
+joblib.dump(control_limits, MODEL_DIR / 'control_limits.pkl')
+
+print("✓ 模型儲存完成")
+print(f"  Scaler: {MODEL_DIR / 'scaler.pkl'}")
+print(f"  PCA Model: {MODEL_DIR / 'pca_model.pkl'}")
+print(f"  Control Limits: {MODEL_DIR / 'control_limits.pkl'}")
 ```
 
 **執行結果**：
 ```
-模型檔案已儲存至: outputs/P2_Unit06_PCA/
-
-儲存檔案清單:
-  ✓ pca_model.pkl          - PCA 降維模型
-  ✓ scaler.pkl             - 數據標準化器
-  ✓ monitoring_system.pkl  - 監控系統（含統計方法）
-  ✓ control_limits.json    - 控制限設定檔
-
-控制限設定:
-  T² Control Limit : 7.900  (α=0.05)
-  SPE Control Limit: 4.289  (α=0.05)
-
-✓ 所有模型與設定檔儲存完成
+✓ 模型儲存完成
+  Scaler: outputs/P2_Unit06_PCA/models/scaler.pkl
+  PCA Model: outputs/P2_Unit06_PCA/models/pca_model.pkl
+  Control Limits: outputs/P2_Unit06_PCA/models/control_limits.pkl
 ```
 
 **部署應用流程**：
@@ -1368,35 +1451,34 @@ with open(save_dir / 'control_limits.json', 'w', encoding='utf-8') as f:
 ```python
 # === 生產環境載入模型 ===
 import joblib
-import json
+import numpy as np
 from pathlib import Path
 
-# 載入模型
-pca = joblib.load('outputs/P2_Unit06_PCA/pca_model.pkl')
-scaler = joblib.load('outputs/P2_Unit06_PCA/scaler.pkl')
-monitor = joblib.load('outputs/P2_Unit06_PCA/monitoring_system.pkl')
+MODEL_DIR = Path('outputs/P2_Unit06_PCA/models')
 
-# 載入控制限
-with open('outputs/P2_Unit06_PCA/control_limits.json', 'r') as f:
-    limits = json.load(f)
+# 載入模型與控制限
+pca = joblib.load(MODEL_DIR / 'pca_model.pkl')
+scaler = joblib.load(MODEL_DIR / 'scaler.pkl')
+limits = joblib.load(MODEL_DIR / 'control_limits.pkl')
 
 # === 即時監控新批次數據 ===
-# 假設 X_new 是新批次的 10 個製程變數
-X_new_scaled = scaler.transform(X_new)  # 標準化
-stats = monitor.compute_statistics(X_new_scaled)  # 計算 T²/SPE
+# 假設 X_new 是新批次的 10 個製程變數 (shape: (1, 10))
+X_new_scaled = scaler.transform(X_new)       # 標準化
+scores = pca.transform(X_new_scaled)          # PCA降維
+
+# 計算 T² 統計量（Hotelling's T²）
+eigenvalues = pca.explained_variance_
+T2_new = np.sum((scores / np.sqrt(eigenvalues))**2, axis=1)
+
+# 計算 SPE 統計量（Q 統計量）
+X_reconstructed = pca.inverse_transform(scores)
+SPE_new = np.sum((X_new_scaled - X_reconstructed)**2, axis=1)
 
 # 判斷是否異常
-if stats['T2'] > limits['T2_limit']:
-    print(f"⚠️ T² 異常：{stats['T2']:.2f} > {limits['T2_limit']:.2f}")
-    # 執行貢獻度分析
-    contrib = monitor.compute_contributions(X_new_scaled)
-    print(f"主要異常變數：{contrib['T2_top3']}")
-    
-if stats['SPE'] > limits['SPE_limit']:
-    print(f"⚠️ SPE 異常：{stats['SPE']:.2f} > {limits['SPE_limit']:.2f}")
-    # 執行貢獻度分析
-    contrib = monitor.compute_contributions(X_new_scaled)
-    print(f"主要異常變數：{contrib['SPE_top3']}")
+if T2_new[0] > limits['T2_limit']:
+    print(f"⚠️ T² 異常：{T2_new[0]:.2f} > {limits['T2_limit']:.2f}")
+if SPE_new[0] > limits['SPE_limit']:
+    print(f"⚠️ SPE 異常：{SPE_new[0]:.2f} > {limits['SPE_limit']:.2f}")
 ```
 
 **部署檢查清單**：
@@ -1464,31 +1546,37 @@ loadings_df = pd.DataFrame(
 # ============================
 # 5. 製程監控
 # ============================
-monitor = PCAMonitoring(pca, X_train_scaled, alpha=0.05)
-train_stats = monitor.compute_statistics(X_train_scaled)
+X_reconstructed = pca.inverse_transform(X_pca)
+T2_train  = np.sum((X_pca ** 2) / pca.explained_variance_, axis=1)
+SPE_train = np.sum((X_train_scaled - X_reconstructed) ** 2, axis=1)
 
-# T² and SPE control limits
-T2_limit = monitor.T2_limit  # 7.900
-SPE_limit = monitor.SPE_limit  # 4.289
+# 控制限（α=0.05）
+T2_limit = 7.900    # Hotelling's T²（F分布）
+SPE_limit = 4.289   # SPE（訓練集第95百分位數）
 
 # ============================
 # 6. 異常診斷
 # ============================
 # 找出最大異常樣本
-max_T2_idx = np.argmax(train_stats['T2'])  # Sample 209
-max_SPE_idx = np.argmax(train_stats['SPE'])  # Sample 194
+max_T2_idx  = np.argmax(T2_train)   # Sample 209
+max_SPE_idx = np.argmax(SPE_train)  # Sample 194
 
-# 計算貢獻度
-contrib_209 = monitor.compute_contributions(X_train_scaled, max_T2_idx)
-contrib_194 = monitor.compute_contributions(X_train_scaled, max_SPE_idx)
+# 計算 T² 貢獻度（各主成分的相對貢獻）
+t2_contrib_209 = (X_pca[max_T2_idx] ** 2) / pca.explained_variance_
+
+# 計算 SPE 貢獻度（各變數的殘差平方）
+residual_194 = X_train_scaled[max_SPE_idx] - X_reconstructed[max_SPE_idx]
+spe_contrib_194 = residual_194 ** 2
 
 # ============================
 # 7. 模型儲存
 # ============================
-save_dir = Path('outputs/P2_Unit06_PCA')
-joblib.dump(pca, save_dir / 'pca_model.pkl')
-joblib.dump(scaler, save_dir / 'scaler.pkl')
-joblib.dump(monitor, save_dir / 'monitoring_system.pkl')
+MODEL_DIR = Path('outputs/P2_Unit06_PCA/models')
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+joblib.dump(scaler, MODEL_DIR / 'scaler.pkl')
+joblib.dump(pca, MODEL_DIR / 'pca_model.pkl')
+joblib.dump({'T2_limit': T2_limit, 'SPE_limit': SPE_limit, 'alpha': alpha},
+            MODEL_DIR / 'control_limits.pkl')
 
 print("✓ PCA 化工製程監控系統建立完成")
 ```
@@ -1499,10 +1587,10 @@ print("✓ PCA 化工製程監控系統建立完成")
 |------|------|------|
 | **降維效果** | 10維 → 3維 | 維度減少70% |
 | **信息保留** | 85.26% | PC1(35.50%) + PC2(31.10%) + PC3(18.66%) |
-| **T² 控制限** | 7.900 | α=0.05, 16個違規樣本(4.0%) |
-| **SPE 控制限** | 4.289 | α=0.05, 20個違規樣本(5.0%) |
-| **最大T²異常** | Sample 209 (T²=23.389) | 反應器溫度/壓力系統性偏高 |
-| **最大SPE異常** | Sample 194 (SPE=9.063) | 進料流量非典型控制模式 |
+| **$T^2$ 控制限** | 7.900 | α=0.05, 20個違規樣本(4.0%) |
+| **SPE 控制限** | 4.289 | α=0.05, 25個違規樣本(5.0%) |
+| **最大 $T^2$ 異常** | Sample 209 ($T^2$=23.389) | 反應器壓力/溫度系統性偏高 |
+| **最大SPE異常** | Sample 194 (SPE=9.063) | pH極端異常（新型態變異）|
 
 **PCA 工作流程圖**：
 ```
@@ -1511,7 +1599,7 @@ print("✓ PCA 化工製程監控系統建立完成")
 標準化數據(μ=0, σ=1)
     ↓ [PCA(n_components=3)]
 主成分數據(500×3, 85.26%變異數)
-    ↓ [PCAMonitoring(α=0.05)]
+    ↓ [Hotelling T²/SPE統計量計算(α=0.05)]
 T²/SPE統計量 → 控制圖監控
     ↓ [超出控制限?]
     ├─ Yes → Contribution Plot → 根本原因診斷
@@ -1662,7 +1750,7 @@ print(f"\nNumber of non-zero loadings: {np.count_nonzero(spca.components_)}")
 ### 10.4 製程監控應用
 
 ✅ **建立控制圖**：
-- [ ] 計算 T² 和 SPE 統計量
+- [ ] 計算 $T^2$ 和 SPE 統計量
 - [ ] 設定控制限（通常 95% 或 99%）
 - [ ] 繪製控制圖並標記異常點
 
@@ -1785,7 +1873,7 @@ print(f"\nNumber of non-zero loadings: {np.count_nonzero(spca.components_)}")
 1. PCA 是線性降維技術，透過最大化變異數保留將高維數據投影至低維空間
 2. 主成分彼此正交，依解釋變異數大小排序
 3. Loadings 解釋主成分的物理意義，Scores 是降維後的特徵
-4. PCA 在化工製程監控中扮演關鍵角色（T²、SPE 控制圖）
+4. PCA 在化工製程監控中扮演關鍵角色（$T^2$、SPE 控制圖）
 5. 選擇主成分數量需結合統計指標與領域知識
 
 **化工應用價值**：
