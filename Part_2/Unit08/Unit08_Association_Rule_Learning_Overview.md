@@ -240,6 +240,258 @@ $$
 
 關聯規則學習的核心挑戰是從龐大的可能規則空間中高效地找出有意義的規則。本單元介紹兩種經典演算法：Apriori 演算法和 FP-Growth 演算法。
 
+### 3.0 Python 工具：mlxtend 套件
+
+本課程使用 **mlxtend (Machine Learning Extensions)** 套件實作關聯規則學習。mlxtend 是一個開源的 Python 機器學習延伸工具包，提供了簡潔易用的 Apriori 與 FP-Growth 實作。
+
+#### 安裝方式
+
+```bash
+pip install mlxtend
+```
+
+#### 核心函式總覽
+
+關聯規則挖掘的完整流程需要三個步驟，分別對應三個函式：
+
+```
+原始交易數據
+    │
+    ▼
+Step 1: TransactionEncoder     ← 將交易格式轉為 One-Hot 矩陣
+    │
+    ▼
+Step 2: apriori() / fpgrowth() ← 挖掘頻繁項目集
+    │
+    ▼
+Step 3: association_rules()    ← 從頻繁項目集生成關聯規則
+```
+
+---
+
+#### 函式 1：TransactionEncoder（數據格式轉換）
+
+`mlxtend.preprocessing.TransactionEncoder`
+
+**用途**：將「交易清單格式」（每筆交易是一個 list）轉換為 Apriori / FP-Growth 所需的 **One-Hot Boolean DataFrame**。
+
+```python
+from mlxtend.preprocessing import TransactionEncoder
+import pandas as pd
+
+# 原始交易格式（每筆交易是一個項目列表）
+transactions = [
+    ['催化劑A', '溶劑X', '高溫'],
+    ['催化劑A', '溶劑Y', '高溫'],
+    ['催化劑B', '溶劑X', '低溫'],
+]
+
+# 轉換為 One-Hot 矩陣
+te = TransactionEncoder()
+te_array = te.fit(transactions).transform(transactions)
+df = pd.DataFrame(te_array, columns=te.columns_).astype(bool)
+print(df)
+```
+
+**輸出格式**（`dtype=bool` 的 DataFrame）：
+
+```
+   催化劑A  催化劑B  低溫   溶劑X  溶劑Y  高溫
+0   True   False  False  True  False  True
+1   True   False  False  False  True   True
+2   False  True   True   True  False  False
+```
+
+> **注意**：`mlxtend` 的 `apriori()` 與 `fpgrowth()` 要求輸入為 `bool` 型態的 DataFrame，務必加上 `.astype(bool)`。若使用 `int` (0/1) 型態，部分版本會發出警告。
+
+---
+
+#### 函式 2：apriori()（Apriori 頻繁項目集挖掘）
+
+`mlxtend.frequent_patterns.apriori`
+
+**完整函式簽名**：
+
+```python
+from mlxtend.frequent_patterns import apriori
+
+frequent_itemsets = apriori(
+    df,                    # bool 型 DataFrame（One-Hot 編碼）
+    min_support=0.5,       # 最小支持度（float，必填）
+    use_colnames=False,    # True：結果顯示欄位名稱；False：顯示欄位索引編號
+    max_len=None,          # 最大項目集大小（int，None = 不限制）
+    verbose=0,             # 0：不輸出進度；1：輸出掃描進度
+    low_memory=False,      # True：降低記憶體用量（速度較慢，大數據集使用）
+)
+```
+
+**各參數說明**：
+
+| 參數 | 型態 | 預設值 | 說明 |
+|------|------|--------|------|
+| `df` | DataFrame | — | One-Hot bool 格式的交易矩陣（必填） |
+| `min_support` | float | — | 最小支持度閾值，範圍 (0, 1]（必填） |
+| `use_colnames` | bool | `False` | `True` 使結果 itemsets 顯示欄位名稱，建議設為 `True` |
+| `max_len` | int / None | `None` | 限制頻繁項目集的最大大小，設較小值可加速計算 |
+| `verbose` | int | `0` | 印出掃描過程，除錯時可設為 `1` |
+| `low_memory` | bool | `False` | 大數據集時設 `True` 以節省記憶體，但速度較慢 |
+
+**回傳值**：包含 `support`（float）與 `itemsets`（frozenset）兩欄的 DataFrame。
+
+```python
+# 範例
+frequent_itemsets = apriori(df, min_support=0.08, use_colnames=True, max_len=5)
+print(frequent_itemsets.head())
+#    support              itemsets
+# 0     0.80            (催化劑A,)
+# 1     0.60    (催化劑A, 溶劑X,)
+# ...
+```
+
+> **實務提示**：先用較高的 `min_support`（如 0.2）試跑，確認回傳項目集數量在合理範圍（數十到數百個）後，再逐步降低。若一次設太低，可能產生數萬個候選集，造成記憶體不足。
+
+---
+
+#### 函式 3：fpgrowth()（FP-Growth 頻繁項目集挖掘）
+
+`mlxtend.frequent_patterns.fpgrowth`
+
+**完整函式簽名**：
+
+```python
+from mlxtend.frequent_patterns import fpgrowth
+
+frequent_itemsets = fpgrowth(
+    df,                    # bool 型 DataFrame（One-Hot 編碼）
+    min_support=0.5,       # 最小支持度（float，必填）
+    use_colnames=False,    # True：結果顯示欄位名稱
+    max_len=None,          # 最大項目集大小
+    verbose=0,             # 0：不輸出進度
+)
+```
+
+**各參數說明**：
+
+| 參數 | 型態 | 預設值 | 說明 |
+|------|------|--------|------|
+| `df` | DataFrame | — | One-Hot bool 格式的交易矩陣（必填） |
+| `min_support` | float | — | 最小支持度閾值，範圍 (0, 1]（必填） |
+| `use_colnames` | bool | `False` | `True` 使結果 itemsets 顯示欄位名稱，建議設為 `True` |
+| `max_len` | int / None | `None` | 限制頻繁項目集的最大大小 |
+| `verbose` | int | `0` | 印出掃描過程 |
+
+**回傳值**：格式與 `apriori()` 完全相同，可直接互換使用。
+
+> **apriori vs fpgrowth 選擇建議**：兩者的輸入參數與回傳格式完全一致，可以直接替換函式名稱。小數據集（< 10,000 筆）兩者速度相近，建議使用 `apriori`（邏輯較透明）；大數據集（> 10,000 筆）使用 `fpgrowth` 速度更快。
+
+---
+
+#### 函式 4：association_rules()（生成關聯規則）
+
+`mlxtend.frequent_patterns.association_rules`
+
+**完整函式簽名**：
+
+```python
+from mlxtend.frequent_patterns import association_rules
+
+rules = association_rules(
+    df,                        # apriori() / fpgrowth() 的回傳結果
+    metric="confidence",       # 過濾指標：'support', 'confidence', 'lift',
+                               #           'leverage', 'conviction', 'zhangs_metric'
+    min_threshold=0.8,         # 對應 metric 的最小值（必填）
+    support_only=False,        # True：只計算 support，跳過其他指標（加速用）
+    num_itemsets=None,         # 新版參數（mlxtend ≥ 0.23）：指定處理的頻繁項目集數量上限
+)
+```
+
+**各參數說明**：
+
+| 參數 | 型態 | 預設值 | 說明 |
+|------|------|--------|------|
+| `df` | DataFrame | — | `apriori()` 或 `fpgrowth()` 的回傳值（必填） |
+| `metric` | str | `"confidence"` | 作為過濾基準的指標名稱，見下方選項表 |
+| `min_threshold` | float | — | 對應 `metric` 的最小值（必填） |
+| `support_only` | bool | `False` | `True` 時只填入 support 欄，其餘指標設為 NaN，用於加速大規則集 |
+| `num_itemsets` | int / None | `None` | mlxtend ≥ 0.23 新增，限制處理的最大項目集數量 |
+
+**`metric` 可選值**：
+
+| metric 值 | 說明 | 建議 min_threshold |
+|-----------|------|-------------------|
+| `'support'` | 規則的支持度 | 0.05 ~ 0.2 |
+| `'confidence'` | 規則的置信度（最常用） | 0.5 ~ 0.8 |
+| `'lift'` | 規則的提升度 | 1.0 ~ 1.5 |
+| `'leverage'` | 槓桿值 | 0.0 ~ 0.1 |
+| `'conviction'` | 確信度 | 1.0 ~ 2.0 |
+| `'zhangs_metric'` | Zhang's Metric | 0.0 ~ 0.5 |
+
+**回傳值**：DataFrame，包含以下欄位：
+
+| 欄位 | 說明 |
+|------|------|
+| `antecedents` | 前項（frozenset） |
+| `consequents` | 後項（frozenset） |
+| `antecedent support` | 前項支持度 |
+| `consequent support` | 後項支持度 |
+| `support` | 規則支持度（= antecedent ∩ consequent support） |
+| `confidence` | 置信度 |
+| `lift` | 提升度 |
+| `leverage` | 槓桿值 |
+| `conviction` | 確信度 |
+| `zhangs_metric` | Zhang's Metric（mlxtend ≥ 0.21） |
+
+---
+
+#### 完整使用範例
+
+```python
+import pandas as pd
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# ── Step 1：準備交易數據 ──────────────────────────────────────────
+transactions = [
+    ['催化劑A', '溶劑X', '高溫', '高產率'],
+    ['催化劑A', '引發劑I1', '高溫'],
+    ['溶劑X', '中溫', '鏈轉移劑T2', '高純度'],
+    ['催化劑A', '溶劑X', '高溫', '高轉化率'],
+    ['引發劑I1', '中溫', '高純度'],
+]
+
+# ── Step 2：轉換為 One-Hot 矩陣 ──────────────────────────────────
+te = TransactionEncoder()
+te_array = te.fit(transactions).transform(transactions)
+df = pd.DataFrame(te_array, columns=te.columns_).astype(bool)
+
+# ── Step 3：挖掘頻繁項目集 ───────────────────────────────────────
+frequent_itemsets = apriori(
+    df,
+    min_support=0.4,      # 至少 40% 的交易包含此項目集（5 筆 × 0.4 = 2 次）
+    use_colnames=True,    # 顯示欄位名稱（而非欄位索引編號）
+    max_len=4,            # 最大 4 元素組合
+)
+print(f"找到 {len(frequent_itemsets)} 個頻繁項目集\n")
+
+# ── Step 4：生成關聯規則 ─────────────────────────────────────────
+rules = association_rules(
+    frequent_itemsets,
+    metric="confidence",  # 以置信度作為主要篩選指標
+    min_threshold=0.6,    # 置信度 ≥ 60%
+)
+
+# 二次過濾：進一步要求 Lift > 1.2
+quality_rules = rules[rules['lift'] > 1.2].sort_values('lift', ascending=False)
+
+print(f"找到 {len(rules)} 條規則（confidence ≥ 0.6）")
+print(f"高品質規則（lift > 1.2）：{len(quality_rules)} 條\n")
+print(quality_rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
+```
+
+> **常見錯誤排除**：若出現 `TypeError: Argument 'df' should be boolean` 錯誤，請確認 DataFrame 已加上 `.astype(bool)`。若出現 `KeyError: 'zhangs_metric'`，請升級 mlxtend 至 0.21 以上版本（`pip install --upgrade mlxtend`）。
+
+---
+
 ### 3.1 Apriori 演算法
 
 **核心原理**
@@ -298,6 +550,84 @@ L₃ = {{催化劑A, 溶劑X, 高溫}}
 
 無法產生更大的頻繁項目集，演算法終止。
 
+#### 第二階段：從頻繁項目集建立關聯規則
+
+完成頻繁項目集挖掘後，對每個包含 **2 個以上元素**的頻繁項目集，枚舉所有可能的非空子集分割（前項 A ⇒ 後項 B），計算 Confidence 與 Lift，再以最小置信度閾值過濾。
+
+**核心公式：**
+
+$$
+\text{Confidence}(A \Rightarrow B) = \frac{\text{support}(A \cup B)}{\text{support}(A)}
+$$
+
+$$
+\text{Lift}(A \Rightarrow B) = \frac{\text{Confidence}(A \Rightarrow B)}{\text{support}(B)}
+$$
+
+以 $\{催化劑A,\ 溶劑X,\ 高溫\}$（support = 0.4）為例，可分割出 6 條候選規則：
+
+| 規則 | Confidence 計算 | Confidence | Lift |
+|------|----------------|------------|------|
+| $\{催化劑A\} \Rightarrow \{溶劑X,\ 高溫\}$ | $0.4 / 0.8$ | 0.50 | 1.04 |
+| $\{溶劑X\} \Rightarrow \{催化劑A,\ 高溫\}$ | $0.4 / 0.8$ | 0.50 | 1.04 |
+| $\{高溫\} \Rightarrow \{催化劑A,\ 溶劑X\}$ | $0.4 / 0.6$ | 0.67 | 1.04 |
+| $\{催化劑A,\ 溶劑X\} \Rightarrow \{高溫\}$ | $0.4 / 0.6$ | 0.67 | 1.11 |
+| $\{催化劑A,\ 高溫\} \Rightarrow \{溶劑X\}$ | $0.4 / 0.6$ | 0.67 | 0.83 |
+| $\{溶劑X,\ 高溫\} \Rightarrow \{催化劑A\}$ | $0.4 / 0.4$ | **1.00** | **1.25** |
+
+以 `min_confidence = 0.6` 篩選後，前兩條（Confidence = 0.50）被過濾，保留最後 4 條。
+
+> **判斷規則品質**：Confidence 高表示預測可靠性強；Lift > 1 表示正關聯（出現 A 會增加 B 的機率），Lift < 1 表示負關聯，Lift = 1 表示獨立。例如 $\{催化劑A,\ 高溫\} \Rightarrow \{溶劑X\}$ 雖然 Confidence = 0.67，但 Lift = 0.83 < 1，代表此條件組合實際上**抑制**了溶劑X的出現，是需要注意的警示規則。
+
+**Python 實作（mlxtend 一行完成）：**
+
+```python
+# 從頻繁項目集生成關聯規則
+rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.6)
+print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
+```
+
+`association_rules()` 函式會自動枚舉所有頻繁項目集的子集分割、計算 Support、Confidence、Lift、Leverage、Conviction 等指標，並按 `min_threshold` 過濾。
+
+---
+
+#### 💻 範例演練：Apriori 逐步追蹤執行結果
+
+以下為 Python 程式碼對上述 5 筆交易範例的完整逐步追蹤輸出：
+
+```text
+min_support = 0.4 (至少出現 2 次)
+
+=== L1：單一項目支持度 ===
+  {催化劑A}  count=4  support=0.80  ✓ 通過
+  {溶劑X}    count=4  support=0.80  ✓ 通過
+  {高溫}     count=3  support=0.60  ✓ 通過
+  {催化劑B}  count=1  support=0.20  ✗ 剪除
+  {溶劑Y}    count=1  support=0.20  ✗ 剪除
+  {低溫}     count=1  support=0.20  ✗ 剪除
+  {高產率}   count=1  support=0.20  ✗ 剪除
+
+L1 = { 催化劑A: 0.80,  溶劑X: 0.80,  高溫: 0.60 }
+
+=== L2：2-項目集 ===
+  {催化劑A, 溶劑X}  support=0.60  ✓ 通過
+  {催化劑A, 高溫}   support=0.60  ✓ 通過
+  {溶劑X, 高溫}     support=0.40  ✓ 通過
+
+L2 = { {催化劑A,溶劑X}: 0.60,  {催化劑A,高溫}: 0.60,  {溶劑X,高溫}: 0.40 }
+
+=== L3：3-項目集 ===
+  {催化劑A, 溶劑X, 高溫}  support=0.40  ✓ 通過
+
+L3 = { {催化劑A,溶劑X,高溫}: 0.40 }
+
+=== 嘗試 L4：候選集數量 = 0 → 演算法終止 ===
+
+✓ 最終頻繁項目集總數: 7
+```
+
+> **結果分析**：程式執行結果與上方手動推導完全一致，共發現 **7 個頻繁項目集**（3 個 1-項目集 + 3 個 2-項目集 + 1 個 3-項目集）。其中 4 個 1-項目集（催化劑B、溶劑Y、低溫、高產率）因支持度低於 0.4 而在 L1 階段即被剪除，體現了 Apriori 原理的高效剪枝能力。
+
 **Python 實現 (mlxtend 套件)**
 
 ```python
@@ -325,6 +655,45 @@ rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=
 print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
 ```
 
+#### 💻 範例演練：mlxtend 執行驗證結果
+
+對同一份 5 筆交易數據執行 mlxtend，驗證手動計算的正確性：
+
+**頻繁項目集 (min_support=0.4)：共 7 個**
+
+```text
+   support           itemsets
+0      0.8           (催化劑A)
+1      0.8            (溶劑X)
+2      0.6             (高溫)
+3      0.6     (催化劑A, 溶劑X)
+4      0.6      (催化劑A, 高溫)
+5      0.4       (溶劑X, 高溫)
+6      0.4  (催化劑A, 溶劑X, 高溫)
+```
+
+**關聯規則 (min_confidence=0.6)：共 9 條**
+
+```text
+         antecedents      consequents  support  confidence      lift
+0           (催化劑A)          (溶劑X)      0.6    0.750000  0.937500
+1            (溶劑X)          (催化劑A)      0.6    0.750000  0.937500
+2           (催化劑A)           (高溫)      0.6    0.750000  1.250000
+3             (高溫)          (催化劑A)      0.6    1.000000  1.250000
+4             (高溫)           (溶劑X)      0.4    0.666667  0.833333
+5     (催化劑A, 溶劑X)           (高溫)      0.4    0.666667  1.111111
+6      (催化劑A, 高溫)          (溶劑X)      0.4    0.666667  0.833333
+7       (溶劑X, 高溫)          (催化劑A)      0.4    1.000000  1.250000
+8             (高溫)   (催化劑A, 溶劑X)      0.4    0.666667  1.111111
+```
+
+**驗證重點：**
+
+- **{催化劑A} ⇒ {高產率}**：Confidence = 0.25 < 0.6（min_confidence 閾值），**正確地被過濾**，未出現在規則集中。
+- **{高溫} ⇒ {催化劑A}**：手算 Conf = 1.000, Lift = 1.250；mlxtend Conf = 1.000, Lift = 1.250 → ✅ **完全一致**！
+
+> **結果分析**：9 條規則中，{高溫} ⇒ {催化劑A} 和 {溶劑X,高溫} ⇒ {催化劑A} 的置信度均達到 100%，是此範例中最強的規則。部分規則（如 {催化劑A} ⇒ {溶劑X}）雖置信度達 75%，但 Lift = 0.94 < 1 表示**負相關**——這警示我們光靠置信度不足以判斷規則品質，必須同時參考提升度。
+
 **優點**
 
 - 演算法邏輯清晰，易於理解和實現
@@ -343,7 +712,6 @@ print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
 - 小規模配方數據庫分析（< 10,000 筆交易）
 - 實驗室實驗數據分析
 - 需要高度可解釋性的場景
-- 教學與演示
 
 ### 3.2 FP-Growth 演算法
 
@@ -394,30 +762,33 @@ FP-Tree 是一種壓縮的前綴樹 (prefix tree)，具有以下特點：
 建立的 FP-Tree 結構：
 ```
                  root
-                   |
-              催化劑A:4
               /        \
-          溶劑X:3      高溫:1
-            |
-          高溫:2
+         催化劑A:4    溶劑X:1
+         /        \
+     溶劑X:3      高溫:1
+         |
+       高溫:2
 ```
+
+> 注意：T3 的頻繁項目 {溶劑X} 從根節點直接插入，形成 root→溶劑X:1 的獨立分支，因為其前綴（催化劑B）不在頻繁項目中。
 
 **挖掘 FP-Tree**：
 1. 從「高溫」開始
    - 條件模式基：{催化劑A, 溶劑X:2}, {催化劑A:1}
-   - 條件 FP-Tree：{催化劑A:3} (支持度 ≥ 2)
-   - 頻繁項目集：{高溫}, {催化劑A, 高溫}
+   - 條件 FP-Tree：root→催化劑A:3→溶劑X:2（兩者支持度計數均 ≥ 2）
+   - 頻繁項目集：{高溫}, {催化劑A, 高溫}, {溶劑X, 高溫}, {催化劑A, 溶劑X, 高溫}
 
 2. 處理「溶劑X」
-   - 條件模式基：{催化劑A:3}
-   - 條件 FP-Tree：{催化劑A:3}
+   - 條件模式基：{催化劑A:3}（root→溶劑X:1 的空前綴不貢獻頻繁項）
+   - 條件 FP-Tree：root→催化劑A:3
    - 頻繁項目集：{溶劑X}, {催化劑A, 溶劑X}
 
 3. 處理「催化劑A」
    - 頻繁項目集：{催化劑A}
 
-4. 組合結果
-   - 從「高溫」的條件樹和「溶劑X」的條件樹，可得：{催化劑A, 溶劑X, 高溫}
+4. 組合所有結果
+   - 全部頻繁項目集：{催化劑A}, {溶劑X}, {高溫}, {催化劑A, 溶劑X}, {催化劑A, 高溫}, {溶劑X, 高溫}, {催化劑A, 溶劑X, 高溫}
+   - 注意：{催化劑A, 溶劑X, 高溫} 已在步驟 1 挖掘「高溫」條件樹時直接得出，與 Apriori 結果完全一致
 
 **Python 實現 (mlxtend 套件)**
 
@@ -493,6 +864,28 @@ print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
 | **配方知識庫建立** | Apriori | 注重規則的可解釋性和可追溯性 |
 | **大數據分析** | FP-Growth | 高維度、大規模數據 |
 
+#### 💻 範例演練：Apriori vs FP-Growth 效能比較
+
+對包含 **500 筆交易、22 個化工項目**的模擬數據集（Cat_A~C、Solvent_X~Z、High/Low/Optimal Temp、High/Med/Low Press、Add_1~3 等）分別執行兩種演算法：
+
+```text
+數據集摘要：500 筆交易 × 22 個化工項目
+主要項目出現頻率：
+  Optimal_Temp   50.2%    High_Purity   44.0%
+  Cat_A          42.4%    Excellent_Yield  42.2%
+  Solvent_X      38.6%    High_Temp     36.8%
+  Cat_B          33.6%    Solvent_Y     32.2%
+  High_Press     29.0%    Good_Yield    27.6%
+
+===== 演算法效能比較 =====
+Apriori   執行時間: 0.0196s  頻繁項目集: 400 個  關聯規則: 88 條
+FP-Growth 執行時間: 0.0365s  頻繁項目集: 400 個  關聯規則: 88 條
+
+✓ 兩種演算法結果完全一致：True
+```
+
+> **結果分析**：對於此規模的數據（500 筆 × 22 項目），兩種演算法均在 50ms 以內完成，速度都極快。值得注意的是，在此小規模數據下 **Apriori 反而略快**（0.020s vs 0.037s），這符合 FP-Growth 在小數據集時因 FP-Tree 建構開銷而略慢的特性。兩者產生相同的 400 個頻繁項目集和 88 條規則，驗證了演算法的正確性。在實際大規模生產數據（> 10 萬筆）的場景下，FP-Growth 的速度優勢將顯著體現。
+
 ---
 
 ## 4. 規則評估與過濾
@@ -541,12 +934,6 @@ $$
 \text{Zhang}(X, Y) = \frac{P(X \cap Y) - P(X)P(Y)}{\max\{P(X)P(\bar{Y}), P(\bar{X})P(Y)\}}
 $$
 
-或用支持度和置信度表示：
-
-$$
-\text{Zhang}(X, Y) = \frac{\text{Confidence}(X \Rightarrow Y) - \text{Support}(Y)}{\max\{\text{Confidence}(X \Rightarrow Y)(1 - \text{Support}(Y)), \text{Support}(Y)(1 - \text{Confidence}(X \Rightarrow Y))\}}
-$$
-
 **意義**：
 - 值域為 [-1, 1]
 - Zhang = 0：獨立
@@ -573,41 +960,124 @@ $$
 
 **意義**：衡量項目集大小的不平衡程度，值越小表示越平衡。
 
+#### 💻 範例演練：進階評估指標計算結果
+
+對 500 筆交易數據集中的 88 條規則計算 Conviction、Leverage、Zhang's Metric 和 Kulczynski，以下為 **Conviction 最高的前 10 條規則**：
+
+```text
+===== Top-10 規則（依 Conviction 排序）=====
+
+#1   {Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}
+     conf=0.909  lift=2.154  conviction=6.358  leverage=0.032  zhang=0.082  kulc=0.526
+
+#2   {High_Press, Optimal_Temp} ⇒ {Excellent_Yield}
+     conf=0.839  lift=1.988  conviction=3.601  leverage=0.076  zhang=0.228  kulc=0.591
+
+#3   {Cat_A, Solvent_X, Optimal_Temp} ⇒ {Excellent_Yield}
+     conf=0.832  lift=1.971  conviction=3.444  leverage=0.069  zhang=0.205  kulc=0.582
+
+#4   {Cat_A, Optimal_Temp} ⇒ {Excellent_Yield}
+     conf=0.829  lift=1.963  conviction=3.372  leverage=0.085  zhang=0.256  kulc=0.620
+
+...（第 5~9 名省略）
+
+#10  {Cat_B, Low_Temp} ⇒ {Poor_Yield}
+     conf=0.600  lift=2.750  conviction=2.500  leverage=0.034  zhang=0.208  kulc=0.465
+```
+
+> **結果分析**：Conviction 最高（6.358）的規則 `{Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}` 表示在此三因素組合下，「沒有達到高品質產率」幾乎是不可能發生的事。而 `{Cat_B, Low_Temp} ⇒ {Poor_Yield}` 雖然 Lift = 2.75 是全集最高（最強正關聯），但 Conviction 僅 2.5，說明這個規則仍有 40% 的例外情形。四種進階指標的排序差異顯著，充分說明**單一指標不足以全面評估規則品質**，需要多指標綜合考量才能做出正確的製程決策。
+
 ### 4.3 設定合理的閾值
 
-**min_support 的設定原則**
+關聯規則挖掘有三個核心參數需要設定：`min_support`、`min_confidence` 與 `min_lift`。在開始調整前，先用下面三個直覺問題幫助自己定位，再對照應用場景建議表格選取初始值。
 
-- **太高**：可能遺漏重要但罕見的規則（如罕見故障模式）
-- **太低**：產生大量無意義的規則，增加計算負擔和誤導風險
+---
 
-**化工應用建議**：
+#### 參數 1：min_support（最小支持度）
+
+**直覺問題**：「我的數據有多少筆？一條規則至少要出現幾次，我才願意相信它？」
+
+`min_support` 的本質是「最少要有幾筆交易支持這條規則」。把它轉換成絕對次數更直覺：
+
+$$
+\text{最少出現次數} = \text{min\_support} \times \text{總交易筆數}
+$$
+
+例如有 200 筆數據，`min_support = 0.08` 代表規則至少要出現 $0.08 \times 200 = 16$ 次才算頻繁。**如果一個配方組合只出現過 3 次，你敢據此下生產決策嗎？** 這就是為什麼 min_support 不能設太低。
+
+- 設定**太高**：可能遺漏重要但罕見的規則（如罕見故障模式）
+- 設定**太低**：產生大量無意義的規則，增加計算負擔和誤導風險
+
+**化工應用場景建議：**
 
 | 應用場景 | 建議 min_support | 理由 |
 |----------|-----------------|------|
-| **常見操作模式** | 0.1 - 0.3 | 希望找到普遍存在的模式 |
-| **故障診斷** | 0.01 - 0.05 | 故障是罕見事件，但需要識別 |
-| **配方篩選** | 0.05 - 0.15 | 平衡常見配方與創新配方 |
-| **品質控制** | 0.1 - 0.2 | 關注主要影響因素 |
+| **常見操作模式** | 0.10 ~ 0.30 | 希望找到普遍存在的模式 |
+| **配方篩選** | 0.05 ~ 0.15 | 平衡常見配方與創新配方 |
+| **品質控制** | 0.10 ~ 0.20 | 關注主要影響因素 |
+| **故障診斷** | 0.01 ~ 0.05 | 故障是罕見事件，但需要識別 |
 
-**動態調整策略**：
-1. 從較高的 min_support 開始（如 0.2）
-2. 逐步降低，觀察規則數量和品質
-3. 當規則數量爆炸式增長但品質下降時，停止降低
-4. 使用領域知識驗證關鍵規則
+---
 
-**min_confidence 的設定原則**
+#### 參數 2：min_confidence（最小置信度）
 
-- **太高**：只保留非常強的規則，可能過於保守
-- **太低**：包含大量不可靠的規則
+**直覺問題**：「如果這條規則成立，我希望它至少有多少機率是對的？」
 
-**化工應用建議**：
+`min_confidence` 就是你對規則可靠性的最低要求。依照決策影響程度設定：
 
-| 應用場景 | 建議 min_confidence | 理由 |
-|----------|-------------------|------|
-| **關鍵品質控制** | 0.8 - 0.95 | 需要高可靠性 |
-| **配方建議** | 0.6 - 0.8 | 允許一定程度的不確定性 |
-| **探索性分析** | 0.5 - 0.7 | 發現潛在有趣的模式 |
-| **故障預警** | 0.7 - 0.9 | 平衡誤報與漏報 |
+| 使用目的 | 建議 min_confidence | 說明 |
+|---------|-------------------|------|
+| **探索性分析**（先找線索） | 0.50 ~ 0.70 | 允許較多不確定性，廣泛搜尋潛在模式 |
+| **配方建議**（給工程師參考） | 0.65 ~ 0.80 | 兼顧探索性與可靠性 |
+| **關鍵品質控制 / 生產決策** | 0.80 ~ 0.95 | 需要高可靠性，直接影響產品品質 |
+| **故障預警** | 0.70 ~ 0.90 | 平衡誤報（太高）與漏報（太低） |
+
+- 設定**太高**：只保留非常強的規則，可能過於保守，遺漏有用線索
+- 設定**太低**：包含大量不可靠的規則，降低知識庫可信度
+
+---
+
+#### 參數 3：min_lift（最小提升度）
+
+**直覺問題**：「Lift 要大於多少，這條規則才不只是巧合？」
+
+Lift = 1 代表純粹巧合（A 與 B 互相獨立）。建議將 Lift 作為**第三道篩選關卡**：
+
+| Lift 範圍 | 解讀 | 建議做法 |
+|-----------|------|---------|
+| Lift < 1 | 負關聯（A 出現反而抑制 B） | 保留作為「禁忌配方」警示規則 |
+| Lift ≈ 1（0.9 ~ 1.1） | 幾乎獨立，可能是巧合 | 過濾掉 |
+| 1.2 ≤ Lift < 1.5 | 弱正關聯 | 保留作參考，但不作決策依據 |
+| 1.5 ≤ Lift < 2.0 | 中等正關聯 | 具有實質協同效應，值得關注 |
+| Lift ≥ 2.0 | 強正關聯 | 高優先度規則，應優先驗證 |
+
+---
+
+#### 常見的錯誤設定與對應徵兆
+
+| 症狀 | 可能原因 | 修正方向 |
+|------|---------|---------|
+| 規則數量 = 0 或極少 | `min_support` 或 `min_confidence` 設定太高 | 逐步降低，每次降 0.05 觀察規則數量變化 |
+| 規則數量爆炸（數千條） | `min_support` 設定太低 | 提高 `min_support`；或加上 `Lift > 1.5` 後過濾 |
+| 規則都是顯而易見的常識 | `min_support` 太高，只剩下最普通的組合 | 適度降低 `min_support`，或預先排除背景項目 |
+
+#### 建議的調參流程（由粗到細）
+
+```
+Step 1  先設保守值：min_support = 0.1,  min_confidence = 0.7
+        → 觀察規則數量，若 < 10 條則往 Step 2
+
+Step 2  放寬 min_support：降至 0.05
+        → 若規則數仍少，再降至 0.03（小數據集最低建議值）
+
+Step 3  用 Lift > 1.5 二次過濾，去除巧合關聯
+
+Step 4  用領域知識驗證前 10 條最強規則
+        → 若結果符合製程常識，閾值設定合理
+        → 若全是廢話，考慮提高 min_confidence 或 min_lift
+```
+
+> **化工學生注意**：不要只追求「規則越多越好」。找到 5~20 條高 Lift、高 Confidence、可以被化學或製程機理解釋的規則，遠比找到 500 條無法解釋的規則有價值。
 
 ### 4.4 規則過濾策略
 
@@ -652,6 +1122,38 @@ $$
 **5. 領域知識驗證**
 
 與化工專家合作，移除違反物理化學原理或製程邏輯的規則。
+
+#### 💻 範例演練：多策略規則過濾結果
+
+對 88 條初始規則套用三種過濾策略（卡方檢驗使用 scipy.stats.chi2_contingency）：
+
+```text
+過濾前：共 88 條規則
+
+策略 1 — Lift ≥ 1.2（移除弱關聯規則）：  88 條（移除  0 條）
+策略 2 — 卡方 p ≤ 0.05（移除統計不顯著）：86 條（移除  2 條）
+策略 3 — 前項長度 ≤ 2（移除過複雜規則）： 51 條（移除 35 條）
+
+最終保留：51 條高品質規則
+
+===== Top-10 綜合評分規則（Score = 0.5×Conf + 0.3×Lift_norm + 0.2×Sup_norm）=====
+
+#1   {Cat_A, Optimal_Temp} ⇒ {Excellent_Yield}
+     sup=0.174  conf=0.829  lift=1.96  score=0.663
+
+#2   {Add_3, Excellent_Yield} ⇒ {Optimal_Temp}
+     sup=0.062  conf=0.861  lift=1.72  score=0.630
+
+#3   {High_Press, Solvent_X} ⇒ {High_Purity}
+     sup=0.108  conf=0.794  lift=1.80  score=0.615
+
+#4   {Cat_B, Low_Temp} ⇒ {Poor_Yield}
+     sup=0.054  conf=0.600  lift=2.75  score=0.611
+
+#5~10  (其他高品質規則)
+```
+
+> **結果分析**：從 88 條規則精簡至 51 條（減少 42%），主要透過「前項長度 ≤ 2」策略移除了 35 條複雜三因子以上規則。統計顯著性過濾只移除 2 條，說明大多數規則的樣本量足夠充分。綜合評分最高的 `{Cat_A, Optimal_Temp} ⇒ {Excellent_Yield}`（score=0.663）具備高置信度（82.9%）、正向提升（1.96×）且支持度 17.4% 高，是最具實際操作價值的製程優化規則。`{Cat_B, Low_Temp} ⇒ {Poor_Yield}` 雖 Lift 最高（2.75×），但置信度僅 60% 且支持度低（5.4%），說明在某些特殊工況下才會觸發，需要謹慎對待。
 
 ### 4.5 規則排序與選擇
 
@@ -712,54 +1214,245 @@ $$
 
 ### 4.7 常見陷阱與注意事項
 
-**1. Simpson's Paradox (辛普森悖論)**
+---
 
-在整體數據中成立的關聯規則，在子群體中可能不成立；反之亦然。
+#### 陷阱 1：Simpson's Paradox（辛普森悖論）
 
-**範例**：
-- 整體數據：{催化劑A} $\Rightarrow$ {高產率} (Confidence = 0.8)
-- 高溫子群：{催化劑A} $\Rightarrow$ {高產率} (Confidence = 0.6)
-- 低溫子群：{催化劑A} $\Rightarrow$ {高產率} (Confidence = 0.9)
+**核心問題**：在整體數據中成立的關聯規則，在子群體中可能不成立；甚至方向相反。這是因為**第三個隱藏變數（混淆變數）**影響了整體結果。
 
-**應對策略**：進行分層分析，檢查規則在不同子群體中的表現。
+**具體說明**：
 
-**2. 相關性 ≠ 因果性**
+假設工廠有 200 筆生產記錄，分為「新操作員」（120筆）和「資深操作員」（80筆）兩個子群：
 
-關聯規則只能揭示相關性，不能證明因果關係。
+| 子群 | 使用催化劑A | 達高產率 | Confidence |
+|------|------------|---------|------------|
+| 資深操作員 | 20筆 | 18筆 | **90%** |
+| 新操作員 | 100筆 | 62筆 | **62%** |
+| **整體合併** | **120筆** | **80筆** | **67%** |
 
-**範例**：
-- 規則：{高反應溫度} $\Rightarrow$ {高產率}
-- 可能的真相：高溫和高產率都是「優秀操作人員」的結果，而非直接因果
+但若只看整體數據並加上另一種計算方式：
 
-**應對策略**：
-- 結合領域知識推斷因果關係
-- 使用實驗設計 (DOE) 驗證因果性
-- 考慮時間序列（原因應該在結果之前發生）
+- 整體：{催化劑A} $\Rightarrow$ {高產率} (Confidence = **0.80**)
+- 高溫操作子群：{催化劑A} $\Rightarrow$ {高產率} (Confidence = **0.60**)
+- 低溫操作子群：{催化劑A} $\Rightarrow$ {高產率} (Confidence = **0.90**)
 
-**3. 稀有項目的規則不可靠**
+整體 Confidence 反而介於兩個子群之間，甚至可能比兩個子群都高（因為整體中不同子群的比例分配會造成加權偏差）。
 
-當項目集的支持度非常低時，規則可能只是偶然現象。
+**為什麼會發生？**
 
-**範例**：
-- 只有 2 筆交易包含{罕見添加劑X}，其中 2 筆都有高產率
-- 規則：{罕見添加劑X} $\Rightarrow$ {高產率} (Confidence = 1.0)
-- 但樣本太小，不能可靠推斷
+混淆變數（如「操作溫度」或「操作員資歷」）同時影響了「是否使用催化劑A」和「是否達到高產率」，但我們在整體分析時忽略了它。整體的規則看起來很強，實際上是某個子群數量較多「稀釋」或「拉高」了結果。
 
 **應對策略**：
-- 設定最小支持度計數（如至少 30 筆交易）
-- 使用統計顯著性檢驗
-- 透過額外實驗驗證稀有規則
 
-**4. 數據品質問題**
+1. **分層分析**：將數據按已知的重要變數（如反應溫度區間、設備編號、班組）分層，在每個子群分別執行關聯規則挖掘。
+2. **加入情境變數作為項目**：在交易數據中加入「高溫操作」、「低溫操作」作為顯式項目，讓演算法自然區分。例如，將 {催化劑A, 高溫} $\Rightarrow$ {高產率} 與 {催化劑A, 低溫} $\Rightarrow$ {高產率} 分開評估。
+3. **優先驗證關鍵規則**：對整體分析中看起來最強的規則，逐一按子群重新計算 Confidence，確認是否在各子群都成立。
 
-- **遺漏值**：可能導致低估某些項目集的支持度
-- **記錄錯誤**：產生誤導性規則
-- **數據不平衡**：常見項目主導規則集，罕見但重要的模式被忽略
+```python
+# 分層分析示範：按「操作溫度」分群，分別挖掘規則
+for group_name, group_df in transaction_df.groupby('temperature_level'):
+    sub_transactions = group_df['items'].tolist()
+    # 對每個子群分別執行完整的 TransactionEncoder → apriori → association_rules 流程
+    print(f"\n=== {group_name} 子群規則 ===")
+    # ... (後續與一般流程相同)
+```
+
+---
+
+#### 陷阱 2：相關性 ≠ 因果性
+
+**核心問題**：關聯規則只能發現「A 與 B 常常同時出現」，但**無法告訴你 A 是否導致了 B**。在化工製程中，盲目根據相關性規則調整操作條件，可能導致無效甚至危險的決策。
+
+**三種常見的混淆情況**：
+
+| 情況 | 說明 | 化工範例 |
+|------|------|---------|
+| **A 造成 B** | 真正的因果 | 高溫 → 反應速率加快 → 高產率 |
+| **B 造成 A** | 因果方向相反 | 高純度產品 → 操作員記錄「使用A配方」（其實是因為純度高才被歸類為A） |
+| **C 同時造成 A 和 B** | 共同原因（混淆變數） | 「資深操作員」同時傾向使用催化劑A、且傾向有高產率 → 規則{催化劑A}⇒{高產率}是幻象 |
+
+**具體化工範例**：
+
+挖掘到規則：{高壓操作} $\Rightarrow$ {低設備故障率} (Confidence = 0.85, Lift = 2.1)
+
+你可能下結論「提高操作壓力可以降低設備故障」，但真相可能是：
+
+- 高壓操作只在**新設備**上進行（因為舊設備無法承受高壓）
+- **新設備**本身就有較低的故障率
+- 混淆變數：**設備新舊程度**
+
+若你根據這條規則把舊設備也調整為高壓操作，結果可能是更多故障，甚至安全事故。
 
 **應對策略**：
-- 數據清洗與驗證
-- 使用加權支持度（對罕見但重要的項目賦予更高權重）
-- 採用分層抽樣，確保各類別數據的平衡
+
+1. **用領域知識過濾**：每條看起來有意義的規則，都要問「有沒有合理的物理化學機理能解釋這個因果關係？」沒有機理支撐的強關聯，優先懷疑是混淆變數造成的。
+
+2. **時間序列驗證**：真正的因果，原因（A）應該發生在結果（B）之前。若你的數據有時間戳記，可以檢查 A 出現後 B 才出現，而不是兩者同時記錄。
+
+3. **使用隨機化實驗（DOE）確認因果**：關聯規則只是「提出假說」；要確認因果，需要設計受控實驗，固定其他變數，只改變A，觀察B是否改變。
+
+4. **計算 Zhang's Metric 輔助判斷**：Zhang's Metric 能區分「正相關」、「負相關」、「獨立」，比 Confidence 更難被混淆變數誤導：
+
+$$
+\text{Zhang's Metric} = \frac{P(A \cap B) - P(A) \cdot P(B)}{\max[P(A \cap B)(1 - P(A)), P(A) \cdot P(B) - P(A \cap B)]}
+$$
+
+值域 $[-1, 1]$：接近 +1 表示強正關聯，接近 -1 表示強負關聯，接近 0 表示獨立。
+
+```python
+# 篩選 Zhang's Metric 較高的規則（比 Lift 更抗混淆）
+rules_zhang = rules[rules['zhangs_metric'] > 0.3].sort_values('zhangs_metric', ascending=False)
+```
+
+---
+
+#### 陷阱 3：稀有項目的規則不可靠（小樣本過度擬合）
+
+**核心問題**：當某個項目集出現次數極少時，即使 Confidence = 100%，也完全無法信任，因為**樣本數太小，任何結果都可能是純屬偶然**。
+
+**數值說明**：
+
+假設「罕見添加劑X」在 500 筆交易中只出現了 3 次，且 3 次都達到高產率：
+
+- 規則：{罕見添加劑X} $\Rightarrow$ {高產率} (Support = 0.006, Confidence = 1.0, Lift = 1.8)
+- 表面上非常強的規則，但只有 3 筆支撐。
+
+如果整體高產率的基礎機率是 60%，那麼「3 筆全部是高產率」的純粹偶然機率是多少？
+
+$$
+P(\text{3 次全部高產率} \mid \text{純粹偶然}) = 0.6^3 = 0.216 = 21.6\%
+$$
+
+換言之，純靠運氣就有 **21.6%** 的機率得到這個看似完美的規則。這絕對不可信。
+
+**最小支持度計數的建議**：
+
+在設定 `min_support` 時，同時確認對應的**絕對次數**：
+
+| 數據筆數 | 最低建議絕對次數 | 對應 min_support |
+|---------|----------------|-----------------|
+| 100 筆  | 10 次 | 0.10 |
+| 500 筆  | 20 次 | 0.04 |
+| 1,000 筆 | 30 次 | 0.03 |
+| 5,000 筆 | 50 次 | 0.01 |
+| > 10,000 筆 | 100 次 | 0.01 |
+
+> 一般建議：無論 `min_support` 多低，確保每條規則背後至少有 **20~30 筆**實際交易支撐。
+
+**統計顯著性檢驗（選用）**：
+
+若要更嚴格驗證，可對規則做費雪精確檢驗（Fisher's Exact Test），計算「A 和 B 的共現是否顯著高於期望值」：
+
+```python
+from scipy.stats import fisher_exact
+import numpy as np
+
+def rule_significance(support_AB, support_A, support_B, n_transactions):
+    """計算規則 A => B 的費雪精確檢驗 p-value"""
+    n_AB = int(support_AB * n_transactions)
+    n_A_only = int((support_A - support_AB) * n_transactions)
+    n_B_only = int((support_B - support_AB) * n_transactions)
+    n_neither = n_transactions - n_AB - n_A_only - n_B_only
+
+    contingency_table = [[n_AB, n_A_only],
+                         [n_B_only, n_neither]]
+    _, p_value = fisher_exact(contingency_table, alternative='greater')
+    return p_value
+
+# 對所有規則計算 p-value，過濾不顯著的規則
+rules['p_value'] = rules.apply(
+    lambda r: rule_significance(
+        r['support'], r['antecedent support'],
+        r['consequent support'], n_transactions=len(df)
+    ), axis=1
+)
+significant_rules = rules[rules['p_value'] < 0.05]  # 僅保留統計顯著的規則
+print(f"統計顯著規則：{len(significant_rules)} 條（p < 0.05）")
+```
+
+---
+
+#### 陷阱 4：數據品質問題
+
+**核心問題**：關聯規則挖掘對數據品質非常敏感。以下四種常見問題都會使挖掘結果嚴重失真：
+
+**問題 4-1：遺漏值（Missing Values）**
+
+若某次實驗沒有記錄「催化劑種類」，這筆交易就不會貢獻任何含催化劑的規則，導致所有催化劑相關規則的 Support **被低估**。
+
+```python
+# 檢查遺漏值
+print("各欄位遺漏率：")
+print(df.isnull().mean().sort_values(ascending=False))
+
+# 對 One-Hot 數據而言，遺漏代表「未知」，應與「False（不存在）」區別
+# 策略：若欄位遺漏率 > 20%，考慮排除該欄位或獨立建立子集分析
+cols_high_missing = df.isnull().mean()[df.isnull().mean() > 0.2].index
+print(f"遺漏率 > 20% 的欄位（建議排除）: {list(cols_high_missing)}")
+```
+
+**問題 4-2：記錄錯誤（Data Entry Errors）**
+
+例如「高溫」有時被記錄成「High Temp」、「高溫操作」、「350°C 以上」等多種寫法，導致本應為同一個項目的記錄被分散成多個不同項目，每個的 Support 都很低，造成本應挖到的規則消失。
+
+```python
+# 在資料前處理階段，統一項目名稱
+item_mapping = {
+    'High Temp': '高溫',
+    '高溫操作': '高溫',
+    '350C以上': '高溫',
+    'Cat-A': '催化劑A',
+    'Catalyst A': '催化劑A',
+}
+transactions_clean = [
+    [item_mapping.get(item, item) for item in transaction]
+    for transaction in transactions_raw
+]
+```
+
+**問題 4-3：數據不平衡（Imbalanced Data）**
+
+在化工生產中，正常操作佔 95%，異常操作只佔 5%。若用統一的 `min_support`，異常相關規則因 Support 過低全部被過濾掉，但這些恰好是最有工程價值的規則（故障診斷、安全預警）。
+
+**解決方案**：
+
+| 方法 | 說明 | 適用場景 |
+|------|------|---------|
+| **分組挖掘** | 正常 / 異常分開，各自設不同 `min_support` | 異常佔比 < 10% |
+| **過採樣** | 複製異常記錄至接近正常數量，再挖掘 | 異常規則極少但重要 |
+| **降低稀有類 min_support** | 先過濾出含異常標籤的子集，設 `min_support=0.01` | 數據量充足（> 1000 筆） |
+
+```python
+# 方法：分組挖掘，對「異常批次」使用更低的 min_support
+normal_df = encoded_df[encoded_df['正常操作'] == True]
+abnormal_df = encoded_df[encoded_df['異常操作'] == True]
+
+normal_itemsets  = apriori(normal_df.drop(columns=['正常操作','異常操作']),
+                           min_support=0.15, use_colnames=True)
+abnormal_itemsets = apriori(abnormal_df.drop(columns=['正常操作','異常操作']),
+                            min_support=0.05, use_colnames=True)  # 異常用更低閾值
+```
+
+**問題 4-4：交易粒度不一致（Mixed Granularity）**
+
+若某些記錄是「每批次」，另一些是「每日」，支持度的計算單位就不一致，導致日記錄的項目組合 Support 高（因為每天都有），而批次記錄的項目 Support 低，兩者不能放在一起挖掘。
+
+**應對策略**：在建立交易數據前，明確定義**一筆「交易」代表什麼**（一次反應、一個批次、一個工作班次），並確保所有記錄使用相同粒度。
+
+**數據品質檢查清單**：
+
+```python
+# 數據品質快速檢查
+print("=== 數據品質報告 ===")
+print(f"總交易筆數：{len(df)}")
+print(f"總項目數：{len(df.columns)}")
+print(f"稀疏度（False 比例）：{1 - df.values.mean():.1%}")
+print(f"遺漏值總數：{df.isnull().sum().sum()}")
+print(f"全為 False 的交易（空交易）：{(df.sum(axis=1) == 0).sum()} 筆")
+print(f"項目出現次數分布（前 5 個最少出現）：")
+print(df.sum().sort_values().head())
+# 若前幾個項目出現次數 < 5，考慮合併或排除
+```
 
 ---
 
@@ -813,6 +1506,12 @@ plt.show()
 - 設定閾值線（如 support = 0.1, confidence = 0.6），劃分出「有效規則區域」
 - 使用互動式工具（如 Plotly），滑鼠懸停時顯示規則內容
 - 對規則進行分群著色，突出不同類型的規則
+
+#### 💻 範例演練：Support-Confidence 散佈圖
+
+![Support-Confidence Scatter Plot](outputs/P2_Unit08_Association_Rule_Learning_Overview/figs/support_confidence_scatter.png)
+
+> **圖表說明**：上圖為 500 筆交易數據集中 88 條關聯規則的 Support-Confidence 散佈圖，點的顏色對應 Lift 值（暖色調 = 高 Lift，冷色調 = 低 Lift）。大多數規則集中在低支持度（< 0.15）但中高置信度（0.6~0.9）的區域，這是化工配方數據的典型分布特徵——每種成功配方的使用頻率不高，但一旦使用則高度可靠。圖中右上方的高支持度 × 高置信度區域是最具實用價值的規則所在，而顏色偏暖（高 Lift）的規則則代表比隨機配對有更強的因子關聯性，值得優先關注。
 
 ### 5.2 規則網絡圖 (Network Graph)
 
@@ -887,6 +1586,12 @@ plt.show()
 - 過濾低置信度規則，避免圖形過於複雜
 - 使用子圖，分別展示不同類別的規則（如配方規則、操作規則）
 - 標註關鍵節點（如「高產率」、「品質合格」）
+
+#### 💻 範例演練：規則網絡圖
+
+![Association Rules Network Graph](outputs/P2_Unit08_Association_Rule_Learning_Overview/figs/rules_network.png)
+
+> **圖表說明**：網絡圖展示 51 條過濾後規則中前 20 條高品質規則（依 Lift 排序）。節點代表化工項目，有向邊的方向為規則前項→後項，邊的粗細對應置信度，顏色深淺對應 Lift 強度。圖中清楚顯示 `Excellent_Yield`（高品質產率）是多條規則的核心目標後項，與 `Cat_A`（催化劑A）、`Optimal_Temp`（最佳溫度）、`High_Press`（高壓）形成緊密的關聯叢集，為製程優化提供了清晰的操作路徑指引。`High_Purity`（高純度）則主要與 `Solvent_X` 和 `High_Press` 關聯，形成另一個獨立的製程優化群組。
 
 ### 5.3 平行坐標圖 (Parallel Coordinates)
 
@@ -999,6 +1704,12 @@ plt.show()
 - 對行和列進行聚類排序，讓相似的項目相鄰
 - 只顯示顯著規則（Lift > 1.2），將其他單元格留白
 
+#### 💻 範例演練：矩陣熱力圖視覺化
+
+![Rules Matrix Heatmap](outputs/P2_Unit08_Association_Rule_Learning_Overview/figs/rules_matrix_heatmap.png)
+
+> **圖表說明**：矩陣熱力圖以顏色深淺展示各「前項→後項」組合的置信度（Confidence）。行代表規則前項，列代表規則後項，顏色越深（越紅）表示置信度越高。從圖中可快速識別：哪些製程條件組合最能預測特定產出結果（如 `Excellent_Yield`、`High_Purity`）；以及哪些後項（如 `Poor_Yield`）只在特定前項條件下才會出現。相較於散佈圖，矩陣視覺化提供了製程條件與結果之間的全局俯視，適合用於配方篩選會議或品質管制報告。
+
 ### 5.5 規則樹狀圖 (Rule Tree / Decision Tree)
 
 **核心概念**
@@ -1078,6 +1789,12 @@ plt.tight_layout()
 plt.savefig('bubble_chart.png', dpi=300, bbox_inches='tight')
 plt.show()
 ```
+
+#### 💻 範例演練：氣泡圖視覺化
+
+![Association Rules Bubble Chart](outputs/P2_Unit08_Association_Rule_Learning_Overview/figs/rules_bubble_chart.png)
+
+> **圖表說明**：氣泡圖同時呈現三個視覺維度：橫軸為支持度（Support）、縱軸為置信度（Confidence）、**氣泡大小**為 Support × Confidence 乘積（代表規則整體覆蓋效益，越大表示越廣泛且可靠）、**氣泡顏色**為提升度（Lift，色條偏紅 = 高 Lift）。相較於散佈圖，氣泡圖更直觀地凸顯「大氣泡 + 深紅色」的規則，即兼具高覆蓋效益與高提升度的優質製程規則。例如圖中 `{Cat_A, Optimal_Temp} ⇒ {Excellent_Yield}` 同時具備較高的氣泡面積（高支持度 × 高置信度）和偏暖色的 Lift 值，是最值得優先執行的配方建議。
 
 ### 5.7 視覺化方法選擇指南
 
@@ -1547,11 +2264,11 @@ processed_data = preprocess_chemical_data(raw_data)
 
 | 指標 | 公式 | 值域 | 意義 | 使用場景 |
 |------|------|------|------|----------|
-| **Support** | $\frac{\|X \cup Y\|}{N}$ | [0, 1] | 規則的普遍性 | 篩選頻繁規則 |
+| **Support** | $\frac{|X \cup Y|}{N}$ | [0, 1] | 規則的普遍性 | 篩選頻繁規則 |
 | **Confidence** | $\frac{\text{Support}(X \cup Y)}{\text{Support}(X)}$ | [0, 1] | 規則的可靠性 | 評估規則強度 |
 | **Lift** | $\frac{\text{Confidence}(X \Rightarrow Y)}{\text{Support}(Y)}$ | [0, ∞) | 關聯強度 | 識別有意義的規則 |
 | **Conviction** | $\frac{1 - \text{Support}(Y)}{1 - \text{Confidence}(X \Rightarrow Y)}$ | [0, ∞) | 規則的確信度 | 評估強規則 |
-| **Leverage** | $\text{Support}(X \cup Y) - \text{Support}(X) \times \text{Support}(Y)$ | [-1, 1] | 相對改善程度 | 評估實際影響 |
+| **Leverage** | $\text{Support}(X \cup Y) - \text{Support}(X) \times \text{Support}(Y)$ | [-0.25, 0.25] | 相對改善程度 | 評估實際影響 |
 
 **進階指標**
 
@@ -1823,6 +2540,86 @@ if __name__ == "__main__":
 
 ---
 
+## 9. 範例演練：完整化工應用實作成果
+
+本章節彙整 Jupyter Notebook（`Unit08_Association_Rule_Learning_Overview.ipynb`）的完整執行結果，包含規則驗證、配方建議報告，以及參數敏感度分析。
+
+### 9.1 設計規則驗證
+
+在 500 筆模擬交易數據中，預先嵌入 3 條設計規則，以驗證演算法的識別能力：
+
+程式使用「子集搜尋」策略（`issubset`），找出**包含**目標前項的最佳規則（依 Lift 排序取最高），並輸出如下：
+
+```text
+=== 設計規則驗證 ===
+
+  ✓ 找到：Rule 1: Cat_A + Optimal_Temp => Excellent_Yield
+    Support=0.060, Confidence=0.909, Lift=2.15
+    ↳ 最佳匹配規則前項：{Cat_A, High_Press, Optimal_Temp}（含目標因子的最強三因子規則）
+
+  ✓ 找到：Rule 2: Solvent_X + High_Press => High_Purity
+    Support=0.108, Confidence=0.794, Lift=1.80
+
+  ✓ 找到：Rule 3: Cat_B + Low_Temp => Poor_Yield
+    Support=0.054, Confidence=0.600, Lift=2.75
+
+3 / 3 條設計規則均成功識別，驗證通過！
+```
+
+> **結果分析**：3 條預先嵌入的設計規則均被成功識別。Rule 1 的驗證邏輯使用「子集搜尋」找出所有前項**包含** `{Cat_A, Optimal_Temp}` 的規則，其中 Lift 最高者為三因子規則 `{Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}`（conf=0.909，lift=2.154），顯示在加入高壓條件後預測力更強。若單看二因子規則 `{Cat_A, Optimal_Temp}` 本身，其 conf=0.829、lift=1.963（見 Section 4 評估結果），仍屬高品質規則。Rule 2 與 Rule 3 則精確匹配（無更強的超集規則覆蓋），確認演算法在化工配方數據中的有效識別能力。
+
+### 9.2 自動化配方建議報告
+
+程式自動從規則集中提取最具操作價值的配方建議：
+
+```text
+========== 化工配方優化建議報告 ==========
+
+建議 1：提升「Excellent_Yield（高品質產率）」
+  前提條件：使用 Cat_A + 設定 Optimal_Temp
+  預期結果：Excellent_Yield（82.9% 機率，是隨機的 1.96 倍）
+  歷史覆蓋：17.4% 的交易數據
+
+建議 2：提升「High_Purity（高純度）」
+  前提條件：使用 High_Press + 使用 Solvent_X
+  預期結果：High_Purity（79.4% 機率，是隨機的 1.80 倍）
+  歷史覆蓋：10.8% 的交易數據
+
+建議 3：提升「Excellent_Yield（高品質產率）」
+  前提條件：使用 Cat_A + 使用 High_Press
+  預期結果：Excellent_Yield（67.6% 機率，是隨機的 1.60 倍）
+  歷史覆蓋：9.2% 的交易數據
+
+建議 4：提升「Excellent_Yield（高品質產率）」
+  前提條件：使用 Add_3 + 設定 Optimal_Temp
+  預期結果：Excellent_Yield（67.4% 機率，是隨機的 1.60 倍）
+  歷史覆蓋：6.2% 的交易數據
+
+建議 5：提升「Excellent_Yield（高品質產率）」
+  前提條件：設定 Optimal_Temp + 使用 Solvent_Y
+  預期結果：Excellent_Yield（64.0% 機率，是隨機的 1.52 倍）
+  歷史覆蓋：11.0% 的交易數據
+
+==========================================
+```
+
+> **結果分析**：報告揭示了兩條主要的製程優化路徑：① **高品質產率路徑**——最強條件為 `Cat_A + Optimal_Temp`（建議 1，82.9% 置信度），亦可搭配 `High_Press`（建議 3）或 `Add_3`（建議 4）進一步強化；② **高純度路徑**——`High_Press + Solvent_X`（建議 2，79.4% 置信度）是最可靠的組合。此報告可直接用於指導化工工程師的配方決策，大幅降低試誤成本。
+
+### 9.3 最小支持度閾值敏感度分析
+
+![Threshold Effect on Frequent Itemsets and Rules](outputs/P2_Unit08_Association_Rule_Learning_Overview/figs/threshold_effect.png)
+
+以下為 min_support 從 0.01 到 0.30 變化時的挖掘結果：
+
+```text
+min_support = 0.05 時：頻繁項目集 400 個，關聯規則 88 條
+（隨 min_support 升高，規則數量急劇減少）
+```
+
+> **圖表說明**：閾值敏感度曲線展示 min_support 對挖掘結果的影響，左軸（藍線）為頻繁項目集數量，右軸（橘線）為關聯規則數量。曲線在 min_support ≈ 0.08~0.12 附近呈現明顯的「肘點」，超過此值後規則數急劇下降。**建議閾值選擇策略**：設定 min_support = 0.05~0.10，可在規則豐富度（> 50 條）與可管理性之間取得平衡；若數據規模更大（> 10,000 筆），可適度提高至 0.10~0.15 以避免規則爆炸。過低的閾值（< 0.03）雖然捕獲罕見規則，但會大量增加統計不可靠的規則，需搭配卡方顯著性過濾使用。
+
+---
+
 **參考資源**
 
 - Agrawal, R., & Srikant, R. (1994). Fast algorithms for mining association rules. *Proceedings of VLDB*, 487-499.
@@ -1834,10 +2631,10 @@ if __name__ == "__main__":
 
 **課程資訊**
 - 課程名稱：AI在化工上之應用
-- 課程單元：Unit08 Association Rule Learning 關聯規則學習總攬
+- 課程單元：Unit08 Association Rule Learning 關聯規則學習總覽
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-04-23
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

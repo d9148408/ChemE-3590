@@ -95,8 +95,8 @@
   - 頻繁項目集挖掘過程
   
 - **實作技術**：
-  - pyfpgrowth 或 mlxtend 套件使用
-  - FP-Tree 視覺化與分析
+  - mlxtend 套件使用（`fpgrowth` 函數）
+  - 關聯規則視覺化（散佈圖、網絡圖）
   - 與 Apriori 的性能比較
   - 記憶體管理與優化
   
@@ -156,10 +156,12 @@
 4. **生產環境、實時應用** → FP-Growth（效率高）
 5. **學習目的** → 兩者都學（Apriori 易懂，FP-Growth 實用）
 
-**性能對比參考**：
+**性能對比參考**（以約 50 個配方項目的典型場景估算）：
 - 1,000 筆配方：Apriori 2.3 秒，FP-Growth 0.8 秒（2.9× 加速）
 - 10,000 筆配方：Apriori 45.6 秒，FP-Growth 5.2 秒（8.8× 加速）
 - 100,000 筆配方：Apriori > 30 分鐘，FP-Growth 78 秒（> 23× 加速）
+
+> **課程範例實測**（50,000 筆，21 個項目，min\_support=0.02）：FP-Growth ~0.37 秒，Apriori ~0.67 秒，加速比 **~1.8×**。項目數越少、min\_support 越高，兩者差距越小，項目數越多差距越顯著。
 
 ---
 
@@ -267,7 +269,7 @@ plotly >= 5.0.0  # 互動式視覺化
 1. **支持度 (Support)**
    - 計算： $\text{Support}(X \Rightarrow Y) = \frac{|X \cup Y|}{N}$ 
    - 意義：規則的普遍性，出現頻率
-   - 閾值建議：化工配方 0.05-0.20，製程數據 0.10-0.30
+   - 閾值建議：化工配方 0.05-0.20，製程數據 0.10-0.30；大規模數據（> 10,000 筆）可降至 0.01-0.05
 
 2. **置信度 (Confidence)**
    - 計算： $\text{Confidence}(X \Rightarrow Y) = \frac{|X \cup Y|}{|X|}$ 
@@ -277,8 +279,8 @@ plotly >= 5.0.0  # 互動式視覺化
 3. **提升度 (Lift)**
    - 計算： $\text{Lift}(X \Rightarrow Y) = \frac{\text{Confidence}(X \Rightarrow Y)}{\text{Support}(Y)}$ 
    - 意義：X 和 Y 的關聯強度
-   - 判斷：Lift > 1 正相關，Lift = 1 獨立，Lift < 1 負相關
-   - 閾值建議：Lift > 1.2 表示有意義的關聯
+   - 判斷： $\text{Lift} > 1$ 正相關， $\text{Lift} = 1$ 獨立， $\text{Lift} < 1$ 負相關
+   - 閾值建議： $\text{Lift} > 1.2$ 表示有意義的關聯
 
 ### 進階指標
 4. **確信度 (Conviction)**
