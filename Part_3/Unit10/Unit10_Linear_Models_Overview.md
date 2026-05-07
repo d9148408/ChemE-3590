@@ -91,12 +91,11 @@ scikit-learn 提供了多種線性回歸模型，主要差異在於**正則化�
 **損失函數**：
 
 $$
-L(\mathbf{w}) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i)^2
+L(\mathbf{w}, b) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i - b)^2
 $$
 
 **主要參數**：
 - `fit_intercept`: 是否計算截距項 (預設 True)
-- `normalize`: 是否對特徵進行標準化 (已棄用，建議使用 Pipeline)
 - `n_jobs`: 並行計算的工作數 (-1 表示使用所有處理器)
 
 ### 2.2 嶺回歸 (Ridge Regression)
@@ -111,7 +110,7 @@ $$
 **損失函數**：
 
 $$
-L(\mathbf{w}) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i)^2 + \alpha \sum_{j=1}^{n} w_j^2
+L(\mathbf{w}, b) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i - b)^2 + \alpha \sum_{j=1}^{n} w_j^2
 $$
 
 其中 $\alpha$ 是正則化強度參數：
@@ -135,7 +134,7 @@ $$
 **損失函數**：
 
 $$
-L(\mathbf{w}) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i)^2 + \alpha \sum_{j=1}^{n} |w_j|
+L(\mathbf{w}, b) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i - b)^2 + \alpha \sum_{j=1}^{n} |w_j|
 $$
 
 **主要參數**：
@@ -156,7 +155,7 @@ $$
 **損失函數**：
 
 $$
-L(\mathbf{w}) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i)^2 + \alpha \rho \sum_{j=1}^{n} |w_j| + \frac{\alpha (1-\rho)}{2} \sum_{j=1}^{n} w_j^2
+L(\mathbf{w}, b) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i - b)^2 + \alpha \rho \sum_{j=1}^{n} |w_j| + \frac{\alpha (1-\rho)}{2} \sum_{j=1}^{n} w_j^2
 $$
 
 其中：
@@ -184,7 +183,7 @@ $$
 **損失函數 (以平方損失為例)**：
 
 $$
-L(\mathbf{w}) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i)^2 + \alpha \cdot \text{Penalty}
+L(\mathbf{w}, b) = \frac{1}{m} \sum_{i=1}^{m} (y_i - \mathbf{w}^T \mathbf{x}_i - b)^2 + \alpha \cdot \text{Penalty}
 $$
 
 其中 Penalty 可以是：
@@ -328,8 +327,8 @@ X_imputed = imputer.fit_transform(X)
 
 3. **前向/後向填補** (時間序列資料)：
 ```python
-df.fillna(method='ffill')  # 前向填補
-df.fillna(method='bfill')  # 後向填補
+df.ffill()  # 前向填補
+df.bfill()  # 後向填補
 ```
 
 ### 3.5 Pipeline 整合
@@ -367,6 +366,18 @@ $$
 \text{MSE} = \frac{1}{m} \sum_{i=1}^{m} (y_i - \hat{y}_i)^2
 $$
 
+**單位**：目標變數單位的**平方**（如目標為溫度 °C，則 MSE 單位為 °C²）
+
+**特性**：
+- 對大誤差給予**更高懲罰**（平方放大效果）
+- 可微分，適合作為梯度下降的損失函數
+- 數值受目標變數的量級影響，**不同資料集間不可直接比較**
+
+**適用情境**：
+- 優化/訓練階段作為損失函數
+- 對大誤差特別敏感的應用（如安全關鍵製程）
+- 需要數學便利性（梯度計算）時
+
 **sklearn 實現**：
 ```python
 from sklearn.metrics import mean_squared_error
@@ -380,11 +391,26 @@ $$
 \text{RMSE} = \sqrt{\frac{1}{m} \sum_{i=1}^{m} (y_i - \hat{y}_i)^2}
 $$
 
+**單位**：與目標變數**相同單位**（MSE 開根號還原單位）
+
+**特性**：
+- 是 MSE 的開根號，**可直接與目標變數比較**（例如：RMSE = 2.5 °C 代表平均預測偏差約 2.5 度）
+- 仍對大誤差較敏感（繼承 MSE 的平方性質）
+- 工程實務中最常見的報告指標
+
+**適用情境**：
+- 向非技術人員解釋預測誤差大小
+- 模型比較（同一資料集）
+- 化工製程中評估預測值的工程容許誤差
+
 **sklearn 實現**：
 ```python
 import numpy as np
+from sklearn.metrics import mean_squared_error
 
 rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+# 或 sklearn >= 1.4：
+# rmse = mean_squared_error(y_true, y_pred, squared=False)
 ```
 
 #### 4.1.3 平均絕對誤差 (Mean Absolute Error, MAE)
@@ -392,6 +418,23 @@ rmse = np.sqrt(mean_squared_error(y_true, y_pred))
 $$
 \text{MAE} = \frac{1}{m} \sum_{i=1}^{m} |y_i - \hat{y}_i|
 $$
+
+**單位**：與目標變數**相同單位**
+
+**特性**：
+- 對每個誤差**均等對待**（不放大大誤差），對異常值（outliers）更**穩健**
+- 直觀意義：平均而言，預測值偏離真實值多少
+- 不可微分（在誤差 = 0 處），梯度計算需特別處理
+
+**MAE vs RMSE 的關係**：
+- 當所有誤差大小相同時，MAE = RMSE
+- 存在少數大誤差時，RMSE > MAE（RMSE 被放大）
+- 因此 **RMSE - MAE 的差距**可反映資料中大誤差的比例
+
+**適用情境**：
+- 資料中存在異常值，不希望少數大誤差主導評估
+- 需要直觀解釋「平均偏差」
+- 穩健回歸 (Robust Regression) 的評估
 
 **sklearn 實現**：
 ```python
@@ -403,15 +446,30 @@ mae = mean_absolute_error(y_true, y_pred)
 #### 4.1.4 決定係數 (R-squared, $R^2$ )
 
 $$
-R^2 = 1 - \frac{\sum_{i=1}^{m} (y_i - \hat{y}_i)^2}{\sum_{i=1}^{m} (y_i - \bar{y})^2}
+R^2 = 1 - \frac{\text{SS}_\text{res}}{\text{SS}_\text{tot}} = 1 - \frac{\sum_{i=1}^{m} (y_i - \hat{y}_i)^2}{\sum_{i=1}^{m} (y_i - \bar{y})^2}
 $$
 
-其中 $\bar{y}$ 是目標變數的平均值。
+其中：
+- $\text{SS}_\text{res} = \sum (y_i - \hat{y}_i)^2$ ：模型殘差平方和（模型無法解釋的變異）
+- $\text{SS}_\text{tot} = \sum (y_i - \bar{y})^2$ ：總變異平方和（目標變數的總變異）
+- $\bar{y}$ 是目標變數的平均值
+
+**直觀解釋**： $R^2$ 代表模型能「解釋」目標變數總變異的比例。
 
 - $R^2$ 範圍：$(-\infty, 1]$
-- $R^2 = 1$ : 完美預測
-- $R^2 = 0$ : 模型預測能力等於使用平均值
-- $R^2 < 0$ : 模型表現比平均值還差
+- $R^2 = 1$ ：完美預測（殘差為零）
+- $R^2 = 0$ ：模型預測能力等同於直接使用均值 $\bar{y}$
+- $R^2 < 0$ ：模型表現比均值預測還差（通常代表模型設定錯誤）
+
+**特性**：
+- **無量綱**，可跨不同資料集或目標變數比較（例如：溫度模型 $R^2 = 0.92$ vs 壓力模型 $R^2 = 0.88$）
+- 多加一個特徵 $R^2$ 永遠不會下降（即使特徵無意義），故需留意特徵選擇
+- **不適合**比較特徵數量不同的模型（應使用調整後 $R^2$）
+
+**適用情境**：
+- 跨模型、跨資料集的整體性能比較
+- 解釋模型「解釋力」給非技術人員
+- 作為交叉驗證的評分標準（`scoring='r2'`）
 
 **sklearn 實現**：
 ```python
@@ -420,13 +478,133 @@ from sklearn.metrics import r2_score
 r2 = r2_score(y_true, y_pred)
 ```
 
+---
+
+#### 4.1.5 四種指標比較總結
+
+| 指標 | 公式核心 | 單位 | 對異常值 | 跨資料集比較 | 主要用途 |
+|------|---------|------|----------|-------------|----------|
+| **MSE** | 誤差平方均值 | 目標²  | 敏感 ↑↑ | 不適合 | 訓練損失函數 |
+| **RMSE** | MSE 開根號 | 與目標同 | 敏感 ↑ | 同資料集可比 | 工程誤差報告 |
+| **MAE** | 誤差絕對值均值 | 與目標同 | 穩健 ✓ | 同資料集可比 | 有異常值的評估 |
+| **$R^2$** | 解釋變異比例 | 無量綱 | 中度敏感 | **可跨資料集** | 整體性能比較 |
+
+**選用建議**：
+
+1. **報告模型誤差大小** → 優先使用 **RMSE**（同目標單位，直觀）
+2. **資料含異常值** → 搭配 **MAE**（不被少數大誤差扭曲）
+3. **比較不同資料集的模型** → 使用 $R^2$（無量綱，可橫向比較）
+4. **RMSE ≫ MAE** → 警示：資料中存在少數**大誤差**樣本，需進一步排查
+5. **化工製程建議**：同時報告 RMSE 和 $R^2$，前者反映工程容許誤差，後者反映模型解釋力
+
+**數值範例（化工情境）**：
+
+假設預測反應溫度（目標值範圍 80–120 °C）：
+
+| 指標 | 數值 | 解讀 |
+|------|------|------|
+| MAE | 1.8 °C | 平均預測偏差約 1.8 度 |
+| RMSE | 2.5 °C | 計入大誤差後的有效偏差約 2.5 度 |
+| $R^2$ | 0.93 | 模型解釋了溫度變異的 93% |
+
+RMSE > MAE（2.5 > 1.8）說明存在少數預測偏差較大的樣本，需檢查這些樣本是否為特殊操作條件。
+
 ### 4.2 交叉驗證 (Cross-Validation)
 
-**目的**：更穩健地評估模型性能，避免過擬合
+#### 4.2.0 為什麼需要交叉驗證？
+
+**核心問題：單次切分的不可靠性**
+
+最直觀的模型評估方式是「訓練集訓練、測試集評估」（Hold-out）。但這個方法有一個根本缺陷：**評估結果強烈依賴切分方式的運氣**。
+
+考慮以下情境（以 100 筆化工數據、80/20 切分為例）：
+
+| 切分情況 | 測試集組成 | 測試集 R² |
+|---------|-----------|-----------|
+| 切分 A | 恰好抽到「容易預測」的樣本 | 0.95（虛高） |
+| 切分 B | 恰好抽到「難以預測」的樣本 | 0.78（虛低） |
+| 交叉驗證 | 所有樣本輪流作驗證集 | 0.87 ± 0.04（真實） |
+
+> 單次切分的評估結果可能讓你高估或低估模型真實性能，而你無從得知自己屬於哪種情況。
+
+---
+
+**三大核心原因**：
+
+**① 估計「真實泛化能力」（Generalization）**
+
+模型的目標是對**未見過的新數據**做出準確預測。交叉驗證透過讓每個樣本都恰好做一次驗證集，模擬模型在「真實世界」中遭遇各種數據的表現，從而得到更可靠的性能估計。
+
+**② 偵測「過擬合」（Overfitting）**
+
+過擬合的特徵是：訓練集表現遠好於測試集。使用交叉驗證，可以觀察：
+
+$$
+\text{過擬合程度} \approx R^2_{\text{train}} - R^2_{\text{CV}}
+$$
+
+- 差值 < 0.05：模型泛化良好 ✓
+- 差值 0.05–0.15：輕度過擬合，考慮增加正則化
+- 差值 > 0.15：嚴重過擬合，需重新設計模型
+
+**③ 更準確的「超參數選擇」（Hyperparameter Tuning）**
+
+在選擇正則化強度 $\alpha$ 時，如果用同一個測試集反覆比較不同 $\alpha$ 的性能，最終選出的 $\alpha$ 會「過度擬合測試集」（即測試集洩漏問題）。交叉驗證提供了一個不受此影響的公平評估框架。
+
+---
+
+**過擬合與泛化的數學直觀**：
+
+設模型在訓練集學到的函數為 $f$，訓練損失為 $L_{\text{train}}$，真實泛化損失為 $L_{\text{true}}$：
+
+$$
+L_{\text{true}} = L_{\text{train}} + \underbrace{\text{Variance}}_{\text{模型複雜度帶來的不穩定性}} + \underbrace{\text{Bias}^2}_{\text{模型假設帶來的系統誤差}}
+$$
+
+交叉驗證直接估計 $L_{\text{true}}$，而不是只看 $L_{\text{train}}$。正則化（Ridge、Lasso、Elastic Net）的作用正是降低 Variance 項，以換取更好的泛化能力。
+
+---
+
+**化工應用情境：為何交叉驗證在化工中格外重要？**
+
+化工數據往往具有以下特點，使得交叉驗證尤為關鍵：
+
+1. **數據量有限**：工廠實驗數據昂貴，往往只有幾十至幾百筆，單次切分的代表性不足
+2. **批次效應**：不同生產批次的數據分佈可能不同，隨機切分可能讓某批次全進訓練集或全進測試集
+3. **時間序列性**：製程數據有時間相依性，需使用時間序列交叉驗證（Time Series Split）避免未來資訊洩漏
+4. **異常操作條件**：少數極端操作條件的樣本若全進測試集，會讓評估結果失真
+
+---
 
 #### 4.2.1 K 折交叉驗證 (K-Fold CV)
 
-將資料分為 $K$ 個子集，每次用 $K-1$ 個子集訓練，1 個子集驗證，重複 $K$ 次。
+**原理**：將資料隨機切分為 $K$ 個等大小的子集（稱為「折」，fold），每次以其中 $K-1$ 折為訓練集、剩餘 1 折為驗證集，重複 $K$ 次，最終取 $K$ 次評估結果的平均值與標準差。
+
+$$
+\text{CV Score} = \frac{1}{K} \sum_{k=1}^{K} \text{Score}_k, \quad \text{CV Std} = \sqrt{\frac{1}{K}\sum_{k=1}^{K}(\text{Score}_k - \text{CV Score})^2}
+$$
+
+**K 值選擇建議**：
+
+| K 值 | 特性 | 適用情況 |
+|------|------|---------|
+| K = 5 | 訓練集 80%，計算快 | **最常用**，一般情況首選 |
+| K = 10 | 訓練集 90%，估計更準 | 數據量充足（> 500 筆）時 |
+| K = m (LOOCV) | 訓練集 99.9%+，估計最準但極慢 | 數據量極少（< 50 筆）時 |
+
+**如何解讀結果**：
+
+```python
+scores = cross_val_score(model, X, y, cv=5, scoring='r2')
+# 例：scores = [0.91, 0.88, 0.93, 0.87, 0.92]
+
+print(f"各折 R²: {scores}")
+print(f"平均 R²: {scores.mean():.3f}")    # → 0.902：模型整體性能
+print(f"標準差: {scores.std():.3f}")       # → 0.024：性能穩定性（越小越好）
+```
+
+- **均值**反映模型的**平均泛化能力**
+- **標準差**反映模型對不同數據切分的**穩定性**（std > 0.05 應警惕）
 
 **sklearn 實現**：
 ```python
@@ -439,7 +617,17 @@ print(f"Mean R²: {scores.mean():.3f} (+/- {scores.std():.3f})")
 
 #### 4.2.2 留一法交叉驗證 (Leave-One-Out CV, LOOCV)
 
-每次只用一個樣本作為驗證集，其餘作為訓練集。
+**原理**：K-Fold 的極端情況（K = 樣本數 m），每次只用 1 個樣本作驗證集，其餘 m-1 個樣本全作訓練集。
+
+**優點**：
+- 每次訓練集最大化，對小樣本數據估計最準
+- 結果不受隨機切分影響（因為每個樣本都會被評估一次）
+
+**缺點**：
+- 計算成本極高（需訓練 $m$ 個模型）
+- 評分方差可能偏高（每次驗證集只有 1 筆）
+
+**適用場景**：數據量極少（< 50 筆）且計算資源充足時
 
 **sklearn 實現**：
 ```python
@@ -447,7 +635,32 @@ from sklearn.model_selection import LeaveOneOut
 
 loo = LeaveOneOut()
 scores = cross_val_score(model, X, y, cv=loo, scoring='r2')
+print(f"LOOCV Mean R²: {scores.mean():.3f}")
 ```
+
+#### 4.2.3 交叉驗證的常見誤用
+
+以下是使用交叉驗證時需要避免的常見錯誤：
+
+**❌ 錯誤：在交叉驗證外做特徵縮放**
+
+```python
+# 錯誤做法：先縮放全部數據，再做 CV（數據洩漏！）
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)          # 洩漏！測試集資訊進入訓練集
+scores = cross_val_score(model, X_scaled, y, cv=5)
+```
+
+```python
+# 正確做法：用 Pipeline 將縮放包進 CV 循環內
+from sklearn.pipeline import Pipeline
+pipeline = Pipeline([('scaler', StandardScaler()), ('model', Ridge())])
+scores = cross_val_score(pipeline, X, y, cv=5)  # 每折分別 fit scaler ✓
+```
+
+**❌ 錯誤：用相同數據集選超參數又做最終評估**
+
+應將超參數選擇（內層 CV）與最終性能評估（外層 CV）分開，即「**巢狀交叉驗證 (Nested CV)**」。
 
 ### 4.3 超參數調整 (Hyperparameter Tuning)
 

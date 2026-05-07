@@ -152,12 +152,14 @@ $$
 \hat{\boldsymbol{\beta}}^{\text{EN}} = (1 + \lambda_2) \hat{\boldsymbol{\beta}}^{\text{naive}}
 $$
 
-其中 $\hat{\boldsymbol{\beta}}^{\text{naive}}$ 是"天真"的 Elastic Net 估計。
+其中 $\hat{\boldsymbol{\beta}}^{\text{naive}}$ 是"天真"的 Elastic Net 估計，原始論文中的 $\lambda_2$ 對應 sklearn 參數化下的 $\frac{\alpha(1-\rho)}{2}$（即 L2 懲罰係數）。
+
+> **注意**：sklearn 的 `ElasticNet` 實現計算的是 $\hat{\boldsymbol{\beta}}^{\text{naive}}$，並未套用 $(1+\lambda_2)$ 校正因子。
 
 **實務意義**：
 - Elastic Net 對係數進行了雙重收縮
 - 第一次：L1 + L2 聯合收縮
-- 第二次： $(1 + \lambda_2)$ 縮放因子校正
+- 第二次： $(1 + \lambda_2)$ 縮放因子校正（理論值，sklearn 未套用）
 
 ---
 
@@ -346,7 +348,7 @@ for i, (idx, name) in enumerate(zip(np.where(enet.coef_ != 0)[0],
 
 | 特性 | OLS | Ridge (L2) | Lasso (L1) | Elastic Net |
 |------|-----|-----------|-----------|-------------|
-| 懲罰項 | 無 | $\alpha \sum \beta_j^2$ | $\alpha \sum \|\beta_j\|$ | $\alpha[\rho\sum\|\beta_j\|+(1-\rho)\sum\beta_j^2/2]$ |
+| 懲罰項 | 無 | $\alpha \sum \beta_j^2$ | $\alpha \sum |\beta_j|$ | $\alpha[\rho\sum|\beta_j|+(1-\rho)\sum\beta_j^2/2]$ |
 | 解的形式 | 解析解 | 解析解 | 數值解 | 數值解 |
 | 係數特性 | 無偏但高方差 | 收縮但非零 | 稀疏（可為 0） | **稀疏且穩定** |
 | 特徵選擇 | ✗ | ✗ | ✓ | ✓ |
@@ -458,17 +460,17 @@ for i, (idx, name) in enumerate(zip(np.where(enet.coef_ != 0)[0],
 
 ---
 
-## 6A. 實戰案例：化學反應器產率預測
+## 7. 實戰案例：化學反應器產率預測
 
-### 6A.1 案例背景
+### 7.1 案例背景
 
 本案例使用模擬的化學反應數據建立 Elastic Net 回歸模型，展示混合正則化的核心優勢：**穩定的特徵選擇** + **處理多重共線性**。
 
 **數據設計（n=500 樣本）**：
 - **4 個重要特徵**：Temperature (溫度)、Pressure (壓力)、Catalyst (催化劑濃度)、Time (反應時間) - 真實影響產率
 - **2 組高度相關特徵**（測試群組效應）：
-  * **溫度相關組**：T1_inlet (入口溫度)、T2_outlet (出口溫度) - 相關係數 r = 0.9743
-  * **壓力相關組**：P1_inlet (入口壓力)、P2_outlet (出口壓力) - 相關係數 r = 0.9945
+  * **溫度相關組**：T1_inlet (入口溫度)、T2_outlet (出口溫度) - 相關係數 $r = 0.9711$
+  * **壓力相關組**：P1_inlet (入口壓力)、P2_outlet (出口壓力) - 相關係數 $r = 0.9915$
 - **2 個冗餘特徵**：Stirring_Speed (攪拌速度)、pH - 不影響產率
 
 **真實模型**：
@@ -483,7 +485,63 @@ $$
 
 ---
 
-### 6A.2 探索性數據分析
+### 7.2 探索性數據分析
+
+#### 數據概覽
+
+模擬數據生成完成，共 **500 筆樣本、10 個特徵**：
+
+```
+======================================================================
+樣本數: 500
+特徵數: 10
+======================================================================
+
+數據前5行:
+   Temperature_C  Pressure_bar  Catalyst_wt%    Time_min  T1_inlet_C  \
+0      94.981605      3.792647      0.870266  107.862268   93.225640
+1     118.028572      3.144385      1.583802  101.877282  116.374812
+2     109.279758      2.238110      2.245892   33.846310  108.826800
+3     103.946339      4.255180      1.964450   81.187174  104.681070
+4      86.240746      3.738925      2.113122   87.029343   88.067915
+
+   T2_outlet_C  P1_inlet_bar  P2_outlet_bar  Stirring_Speed_rpm        pH  \
+0    93.665372      3.979743       3.763792          379.789786  6.787271
+1   117.421120      3.183347       3.066010          354.112357  6.946871
+2   106.588016      2.151281       2.411604          286.455358  7.709095
+3   102.307824      4.308643       4.169503          201.939307  6.680009
+4    85.288304      3.475350       3.683370          348.871767  7.739299
+
+      Yield_%
+0  131.281842
+1  147.973625
+2  137.196292
+3  138.831626
+4  129.537446
+```
+
+**摘要統計**（Yield_% 範圍：106.59 ~ 162.19，均值 136.09）：
+
+```
+       Temperature_C  Pressure_bar  Catalyst_wt%    Time_min    Yield_%
+count     500.000000    500.000000    500.000000  500.000000  500.000000
+mean       99.942468      2.927806      1.535116  104.471473  136.091616
+std        11.947536      1.141974      0.594386   43.051478    9.771916
+min        80.202463      1.018528      0.509880   30.482740  106.589968
+25%        89.651188      1.916397      0.982456   66.161141  129.529184
+50%       100.526550      2.887286      1.579477  106.333701  136.417618
+75%       110.244995      3.905347      2.054688  140.606438  142.743303
+max       119.718592      4.998871      2.498827  179.752127  162.186805
+```
+
+**相關特徵組相關性驗證**：
+```
+  T1_inlet 與 T2_outlet 相關係數: 0.9711
+  P1_inlet 與 P2_outlet 相關係數: 0.9915
+✓ 兩組特徵都高度相關（r > 0.9），符合設計要求
+```
+
+---
 
 #### 特徵與產率的相關性
 
@@ -513,8 +571,8 @@ $$
 ![相關性矩陣](outputs/P3_Unit10_ElasticNet_Regression/figs/correlation_matrix.png)
 
 **關鍵發現**：
-- **溫度組高度相關**：T1_inlet 與 T2_outlet 相關係數 r = 0.97
-- **壓力組高度相關**：P1_inlet 與 P2_outlet 相關係數 r = 0.99
+- **溫度組高度相關**：T1_inlet 與 T2_outlet 相關係數 $r = 0.97$
+- **壓力組高度相關**：P1_inlet 與 P2_outlet 相關係數 $r = 0.99$
 - 這正是測試 Elastic Net 群組效應的理想數據！
 
 #### 相關特徵組散點圖
@@ -525,7 +583,60 @@ $$
 
 ---
 
-### 6A.3 ElasticNetCV 參數選擇
+### 7.2.5 數據預處理
+
+#### 特徵與目標變數分離
+
+```
+======================================================================
+數據分離完成
+======================================================================
+特徵矩陣 X: (500, 10)
+目標變數 y: (500,)
+
+特徵列表:
+  1. Temperature_C
+  2. Pressure_bar
+  3. Catalyst_wt%
+  4. Time_min
+  5. T1_inlet_C
+  6. T2_outlet_C
+  7. P1_inlet_bar
+  8. P2_outlet_bar
+  9. Stirring_Speed_rpm
+  10. pH
+```
+
+#### 訓練集 / 測試集切分（80% / 20%）
+
+```
+======================================================================
+訓練集/測試集切分完成
+======================================================================
+訓練集: X_train (400, 10), y_train (400,)
+測試集: X_test  (100, 10), y_test  (100,)
+切分比例: 80% / 20%
+```
+
+#### 特徵標準化（Z-score）
+
+Elastic Net 的懲罰項對所有係數一視同仁，**必須先進行標準化**，否則懲罰效果因特徵尺度不同而不均勻。
+
+```
+======================================================================
+特徵標準化完成
+======================================================================
+標準化後訓練集: (400, 10)
+標準化後測試集: (100, 10)
+
+標準化統計（訓練集）:
+  均值: 0.000000 (應接近 0)  ✓
+  標準差: 1.000000 (應接近 1)  ✓
+```
+
+---
+
+### 7.3 ElasticNetCV 參數選擇
 
 使用 5-Fold 交叉驗證自動搜索最佳 α 和 l1_ratio：
 
@@ -550,7 +661,7 @@ ElasticNetCV 交叉驗證結果
 
 ---
 
-### 6A.4 Elastic Net 模型訓練
+### 7.4 Elastic Net 模型訓練
 
 使用最佳參數訓練最終模型：
 
@@ -574,7 +685,7 @@ ElasticNetCV 交叉驗證結果
 
 ---
 
-### 6A.5 群組效應驗證
+### 7.5 群組效應驗證
 
 ```
 ======================================================================
@@ -617,7 +728,7 @@ ElasticNetCV 交叉驗證結果
 
 ---
 
-### 6A.6 四模型性能比較
+### 7.6 四模型性能比較
 
 比較 Elastic Net、Lasso、Ridge、OLS 四種模型：
 
@@ -639,6 +750,39 @@ Elastic Net   2.231685  2.568798    2.766200   3.242156  0.923670 0.858028      
 - **特徵選擇**：Elastic Net 和 Lasso 都自動剔除 2 個特徵
 - **泛化能力**：四種模型測試集 R² 都在 0.85-0.86 範圍，表現穩定
 
+#### 四種模型係數詳細比較
+
+各特徵在四種模型下的回歸係數（標準化特徵空間）：
+
+```
+====================================================================================================
+四種模型係數比較
+====================================================================================================
+           Feature  Elastic Net     Lasso     Ridge       OLS
+     Temperature_C     5.413003  5.609238  5.604270  5.662285
+      Pressure_bar     4.044308  4.045958  8.455195  8.784253
+      Catalyst_wt%     3.078906  3.078916  3.123939  3.123942
+          Time_min     3.575451  3.575534  3.649496  3.651435
+        T1_inlet_C     0.989845  0.892710  0.875589  0.845843
+       T2_outlet_C     0.550137  0.450675  0.521258  0.493227
+      P1_inlet_bar     0.000000  0.000000 -2.350479 -2.527938
+     P2_outlet_bar     0.000000  0.000000 -2.023519 -2.175332
+Stirring_Speed_rpm     0.050163  0.051257  0.136256  0.138921
+                pH    -0.162845 -0.162677 -0.221519 -0.221921
+====================================================================================================
+```
+
+**關鍵對比分析：**
+
+| 特徵組 | Elastic Net | Lasso | Ridge | OLS |
+|--------|-------------|-------|-------|-----|
+| P1_inlet_bar | **0** (剔除) | **0** (剔除) | -2.35 (保留) | -2.53 (保留) |
+| P2_outlet_bar | **0** (剔除) | **0** (剔除) | -2.02 (保留) | -2.18 (保留) |
+| T1_inlet_C | 0.99 | 0.89 | 0.88 | 0.85 |
+| T2_outlet_C | 0.55 | 0.45 | 0.52 | 0.49 |
+
+> 注意：壓力組（P1/P2）在 Ridge 和 OLS 中呈現**負係數**，因為壓力本身（Pressure_bar）已具有正係數，P1/P2 是殘差，Ridge/OLS 試圖補償其影響。Elastic Net 和 Lasso 的 L1 懲罰直接將這些多餘係數歸零。
+
 #### 四模型係數並排比較
 
 ![四模型係數比較](outputs/P3_Unit10_ElasticNet_Regression/figs/model_comparison_coefficients.png)
@@ -653,9 +797,23 @@ Elastic Net   2.231685  2.568798    2.766200   3.242156  0.923670 0.858028      
 3. **Ridge**：保留所有特徵，相關特徵係數相似
 4. **OLS**：保留所有特徵，係數可能不穩定
 
+**相關特徵組處理方式詳細比較**：
+
+*溫度組（T1_inlet vs T2_outlet）：*
+- Elastic Net：T1=0.9898, T2=0.5501 → 兩者都保留，係數差異 0.4397 ✓ 群組效應
+- Lasso：T1=0.8927, T2=0.4507 → 兩者都保留，係數差異 0.4420 ✓ 群組效應
+- Ridge：T1=0.8756, T2=0.5213 → 兩者都保留，係數差異 0.3543 ✓ 群組效應
+- OLS：T1=0.8458, T2=0.4932 → 兩者都保留，係數差異 0.3526 ✓ 群組效應
+
+*壓力組（P1_inlet vs P2_outlet）：*
+- Elastic Net：P1=0, P2=0 → 兩者都剔除 ✓
+- Lasso：P1=0, P2=0 → 兩者都剔除 ✓
+- Ridge：P1=-2.3505, P2=-2.0235 → 兩者都保留，係數差異 0.3270 ✓ 群組效應
+- OLS：P1=-2.5279, P2=-2.1753 → 兩者都保留，係數差異 0.3526 ✓ 群組效應
+
 ---
 
-### 6A.7 正則化路徑分析
+### 7.7 正則化路徑分析
 
 ![正則化路徑](outputs/P3_Unit10_ElasticNet_Regression/figs/regularization_path.png)
 
@@ -668,7 +826,7 @@ Elastic Net   2.231685  2.568798    2.766200   3.242156  0.923670 0.858028      
 
 ---
 
-### 6A.8 預測評估
+### 7.8 預測評估
 
 #### Parity Plot（實際值 vs 預測值）
 
@@ -681,7 +839,7 @@ Elastic Net   2.231685  2.568798    2.766200   3.242156  0.923670 0.858028      
 
 ---
 
-### 6A.9 交叉驗證穩定性
+### 7.9 交叉驗證穩定性
 
 ![交叉驗證](outputs/P3_Unit10_ElasticNet_Regression/figs/cross_validation.png)
 
@@ -711,9 +869,58 @@ R²:
 
 ---
 
-### 6A.10 穩定性測試：Elastic Net vs Lasso
+### 7.10 穩定性測試：Elastic Net vs Lasso
 
 進行 10 次不同隨機切分，比較 Elastic Net 和 Lasso 的特徵選擇穩定性：
+
+```
+執行特徵選擇穩定性測試（10次隨機切分）...
+
+Trial 1/10: Elastic Net 選擇 8/10, Lasso 選擇 8/10
+Trial 2/10: Elastic Net 選擇 6/10, Lasso 選擇 6/10
+Trial 3/10: Elastic Net 選擇 7/10, Lasso 選擇 6/10
+Trial 4/10: Elastic Net 選擇 7/10, Lasso 選擇 7/10
+Trial 5/10: Elastic Net 選擇 7/10, Lasso 選擇 7/10
+Trial 6/10: Elastic Net 選擇 5/10, Lasso 選擇 5/10
+Trial 7/10: Elastic Net 選擇 6/10, Lasso 選擇 5/10
+Trial 8/10: Elastic Net 選擇 6/10, Lasso 選擇 6/10
+Trial 9/10: Elastic Net 選擇 6/10, Lasso 選擇 6/10
+Trial 10/10: Elastic Net 選擇 6/10, Lasso 選擇 6/10
+```
+
+**特徵選擇穩定性統計（10 次試驗）**：
+
+```
+==========================================================================================
+特徵選擇穩定性比較（10次試驗）
+==========================================================================================
+           Feature  Elastic Net (%)  Lasso (%)  Difference
+     Temperature_C            100.0      100.0         0.0
+      Pressure_bar            100.0      100.0         0.0
+      Catalyst_wt%            100.0      100.0         0.0
+          Time_min            100.0      100.0         0.0
+        T1_inlet_C            100.0       90.0        10.0
+       T2_outlet_C             30.0       20.0        10.0
+      P1_inlet_bar              0.0        0.0         0.0
+     P2_outlet_bar             10.0       10.0         0.0
+Stirring_Speed_rpm             20.0       20.0         0.0
+                pH             80.0       80.0         0.0
+==========================================================================================
+```
+
+**關鍵發現**：
+
+```
+【溫度相關組穩定性分析】
+  Elastic Net: T1=100%, T2=30% (差異=70%)
+  Lasso:       T1=90%,  T2=20% (差異=70%)
+  △ 溫度組的 T2_outlet 穩定性較低（僅 20-30%）
+
+【壓力相關組穩定性分析】
+  Elastic Net: P1=0%, P2=10% (差異=10%)
+  Lasso:       P1=0%, P2=10% (差異=10%)
+  △ 壓力組穩定地以 P2_outlet 偶爾入模，整體選擇率低
+```
 
 ![穩定性比較](outputs/P3_Unit10_ElasticNet_Regression/figs/stability_comparison.png)
 
@@ -723,28 +930,15 @@ R²:
 - **橘色柱**：Elastic Net 選擇頻率
 - **藍色柱**：Lasso 選擇頻率
 
-**關鍵發現**：
-
-```
-【溫度相關組穩定性分析】
-  Elastic Net: T1=100%, T2=100% (差異=0%)
-  Lasso:       T1=100%, T2=100% (差異=0%)
-  → 兩者都非常穩定
-
-【壓力相關組穩定性分析】
-  Elastic Net: P1=0%, P2=0% (差異=0%)
-  Lasso:       P1=0%, P2=0% (差異=0%)
-  → 兩者都穩定地剔除這組特徵
-```
-
 **結論**：
-- 在本案例中，由於 l1_ratio=0.99 非常接近 Lasso，Elastic Net 與 Lasso 行為幾乎相同
-- 兩者都展現出極高的穩定性（溫度組 100% 保留，壓力組 100% 剔除）
-- 這驗證了混合正則化方法的穩定性
+- **核心特徵（Temperature_C, Pressure_bar, Catalyst_wt%, Time_min）**：兩模型 100% 穩定選入
+- **溫度組（T1/T2）**：T1_inlet 高度穩定（Elastic Net 100%），但 T2_outlet 穩定性較低（Elastic Net 30%，Lasso 20%）
+- **壓力組（P1/P2）**：P1_inlet 被穩定剔除，P2_outlet 僅偶爾（10%）被選入
+- **次要特徵（pH）**：有較高選入率（80%），但不如核心特徵穩定
 
 ---
 
-### 6A.11 新操作條件預測
+### 7.11 新操作條件預測
 
 使用訓練好的 Elastic Net 模型預測 3 種新操作條件的產率：
 
@@ -768,20 +962,20 @@ R²:
 
 ---
 
-### 6A.12 模型持久化
+### 7.12 模型持久化
 
 ```
 ✓ Elastic Net 模型已儲存至: 
-  d:\MyGit\CHE-AI-COURSE\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\elastic_net_model.pkl
+  d:\MyGit\ChemE-3590\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\elastic_net_model.pkl
 
 ✓ 標準化器已儲存至: 
-  d:\MyGit\CHE-AI-COURSE\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\scaler.pkl
+  d:\MyGit\ChemE-3590\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\scaler.pkl
 
 ✓ 模型資訊已儲存至: 
-  d:\MyGit\CHE-AI-COURSE\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\model_info.json
+  d:\MyGit\ChemE-3590\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\model_info.json
 
 ✓ 訓練數據已儲存至: 
-  d:\MyGit\CHE-AI-COURSE\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\training_data.csv
+  d:\MyGit\ChemE-3590\Part_3\Unit10\outputs\P3_Unit10_ElasticNet_Regression\models\training_data.csv
 
 ✓ 模型載入測試成功，測試預測 R²: 0.8580
 ```
@@ -790,7 +984,7 @@ R²:
 
 ---
 
-### 6A.13 案例總結與建議
+### 7.13 案例總結與建議
 
 #### 核心發現
 
@@ -811,8 +1005,9 @@ R²:
 
 4. **穩定性**：
    - 5-Fold CV 標準差 < 0.02（極佳）
-   - 10 次隨機切分特徵選擇 100% 一致
-   - 適合實際生產環境
+   - 核心特徵（Temperature, Pressure, Catalyst, Time）10 次隨機切分 100% 穩定選入
+   - 次要相關特徵（T2_outlet, P2_outlet）穩定性較低，反映實際物理冗餘性
+   - 適合實際生產環境作為參考
 
 #### 實務建議
 
@@ -855,9 +1050,9 @@ R²:
 
 ---
 
-## 7. Elastic Net 的優勢與限制
+## 8. Elastic Net 的優勢與限制
 
-### 7.1 優勢
+### 8.1 優勢
 
 1. **兼具 Lasso 和 Ridge 的優點**：
    - 特徵選擇能力（L1）
@@ -879,7 +1074,7 @@ R²:
    - 對數據擾動不敏感
    - 適合生產環境
 
-### 7.2 限制
+### 8.2 限制
 
 1. **需要調整兩個超參數**：
    - α 和 l1_ratio
@@ -897,7 +1092,7 @@ R²:
    - 與 Lasso 和 Ridge 一樣
    - 必須標準化特徵
 
-### 7.3 改進與擴展
+### 8.3 改進與擴展
 
 1. **Adaptive Elastic Net**：
    - 對不同特徵使用不同權重
@@ -913,7 +1108,7 @@ R²:
 
 ---
 
-## 8. 完整建模流程
+## 9. 完整建模流程
 
 ### 步驟 1: 資料準備與探索
 
@@ -1088,9 +1283,9 @@ plt.show()
 
 ---
 
-## 9. 實務技巧與注意事項
+## 10. 實務技巧與注意事項
 
-### 9.1 特徵標準化是必須的
+### 10.1 特徵標準化是必須的
 
 **為什麼必須標準化？**
 
@@ -1105,7 +1300,7 @@ scaler = StandardScaler()  # Z-score 標準化
 X_scaled = scaler.fit_transform(X)
 ```
 
-### 9.2 參數選擇策略
+### 10.2 參數選擇策略
 
 **l1_ratio 的經驗法則**：
 
@@ -1131,7 +1326,7 @@ X_scaled = scaler.fit_transform(X)
 alphas = np.logspace(-4, 2, 100)
 ```
 
-### 9.3 收斂性設定
+### 10.3 收斂性設定
 
 ```python
 # 增加最大迭代次數
@@ -1141,7 +1336,7 @@ enet = ElasticNet(alpha=0.1, l1_ratio=0.5, max_iter=10000)
 enet = ElasticNet(alpha=0.1, l1_ratio=0.5, tol=1e-5)
 ```
 
-### 9.4 特徵選擇與解釋
+### 10.4 特徵選擇與解釋
 
 ```python
 # 獲取選定的特徵及其係數
@@ -1161,7 +1356,7 @@ print("選定特徵（按重要性排序）:")
 print(selected_df)
 ```
 
-### 9.5 穩定性檢查
+### 10.5 穩定性檢查
 
 ```python
 # 檢查不同數據分割下的特徵選擇穩定性
@@ -1186,7 +1381,7 @@ for feature, count in feature_counts.most_common():
     print(f"  {feature}: {count}/10")
 ```
 
-### 9.6 與 Lasso 和 Ridge 的性能對比
+### 10.6 與 Lasso 和 Ridge 的性能對比
 
 ```python
 # 系統化比較
@@ -1208,7 +1403,7 @@ for name, model in models_to_compare.items():
 
 ---
 
-## 10. 總結
+## 11. 總結
 
 本節課學習了 Elastic Net 回歸的核心概念：
 
@@ -1234,29 +1429,29 @@ for name, model in models_to_compare.items():
 
 ---
 
-## 11. 延伸學習
+## 12. 延伸學習
 
-### 11.1 進階主題
+### 12.1 進階主題
 
 - **Adaptive Elastic Net**：對不同特徵使用不同權重
 - **Group Elastic Net**：對特徵組進行整體懲罰
 - **Sparse Group Elastic Net**：組間和組內雙重稀疏性
 - **非線性擴展**：Kernel Elastic Net
 
-### 11.2 相關模型
+### 12.2 相關模型
 
 - **Multi-task Elastic Net**：多任務學習的 Elastic Net 擴展
 - **Elastic Net Logistic Regression**：分類問題的 Elastic Net
 - **Elastic Net Cox Model**：生存分析的 Elastic Net
 
-### 11.3 Python 套件
+### 12.3 Python 套件
 
 - **`sklearn.linear_model.ElasticNet`**：標準 Elastic Net 回歸
 - **`sklearn.linear_model.ElasticNetCV`**：帶交叉驗證的 Elastic Net
 - **`sklearn.linear_model.enet_path`**：計算正則化路徑
 - **`sklearn.linear_model.MultiTaskElasticNet`**：多任務 Elastic Net
 
-### 11.4 參考資源
+### 12.4 參考資源
 
 - [scikit-learn Elastic Net 官方文檔](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.ElasticNet.html)
 - Zou, H., & Hastie, T. (2005). *Regularization and variable selection via the elastic net*. Journal of the Royal Statistical Society: Series B, 67(2), 301-320.
@@ -1264,7 +1459,7 @@ for name, model in models_to_compare.items():
 
 ---
 
-## 12. 下一步
+## 13. 下一步
 
 完成本節課後，請繼續學習：
 
