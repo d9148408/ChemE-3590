@@ -1,0 +1,96 @@
+Decision Tree Rules — Heart Disease Prediction
+Best Params: {'criterion': 'gini', 'max_depth': 5, 'min_samples_leaf': 5, 'min_samples_split': 2}
+Tree Depth: 5  |  Leaf Nodes: 31
+Test Accuracy: 0.8513  |  AUC: 0.9228
+============================================================
+|--- Thallium <= 4.50
+|   |--- Chest_pain_type <= 3.50
+|   |   |--- ST_depression <= 2.15
+|   |   |   |--- Vessels_fluro <= 0.50
+|   |   |   |   |--- Max_HR <= 150.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Max_HR >  150.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |--- Vessels_fluro >  0.50
+|   |   |   |   |--- Max_HR <= 160.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Max_HR >  160.50
+|   |   |   |   |   |--- class: 0
+|   |   |--- ST_depression >  2.15
+|   |   |   |--- Max_HR <= 156.50
+|   |   |   |   |--- ST_depression <= 2.90
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- ST_depression >  2.90
+|   |   |   |   |   |--- class: 0
+|   |   |   |--- Max_HR >  156.50
+|   |   |   |   |--- Age <= 48.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Age >  48.50
+|   |   |   |   |   |--- class: 0
+|   |--- Chest_pain_type >  3.50
+|   |   |--- Max_HR <= 146.50
+|   |   |   |--- ST_depression <= 0.70
+|   |   |   |   |--- Exercise_angina <= 0.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Exercise_angina >  0.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |--- ST_depression >  0.70
+|   |   |   |   |--- Max_HR <= 132.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- Max_HR >  132.50
+|   |   |   |   |   |--- class: 1
+|   |   |--- Max_HR >  146.50
+|   |   |   |--- Slope_of_ST <= 1.50
+|   |   |   |   |--- Max_HR <= 159.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Max_HR >  159.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |--- Slope_of_ST >  1.50
+|   |   |   |   |--- ST_depression <= 0.95
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- ST_depression >  0.95
+|   |   |   |   |   |--- class: 1
+|--- Thallium >  4.50
+|   |--- Chest_pain_type <= 3.50
+|   |   |--- Exercise_angina <= 0.50
+|   |   |   |--- ST_depression <= 1.10
+|   |   |   |   |--- Sex <= 0.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Sex >  0.50
+|   |   |   |   |   |--- class: 0
+|   |   |   |--- ST_depression >  1.10
+|   |   |   |   |--- Max_HR <= 171.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- Max_HR >  171.50
+|   |   |   |   |   |--- class: 0
+|   |   |--- Exercise_angina >  0.50
+|   |   |   |--- ST_depression <= 0.90
+|   |   |   |   |--- Cholesterol <= 205.00
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- Cholesterol >  205.00
+|   |   |   |   |   |--- class: 1
+|   |   |   |--- ST_depression >  0.90
+|   |   |   |   |--- BP <= 147.00
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- BP >  147.00
+|   |   |   |   |   |--- class: 1
+|   |--- Chest_pain_type >  3.50
+|   |   |--- Vessels_fluro <= 0.50
+|   |   |   |--- Max_HR <= 148.50
+|   |   |   |   |--- Exercise_angina <= 0.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- Exercise_angina >  0.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |--- Max_HR >  148.50
+|   |   |   |   |--- Exercise_angina <= 0.50
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- Exercise_angina >  0.50
+|   |   |   |   |   |--- class: 1
+|   |   |--- Vessels_fluro >  0.50
+|   |   |   |--- Max_HR <= 178.50
+|   |   |   |   |--- Max_HR <= 149.00
+|   |   |   |   |   |--- class: 1
+|   |   |   |   |--- Max_HR >  149.00
+|   |   |   |   |   |--- class: 1
+|   |   |   |--- Max_HR >  178.50
+|   |   |   |   |--- class: 1
