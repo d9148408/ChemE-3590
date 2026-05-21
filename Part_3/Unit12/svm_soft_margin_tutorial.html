@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：SVM 軟邊界、鬆弛變數 (Slack) 與懲罰參數 (C)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .slider-container {
+            width: 100%;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #8b5cf6; /* Tailwind violet-500 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+    </style>
+
+    <!-- 引入 MathJax 來渲染 LaTeX 數學公式 -->
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body class="p-6 md:p-12 min-h-screen">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- 標題區塊 -->
+        <div class="bg-violet-600 text-white p-6 md:p-8">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">SVM 軟邊界 (Soft Margin)</h1>
+            <p class="text-violet-100 text-lg">直觀理解：當資料無法完美分開時，什麼是「鬆弛變數 (ξ)」與「懲罰參數 (C)」？</p>
+        </div>
+
+        <!-- 內容區塊 -->
+        <div class="flex flex-col md:flex-row p-6 md:p-8 gap-8">
+            
+            <!-- 左側：互動圖表 -->
+            <div class="w-full md:w-3/5 flex flex-col items-center">
+                <div class="w-full relative h-[450px] md:h-[550px]">
+                    <canvas id="svmChart"></canvas>
+                </div>
+                <div class="mt-4 text-sm text-slate-500 text-center w-full">
+                    <p>🔵 藍點：類別 +1 | 🟠 橘點：類別 -1</p>
+                    <p class="mt-1 font-semibold text-rose-500">🔴 紅色線段：鬆弛變數 (Slack Variable, ξ) - 測量違規距離</p>
+                </div>
+            </div>
+
+            <!-- 右側：控制面板與教學說明 -->
+            <div class="w-full md:w-2/5 flex flex-col justify-start">
+                
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 shadow-inner">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-800 border-b pb-2 flex justify-between items-center">
+                        <span>互動控制面板</span>
+                    </h2>
+                    
+                    <!-- 顯示狀態統計卡片 -->
+                    <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                        <div class="bg-rose-50 p-2 rounded border border-rose-200 shadow-sm">
+                            <p class="text-xs text-rose-500 font-bold uppercase">違規點數</p>
+                            <p id="violationCount" class="text-base font-bold text-rose-700">0</p>
+                        </div>
+                        <div class="bg-white p-2 rounded border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 font-bold uppercase">總違規 Σξ</p>
+                            <p id="totalSlackBadge" class="text-base font-bold text-rose-600">0.00</p>
+                        </div>
+                        <div class="bg-violet-50 p-2 rounded border border-violet-200 shadow-sm">
+                            <p class="text-xs text-violet-500 font-bold uppercase">懲罰 C·Σξ</p>
+                            <p id="totalPenaltyBadge" class="text-base font-bold text-violet-700">0.00</p>
+                        </div>
+                    </div>
+
+                    <!-- 調整懲罰參數 C -->
+                    <div class="slider-container">
+                        <label for="cSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>懲罰參數 (C):</span>
+                            <span id="cValue" class="text-violet-600 font-bold bg-violet-100 px-2 rounded">1.0</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mb-2">C 越大代表「越嚴格」，對違規點的懲罰越重。</p>
+                        <input type="range" id="cSlider" min="0.1" max="10" step="0.1" value="1.0">
+                    </div>
+
+                    <!-- 調整街道寬度 -->
+                    <div class="slider-container mt-4">
+                        <label for="marginSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>街道寬度 (Margin):</span>
+                            <span id="marginValue" class="text-violet-600 font-bold">2.0</span>
+                        </label>
+                        <input type="range" id="marginSlider" min="0.5" max="5" step="0.1" value="2.0">
+                    </div>
+
+                    <!-- 調整斜率與截距 -->
+                    <div class="flex gap-4 mt-4">
+                        <div class="flex-1 slider-container mt-0">
+                            <label for="slopeSlider" class="flex justify-between text-xs text-slate-600 mb-1">
+                                <span>斜率:</span> <span id="slopeValue">1.0</span>
+                            </label>
+                            <input type="range" id="slopeSlider" min="-3" max="3" step="0.1" value="1.0">
+                        </div>
+                        <div class="flex-1 slider-container mt-0">
+                            <label for="interceptSlider" class="flex justify-between text-xs text-slate-600 mb-1">
+                                <span>截距:</span> <span id="interceptValue">10.0</span>
+                            </label>
+                            <input type="range" id="interceptSlider" min="-10" max="30" step="0.5" value="10.0">
+                        </div>
+                    </div>
+
+                    <!-- 控制按鈕 -->
+                    <div class="flex flex-col gap-2 mt-6">
+                        <button id="btnLowC" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-2 px-4 rounded transition duration-150 border border-indigo-300">
+                            ★ 模擬結果：小 C (寬容、大街道)
+                        </button>
+                        <button id="btnHighC" class="w-full bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold py-2 px-4 rounded transition duration-150 border border-rose-300">
+                            ★ 模擬結果：大 C (嚴格、窄街道)
+                        </button>
+                        <div class="flex gap-2 mt-1">
+                            <button id="btnRandom" class="flex-1 bg-violet-100 hover:bg-violet-200 text-violet-700 font-semibold py-2 px-2 rounded transition duration-150 text-sm shadow-sm active:scale-95">
+                                🎲 新資料
+                            </button>
+                            <button id="btnReset" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold py-2 px-2 rounded transition duration-150 text-sm shadow-sm active:scale-95">
+                                ↺ 重置
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 決策邊界方程式顯示 -->
+                    <div class="mt-3 p-2 bg-white rounded border border-slate-200 text-center">
+                        <p class="text-xs text-slate-500 mb-1">決策邊界方程式</p>
+                        <span id="modelEquation" class="font-mono text-sm font-bold text-slate-700">X2 = 1.0×X1 + 10.0</span>
+                    </div>
+                </div>
+
+                <div class="prose prose-slate prose-sm max-w-none">
+                    <h3 class="text-lg font-semibold text-violet-700">① 鬆弛變數 (Slack Variable, ξ)</h3>
+                    <p>
+                        在現實中，資料很常混在一起。如果我們強制要求「街道上絕對不能有點」，這條線可能根本畫不出來。<br>
+                        因此我們允許點「違規」進入街道，甚至跨界。圖中 <span class="text-rose-500 font-bold">紅色線段</span> 的長度，就是鬆弛變數 $\xi_i$。它計算了這個點距離它「本來應該在的安全邊界」有多遠。
+                    </p>
+
+                    <div class="not-prose bg-violet-50 border border-violet-200 rounded-lg p-3 my-3 text-center">
+                        <p class="text-xs text-violet-500 font-semibold mb-1">軟邊界 SVM 目標函式</p>
+                        <p class="font-mono text-sm text-slate-800">min ½‖w‖² + C × Σᵢ ξᵢ</p>
+                        <p class="text-xs text-slate-500 mt-1">s.t. yᵢ(wᵀxᵢ + b) ≥ 1 − ξᵢ，ξᵢ ≥ 0</p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-violet-700 mt-4">② 懲罰參數 (C) 的拔河遊戲</h3>
+                    <p>
+                        SVM 的優化目標是兩件事的拉扯：<strong>1. 街道越寬越好</strong> vs <strong>2. 違規成本 (C × Σξ) 越小越好</strong>。
+                    </p>
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li><strong>當 C 很大 (嚴格)：</strong> 犯錯的代價極高。模型寧可把街道縮得很窄，甚至把線歪掉，也要努力讓紅線 (ξ) 消失。（容易 Overfitting，被離群值牽著走）</li>
+                        <li><strong>當 C 很小 (寬容)：</strong> 犯錯沒關係。模型會選擇畫出一條又寬又平穩的街道，允許幾個頑皮的點違規。（泛化能力較好，Robust）</li>
+                    </ul>
+
+                    <p class="bg-yellow-50 p-3 rounded border border-yellow-200 mt-4 text-yellow-800">
+                        <strong>💡 動手試試看：</strong> 點擊「模擬結果」按鈕，觀察面對離群值時，大 C 與小 C 的決策差異！或按 🎲 新資料 生成全新的資料集。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const allPoints = [
+                // Class 1 (藍色) - 大致在左上
+                {x: 2, y: 18, label: 1}, {x: 3, y: 22}, {x: 4, y: 17}, {x: 5, y: 20},
+                {x: 6, y: 24}, {x: 7, y: 19}, {x: 3.5, y: 21}, {x: 8, y: 23},
+                {x: 2.5, y: 25}, {x: 5.5, y: 16}, {x: 7.5, y: 22}, {x: 4.5, y: 18.5},
+                // 搗蛋鬼 (藍色掉進橘色區域)
+                {x: 14, y: 12, label: 1, isOutlier: true}, 
+
+                // Class -1 (橘色) - 大致在右下
+                {x: 12, y: 8, label: -1}, {x: 14, y: 11}, {x: 13, y: 6}, {x: 15, y: 9},
+                {x: 17, y: 5}, {x: 18, y: 10}, {x: 16, y: 7}, {x: 12.5, y: 4},
+                {x: 19, y: 8}, {x: 14.5, y: 5.5}, {x: 17.5, y: 11.5}, {x: 11, y: 9},
+                // 搗蛋鬼 (橘色跑到藍色區域深處)
+                {x: 5, y: 13, label: -1, isOutlier: true}
+            ];
+
+            // 補齊 label (除了搗蛋鬼已手動標記外)
+            allPoints.forEach((p, idx) => {
+                if (p.label === undefined) {
+                    p.label = idx < 12 ? 1 : -1;
+                }
+            });
+
+            const ctx = document.getElementById('svmChart').getContext('2d');
+            let C_param = parseFloat(document.getElementById('cSlider').value);
+            let marginDist = parseFloat(document.getElementById('marginSlider').value);
+            let currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+            let currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+
+            // 更新數字顯示
+            const updateLabels = () => {
+                document.getElementById('cValue').innerText = C_param.toFixed(1);
+                document.getElementById('marginValue').innerText = marginDist.toFixed(1);
+                document.getElementById('slopeValue').innerText = currentSlope.toFixed(1);
+                document.getElementById('interceptValue').innerText = currentIntercept.toFixed(1);
+            };
+
+            // 點到直線 y = mx + c 的垂直帶號距離
+            const getSignedDistance = (x, y, m, c) => {
+                return (y - (m * x + c)) / Math.sqrt(m * m + 1);
+            };
+
+            // 計算點 (x0, y0) 在直線 y = mx + c_margin 的垂直投影點
+            // 直線方程式化為 mx - y + c_margin = 0, A=m, B=-1, C=c_margin
+            const getProjectionPoint = (x0, y0, m, c_margin) => {
+                const den = m * m + 1;
+                const num = m * x0 - y0 + c_margin;
+                const projX = x0 - (m * num) / den;
+                const projY = y0 - (-1 * num) / den;
+                return { x: projX, y: projY };
+            };
+
+            let slackLines = []; // 存儲需要畫的紅線資訊
+
+            const getPointStylesAndSlack = () => {
+                const bgColors = [];
+                const borders = [];
+                const borderWs = [];
+                const radii = [];
+                let totalSlack = 0;
+                let violationCount = 0;
+                slackLines = [];
+
+                // 計算垂直位移量 (對應 y 軸) 用於計算投影
+                const yOffset = marginDist * Math.sqrt(currentSlope * currentSlope + 1);
+
+                allPoints.forEach(p => {
+                    const baseBg = p.label === 1 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(249, 115, 22, 0.8)'; 
+                    const signedDist = getSignedDistance(p.x, p.y, currentSlope, currentIntercept);
+                    let slack = 0;
+                    let targetMarginIntercept = 0;
+
+                    if (p.label === 1) {
+                        // 藍點應該要在上邊界 (y > mx + c + offset) 之上，即 signedDist >= marginDist
+                        if (signedDist < marginDist) {
+                            slack = marginDist - signedDist;
+                            targetMarginIntercept = currentIntercept + yOffset;
+                        }
+                    } else {
+                        // 橘點應該要在下邊界 (y < mx + c - offset) 之下，即 signedDist <= -marginDist
+                        if (signedDist > -marginDist) {
+                            slack = signedDist - (-marginDist);
+                            targetMarginIntercept = currentIntercept - yOffset;
+                        }
+                    }
+
+                    if (slack > 0) {
+                        totalSlack += slack;
+                        violationCount++;
+                        // 違規點：紅色粗邊框
+                        bgColors.push(baseBg);
+                        borders.push('rgba(225, 29, 72, 1)'); // Rose-600
+                        borderWs.push(3);
+                        radii.push(6);
+                        
+                        // 記錄投影線的起終點資料座標
+                        const proj = getProjectionPoint(p.x, p.y, currentSlope, targetMarginIntercept);
+                        slackLines.push({
+                            startX: p.x, startY: p.y,
+                            endX: proj.x, endY: proj.y,
+                            slackValue: slack
+                        });
+                    } else {
+                        // 安全點：白邊，正常大小
+                        bgColors.push(p.label === 1 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(249, 115, 22, 0.4)'); 
+                        borders.push('rgba(255, 255, 255, 0.8)');
+                        borderWs.push(1);
+                        radii.push(5);
+                    }
+                });
+                return { bg: bgColors, border: borders, bw: borderWs, radii: radii, totalSlack: totalSlack, violationCount: violationCount };
+            };
+
+            const getLinePoints = (slope, intercept) => {
+                return [ { x: 0, y: slope * 0 + intercept }, { x: 20, y: slope * 20 + intercept } ];
+            };
+
+            let chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: '資料點',
+                            data: allPoints,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'white',
+                            borderWidth: 1,
+                            pointRadius: 5,
+                            order: 3 // 資料點在最上層
+                        },
+                        {
+                            label: '決策邊界',
+                            data: getLinePoints(currentSlope, currentIntercept),
+                            type: 'line',
+                            borderColor: 'rgba(15, 23, 42, 1)', // 黑實線
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0,
+                            order: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    scales: {
+                        x: { min: 0, max: 20 },
+                        y: { min: 0, max: 30 }
+                    },
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                },
+                plugins: [{
+                    // 自訂 Plugin 來畫 Margin 街道與 Slack 紅線
+                    id: 'svmMarginAndSlackDrawer',
+                    beforeDatasetsDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        
+                        // 1. 畫街道 Margin (灰底與虛線)
+                        const yOffset = marginDist * Math.sqrt(currentSlope * currentSlope + 1);
+                        
+                        const drawMarginLine = (offsetSign) => {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(15, 23, 42, 0.3)';
+                            ctx.setLineDash([5, 5]);
+                            ctx.lineWidth = 2;
+                            const y1 = currentSlope * 0 + currentIntercept + offsetSign * yOffset;
+                            const y2 = currentSlope * 20 + currentIntercept + offsetSign * yOffset;
+                            ctx.moveTo(x.getPixelForValue(0), y.getPixelForValue(y1));
+                            ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(y2));
+                            ctx.stroke();
+                        };
+                        drawMarginLine(1);
+                        drawMarginLine(-1);
+                        
+                        // 填滿街道
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.04)';
+                        ctx.beginPath();
+                        ctx.moveTo(x.getPixelForValue(0), y.getPixelForValue(currentSlope * 0 + currentIntercept + yOffset));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(currentSlope * 20 + currentIntercept + yOffset));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(currentSlope * 20 + currentIntercept - yOffset));
+                        ctx.lineTo(x.getPixelForValue(0), y.getPixelForValue(currentSlope * 0 + currentIntercept - yOffset));
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.restore();
+                    },
+                    afterDatasetsDraw(chart) {
+                        // 2. 在資料點上方畫出 Slack 紅色線段
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        
+                        slackLines.forEach(line => {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(225, 29, 72, 0.8)'; // Rose-600
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([]); // 實線
+                            
+                            const pxStartX = x.getPixelForValue(line.startX);
+                            const pxStartY = y.getPixelForValue(line.startY);
+                            const pxEndX = x.getPixelForValue(line.endX);
+                            const pxEndY = y.getPixelForValue(line.endY);
+                            
+                            ctx.moveTo(pxStartX, pxStartY);
+                            ctx.lineTo(pxEndX, pxEndY);
+                            ctx.stroke();
+
+                            // 畫一個小圓點在交界處
+                            ctx.fillStyle = 'rgba(225, 29, 72, 1)';
+                            ctx.beginPath();
+                            ctx.arc(pxEndX, pxEndY, 3, 0, 2 * Math.PI);
+                            ctx.fill();
+                        });
+                        ctx.restore();
+                    }
+                }]
+            });
+
+            const updateChart = () => {
+                C_param = parseFloat(document.getElementById('cSlider').value);
+                marginDist = parseFloat(document.getElementById('marginSlider').value);
+                currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+                currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+                
+                updateLabels();
+
+                // 更新線段資料
+                chart.data.datasets[1].data = getLinePoints(currentSlope, currentIntercept);
+
+                // 計算 Slack 與樣式
+                const styles = getPointStylesAndSlack();
+                chart.data.datasets[0].backgroundColor = styles.bg;
+                chart.data.datasets[0].borderColor = styles.border;
+                chart.data.datasets[0].borderWidth = styles.bw;
+                chart.data.datasets[0].pointRadius = styles.radii;
+
+                // 更新統計卡片
+                const totalSlack = styles.totalSlack;
+                const totalPenalty = C_param * totalSlack;
+
+                document.getElementById('violationCount').innerText = styles.violationCount;
+                document.getElementById('totalSlackBadge').innerText = totalSlack.toFixed(2);
+                document.getElementById('totalPenaltyBadge').innerText = totalPenalty.toFixed(2);
+
+                // 更新方程式顯示
+                const signStr = currentIntercept >= 0
+                    ? `+ ${currentIntercept.toFixed(1)}`
+                    : `- ${Math.abs(currentIntercept).toFixed(1)}`;
+                document.getElementById('modelEquation').innerText =
+                    `X2 = ${currentSlope.toFixed(1)}\u00d7X1 ${signStr}`;
+                
+                chart.update();
+            };
+
+            // 拉桿事件
+            ['cSlider', 'marginSlider', 'slopeSlider', 'interceptSlider'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateChart);
+            });
+
+            // 模擬：小 C 最佳解 (允許違規，追求大 Margin，不被離群值干擾)
+            document.getElementById('btnLowC').addEventListener('click', () => {
+                document.getElementById('cSlider').value = 0.2;
+                document.getElementById('marginSlider').value = 3.5;
+                document.getElementById('slopeSlider').value = -1.0;
+                document.getElementById('interceptSlider').value = 26.0;
+                updateChart();
+            });
+
+            // 模擬：大 C 最佳解 (極度嚴格，為了分類那個橘色離群值，把線弄歪且街道變超窄)
+            document.getElementById('btnHighC').addEventListener('click', () => {
+                document.getElementById('cSlider').value = 10.0;
+                document.getElementById('marginSlider').value = 0.5; // Margin 變積極窄
+                document.getElementById('slopeSlider').value = 0.2; // 線條被離群值拉歪了
+                document.getElementById('interceptSlider').value = 12.0;
+                updateChart();
+            });
+            document.getElementById('btnRandom').addEventListener('click', () => {
+                // 重新產生帶雜訊的兩群資料（保留两個搞蛋鬼離群值）
+                allPoints.length = 0;
+                for (let i = 0; i < 12; i++) {
+                    allPoints.push({ x: 1 + Math.random() * 8, y: 14 + Math.random() * 10, label: 1 });
+                }
+                // 搞蛋鬼：藍點援進橘色區
+                allPoints.push({ x: 11 + Math.random() * 4, y: 9 + Math.random() * 5, label: 1, isOutlier: true });
+                for (let i = 0; i < 12; i++) {
+                    allPoints.push({ x: 10 + Math.random() * 8, y: 2 + Math.random() * 10, label: -1 });
+                }
+                // 搞蛋鬼：橘點跑到藍色區
+                allPoints.push({ x: 3 + Math.random() * 4, y: 10 + Math.random() * 5, label: -1, isOutlier: true });
+                chart.data.datasets[0].data = allPoints;
+                updateChart();
+            });
+
+            document.getElementById('btnReset').addEventListener('click', () => {
+                document.getElementById('cSlider').value = 1.0;
+                document.getElementById('marginSlider').value = 2.0;
+                document.getElementById('slopeSlider').value = 1.0;
+                document.getElementById('interceptSlider').value = 10.0;
+                updateChart();
+            });
+            // 初始執行
+            updateChart();
+        });
+    </script>
+</body>
+</html>

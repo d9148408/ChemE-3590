@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：了解支持向量分類 (SVC) 與邊界 (Margin)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .slider-container {
+            width: 100%;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #10b981; /* Tailwind emerald-500 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 min-h-screen">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- 標題區塊 -->
+        <div class="bg-emerald-600 text-white p-6 md:p-8">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">支持向量分類 (Support Vector Classification, SVC)</h1>
+            <p class="text-emerald-100 text-lg">直觀理解：如何尋找完美分隔兩類別的「最寬街道 (Margin)」？</p>
+        </div>
+
+        <!-- 內容區塊 -->
+        <div class="flex flex-col md:flex-row p-6 md:p-8 gap-8">
+            
+            <!-- 左側：互動圖表 -->
+            <div class="w-full md:w-3/5 flex flex-col items-center">
+                <div class="w-full relative h-[450px] md:h-[550px]">
+                    <canvas id="svcChart"></canvas>
+                </div>
+                <div class="mt-3 text-xs text-slate-400 text-center w-full space-y-0.5">
+                    <p>
+                        <span class="inline-flex items-center gap-1 mr-2"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>藍點：類別 +1</span>
+                        <span class="inline-flex items-center gap-1 mr-2"><span class="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block"></span>橘點：類別 -1</span>
+                        <span class="inline-flex items-center gap-1"><span class="w-3 h-2 rounded-sm bg-yellow-300 inline-block border-2 border-yellow-500"></span>黃框：支持向量</span>
+                    </p>
+                    <p>黑實線：決策邊界 ｜ 黑虛線：Margin 邊界 ｜ 黑箭頭：2M 寬度 ｜ 彩色虛線：違規 ξ</p>
+                </div>
+            </div>
+
+            <!-- 右側：控制面板與教學說明 -->
+            <div class="w-full md:w-2/5 flex flex-col justify-start">
+                
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 shadow-inner">
+                    <h2 class="text-xl font-semibold mb-3 text-slate-800 border-b pb-2">互動控制面板</h2>
+                    <!-- 三格統計摘要 -->
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <div class="bg-red-50 rounded-lg p-2 text-center border border-red-100">
+                            <div class="text-xs text-red-400 font-medium">違規 Loss</div>
+                            <div id="lossBadge" class="text-base font-bold text-red-700 transition-colors duration-300">0.00</div>
+                        </div>
+                        <div class="bg-amber-50 rounded-lg p-2 text-center border border-amber-100">
+                            <div class="text-xs text-amber-500 font-medium">支持向量</div>
+                            <div id="svCount" class="text-base font-bold text-amber-700">0 / 24</div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-100">
+                            <div class="text-xs text-emerald-500 font-medium">分隔間距 2M</div>
+                            <div id="marginDisplay" class="text-base font-bold text-emerald-700">4.00</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 調整邊界寬度 (Margin) -->
+                    <div class="slider-container">
+                        <label for="marginSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>調整街道寬度 (Margin Distance):</span>
+                            <span id="marginValue" class="text-emerald-600 font-bold">2.0</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mb-2">虛線之間的距離。SVC 的目標是讓這條街道越寬越好，且不能有(或盡量少有)點跑進街上。</p>
+                        <input type="range" id="marginSlider" min="0.5" max="6" step="0.1" value="2.0">
+                    </div>
+
+                    <!-- 調整斜率 -->
+                    <div class="slider-container mt-6">
+                        <label for="slopeSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>旋轉決策邊界 (斜率):</span>
+                            <span id="slopeValue" class="text-emerald-600 font-bold">-1.0</span>
+                        </label>
+                        <input type="range" id="slopeSlider" min="-3" max="3" step="0.1" value="-1.0">
+                    </div>
+
+                    <!-- 調整截距 -->
+                    <div class="slider-container mt-6">
+                        <label for="interceptSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>平移決策邊界 (截距):</span>
+                            <span id="interceptValue" class="text-emerald-600 font-bold">20.0</span>
+                        </label>
+                        <input type="range" id="interceptSlider" min="0" max="30" step="0.5" value="20.0">
+                    </div>
+
+                    <!-- 目前決策邊界方程式 -->
+                    <div class="mt-4 p-2 bg-slate-100 rounded-lg text-center border border-slate-200">
+                        <span class="text-xs text-slate-400 block mb-0.5">目前決策邊界方程式</span>
+                        <span id="modelEquation" class="font-mono text-sm font-bold text-slate-700">X2 = -1.0×X1 + 20.0</span>
+                    </div>
+                    <!-- 控制按鈕 -->
+                    <div class="flex gap-2 mt-4">
+                        <button id="btnRandom" class="flex-1 bg-violet-100 hover:bg-violet-200 text-violet-700 font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            🎲 新資料
+                        </button>
+                        <button id="btnReset" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            ↺ 重置
+                        </button>
+                        <button id="btnOptimal" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            ★ 最佳解
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-4 text-sm text-slate-700">
+
+                    <!-- 概念 ① -->
+                    <div>
+                        <h3 class="text-base font-bold text-emerald-700 mb-1">① 為何要「最寬的街道」？</h3>
+                        <p class="text-slate-600">在藍橘兩群點之間可以畫無限多條分隔線，SVC 選擇讓<strong>兩側 Margin 邊界（黑虛線）離決策邊界最遠</strong>的那條：</p>
+                        <ul class="mt-2 space-y-1 pl-1">
+                            <li class="flex gap-2 items-start">
+                                <span class="mt-0.5 text-blue-500 font-bold shrink-0">●</span>
+                                <span><strong>藍色區（+1 類）</strong>：應位於上方 Margin 線以上</span>
+                            </li>
+                            <li class="flex gap-2 items-start">
+                                <span class="mt-0.5 text-orange-500 font-bold shrink-0">●</span>
+                                <span><strong>橘色區（-1 類）</strong>：應位於下方 Margin 線以下</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 概念 ② -->
+                    <div>
+                        <h3 class="text-base font-bold text-emerald-700 mb-1">② 誰是支持向量？</h3>
+                        <p class="text-slate-600"><strong>黃色框線</strong>的點「踩在」 Margin 邊界上（或侵入街道內）。它們是唯一決定決策邊界位置的點 —— 其他點即使移動，只要不踩進街道，模型完全不受影響。</p>
+                        <p class="text-slate-600 mt-1">侵入街道的點上方顯示<strong>彩色虛線段（ξ）</strong>，表示鬆弛量（Soft Margin 中允許的違規距離）。</p>
+                    </div>
+
+                    <!-- 最佳化目標 -->
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">SVC 最大化目標（Hard Margin）</p>
+                        <p class="font-mono text-sm text-center text-slate-800">最大化 2M = 2 / ‖w‖</p>
+                        <p class="text-xs text-slate-400 mt-2 text-center">等價於最小化 ½‖w‖²，使所有點満足 yᵢ(w·xᵢ + b) ≥ 1</p>
+                    </div>
+
+                    <!-- 互動提示 -->
+                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                        <p class="text-xs font-bold text-amber-700 mb-2">🔬 動手試試看：</p>
+                        <ol class="text-xs text-amber-800 space-y-1 list-decimal pl-4">
+                            <li>調整斜率和截距 → 試著讓所有點分到正確側，Loss 降為 0</li>
+                            <li>調大 Margin 寬度 → 點「陷入街道」，ξ 線出現（Soft Margin）</li>
+                            <li>點「最佳解」後再點「新資料」 → 觀察不同資料集的最佳邊界</li>
+                        </ol>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- 1. 產生分類資料 ---
+            const class1Points = []; // 類別 +1 (藍色)，預期在線上方
+            const class2Points = []; // 類別 -1 (橘色)，預期在線下方
+            
+            // 隨機產生稍微集中的兩群點 (線性可分)
+            const pointsData = [
+                // Class 1 (Blue)
+                {x: 2, y: 15}, {x: 3, y: 12}, {x: 4, y: 18}, {x: 5, y: 14},
+                {x: 6, y: 19}, {x: 7, y: 13}, {x: 3.5, y: 16}, {x: 8, y: 17},
+                {x: 2.5, y: 19}, {x: 5.5, y: 16.5}, {x: 7.5, y: 15}, {x: 4.5, y: 12.5},
+                // Class 2 (Orange)
+                {x: 12, y: 4}, {x: 14, y: 7}, {x: 13, y: 2}, {x: 15, y: 5},
+                {x: 17, y: 3}, {x: 18, y: 8}, {x: 16, y: 6}, {x: 12.5, y: 8.5},
+                {x: 19, y: 4}, {x: 14.5, y: 3.5}, {x: 17.5, y: 6.5}, {x: 11, y: 5}
+            ];
+
+            pointsData.forEach((p, index) => {
+                if (index < 12) {
+                    class1Points.push({ x: p.x, y: p.y, label: 1 });
+                } else {
+                    class2Points.push({ x: p.x, y: p.y, label: -1 });
+                }
+            });
+
+            const allPoints = [...class1Points, ...class2Points];
+
+            // --- 2. 獲取 DOM 元素與初始狀態 ---
+            const ctx = document.getElementById('svcChart').getContext('2d');
+            let marginDist = parseFloat(document.getElementById('marginSlider').value);
+            let currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+            let currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+
+            const updateLabels = () => {
+                document.getElementById('marginValue').innerText = marginDist.toFixed(1);
+                document.getElementById('slopeValue').innerText = currentSlope.toFixed(1);
+                document.getElementById('interceptValue').innerText = currentIntercept.toFixed(1);
+            };
+
+            // 計算點到線的「帶號垂直距離」
+            const getSignedDistance = (x, y, m, c) => {
+                const lineY = m * x + c;
+                return (y - lineY) / Math.sqrt(m * m + 1);
+            };
+
+            // 判斷哪些點是支持向量 (在 margin 內，或被誤分類)
+            const getPointStyles = () => {
+                const bgColors = [];
+                const borders = [];
+                const borderWs = [];
+                const radii = [];
+                let currentLoss = 0;
+                let svCountVar = 0;
+
+                allPoints.forEach(p => {
+                    const baseBg = p.label === 1 ? 'rgba(59, 130, 246, 0.9)' : 'rgba(249, 115, 22, 0.9)'; 
+                    
+                    const dist = getSignedDistance(p.x, p.y, currentSlope, currentIntercept);
+                    let isSupportVector = false;
+
+                    if (p.label === 1) {
+                        if (dist <= marginDist) {
+                            isSupportVector = true;
+                            currentLoss += (marginDist - dist); 
+                        }
+                    }
+                    else if (p.label === -1) {
+                        if (dist >= -marginDist) {
+                            isSupportVector = true;
+                            currentLoss += (dist - (-marginDist)); 
+                        }
+                    }
+
+                    if (isSupportVector) {
+                        svCountVar++;
+                        bgColors.push(baseBg);
+                        borders.push('rgba(250, 204, 21, 1)'); 
+                        borderWs.push(4);                      
+                        radii.push(7);                         
+                    } else {
+                        bgColors.push(p.label === 1 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(249, 115, 22, 0.4)'); 
+                        borders.push('rgba(255, 255, 255, 0.8)');
+                        borderWs.push(1);
+                        radii.push(5);
+                    }
+                });
+                return { bg: bgColors, border: borders, bw: borderWs, radii: radii, loss: currentLoss, svCount: svCountVar };
+            };
+
+            // 計算決策邊界的兩端點
+            const getLinePoints = (slope, intercept) => {
+                return [
+                    { x: 0, y: slope * 0 + intercept },
+                    { x: 20, y: slope * 20 + intercept }
+                ];
+            };
+
+            // 建立圖表實體 (這就是之前遺漏的重要部分)
+            let chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: '資料點',
+                            data: allPoints,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'white',
+                            borderWidth: 1,
+                            pointRadius: 5,
+                            order: 2 // 確保點在線的上方
+                        },
+                        {
+                            label: '決策邊界',
+                            data: getLinePoints(currentSlope, currentIntercept),
+                            type: 'line',
+                            borderColor: 'rgba(15, 23, 42, 1)', // 黑實線
+                            borderWidth: 3,
+                            fill: false,
+                            pointRadius: 0,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    scales: {
+                        x: { min: 0, max: 20, title: { display: true, text: '特徵 (X1)' } },
+                        y: { min: -5, max: 30, title: { display: true, text: '特徵 (X2)' } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                },
+                plugins: [{
+                    // 自訂 Plugin 來畫出寬度街道 (Margin)
+                    id: 'svcMarginDrawer',
+                    beforeDatasetsDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        ctx.save();
+                        
+                        // 計算垂直距離在 y 軸上的位移量 (幾何轉換)
+                        const verticalOffset = marginDist * Math.sqrt(currentSlope * currentSlope + 1);
+                        
+                        // 畫虛線函式
+                        const drawMarginLine = (offsetSign) => {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(15, 23, 42, 0.4)'; // 半透明黑色虛線
+                            ctx.setLineDash([6, 6]);
+                            ctx.lineWidth = 2;
+                            
+                            const y1 = currentSlope * 0 + currentIntercept + offsetSign * verticalOffset;
+                            const y2 = currentSlope * 20 + currentIntercept + offsetSign * verticalOffset;
+                            
+                            ctx.moveTo(x.getPixelForValue(0), y.getPixelForValue(y1));
+                            ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(y2));
+                            ctx.stroke();
+                        };
+                        
+                        drawMarginLine(1);
+                        drawMarginLine(-1);
+
+                        // 畫類別背景區域（+1: 淡藍，-1: 淡橘）
+                        const yT0  = currentSlope * 0  + currentIntercept + verticalOffset;
+                        const yT20 = currentSlope * 20 + currentIntercept + verticalOffset;
+                        const yB0  = currentSlope * 0  + currentIntercept - verticalOffset;
+                        const yB20 = currentSlope * 20 + currentIntercept - verticalOffset;
+                        const { top: cTop, bottom: cBot } = chart.chartArea;
+
+                        ctx.fillStyle = 'rgba(59, 130, 246, 0.05)';
+                        ctx.beginPath();
+                        ctx.moveTo(x.getPixelForValue(0),  y.getPixelForValue(yT0));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(yT20));
+                        ctx.lineTo(x.getPixelForValue(20), cTop);
+                        ctx.lineTo(x.getPixelForValue(0),  cTop);
+                        ctx.closePath(); ctx.fill();
+
+                        ctx.fillStyle = 'rgba(249, 115, 22, 0.05)';
+                        ctx.beginPath();
+                        ctx.moveTo(x.getPixelForValue(0),  y.getPixelForValue(yB0));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(yB20));
+                        ctx.lineTo(x.getPixelForValue(20), cBot);
+                        ctx.lineTo(x.getPixelForValue(0),  cBot);
+                        ctx.closePath(); ctx.fill();
+
+                        // 畫街道的灰色填滿區域
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.03)';
+                        ctx.beginPath();
+                        const yTop1 = currentSlope * 0 + currentIntercept + verticalOffset;
+                        const yTop2 = currentSlope * 20 + currentIntercept + verticalOffset;
+                        const yBot2 = currentSlope * 20 + currentIntercept - verticalOffset;
+                        const yBot1 = currentSlope * 0 + currentIntercept - verticalOffset;
+                        
+                        ctx.moveTo(x.getPixelForValue(0), y.getPixelForValue(yTop1));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(yTop2));
+                        ctx.lineTo(x.getPixelForValue(20), y.getPixelForValue(yBot2));
+                        ctx.lineTo(x.getPixelForValue(0), y.getPixelForValue(yBot1));
+                        ctx.closePath();
+                        ctx.fill();
+
+                        ctx.restore();
+                    },
+
+                    // 在資料點之後繪製 ξ 線段 與 2M 標注
+                    afterDatasetsDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+                        const verticalOffset = marginDist * Math.sqrt(currentSlope * currentSlope + 1);
+
+                        // ① 繪製違規 ξ 線段（支持向量到 Margin 邊界）
+                        ctx.save();
+                        allPoints.forEach(p => {
+                            const dist = getSignedDistance(p.x, p.y, currentSlope, currentIntercept);
+                            let isViolating = false;
+                            let marginLineY, color;
+
+                            if (p.label === 1 && dist <= marginDist) {
+                                isViolating = true;
+                                marginLineY = currentSlope * p.x + currentIntercept + verticalOffset;
+                                color = 'rgba(59, 130, 246, 0.65)';
+                            } else if (p.label === -1 && dist >= -marginDist) {
+                                isViolating = true;
+                                marginLineY = currentSlope * p.x + currentIntercept - verticalOffset;
+                                color = 'rgba(249, 115, 22, 0.65)';
+                            }
+
+                            if (isViolating) {
+                                const px     = x.getPixelForValue(p.x);
+                                const py     = y.getPixelForValue(p.y);
+                                const pMargin = y.getPixelForValue(marginLineY);
+
+                                if (Math.abs(py - pMargin) > 3) {
+                                    ctx.strokeStyle = color;
+                                    ctx.setLineDash([3, 3]);
+                                    ctx.lineWidth = 1.5;
+                                    ctx.beginPath();
+                                    ctx.moveTo(px, py);
+                                    ctx.lineTo(px, pMargin);
+                                    ctx.stroke();
+
+                                    ctx.setLineDash([]);
+                                    ctx.font = 'bold 10px serif';
+                                    ctx.fillStyle = color;
+                                    ctx.fillText('\u03be', px + 3, (py + pMargin) / 2 + 4);
+                                }
+                            }
+                        });
+                        ctx.restore();
+
+                        // ② 繪製 2M 雙向箭頭標注
+                        if (marginDist > 0.3) {
+                            const annotDataX = 18.5;
+                            const annotPxX   = x.getPixelForValue(annotDataX) + 10;
+                            const lineMidY   = currentSlope * annotDataX + currentIntercept;
+                            const pxTop = y.getPixelForValue(lineMidY + verticalOffset);
+                            const pxBot = y.getPixelForValue(lineMidY - verticalOffset);
+                            const pxMid = y.getPixelForValue(lineMidY);
+                            const arh   = 5;
+
+                            if (Math.abs(pxBot - pxTop) > 14) {
+                                ctx.save();
+                                ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+                                ctx.fillStyle   = 'rgba(15, 23, 42, 0.55)';
+                                ctx.lineWidth   = 1.5;
+                                ctx.setLineDash([]);
+
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxTop + arh * 1.5);
+                                ctx.lineTo(annotPxX, pxBot - arh * 1.5);
+                                ctx.stroke();
+
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxTop);
+                                ctx.lineTo(annotPxX - arh * 0.8, pxTop + arh * 1.5);
+                                ctx.lineTo(annotPxX + arh * 0.8, pxTop + arh * 1.5);
+                                ctx.closePath(); ctx.fill();
+
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxBot);
+                                ctx.lineTo(annotPxX - arh * 0.8, pxBot - arh * 1.5);
+                                ctx.lineTo(annotPxX + arh * 0.8, pxBot - arh * 1.5);
+                                ctx.closePath(); ctx.fill();
+
+                                [[annotPxX, pxTop], [annotPxX, pxBot]].forEach(([px2, py2]) => {
+                                    ctx.beginPath();
+                                    ctx.moveTo(px2 - 5, py2);
+                                    ctx.lineTo(px2 + 5, py2);
+                                    ctx.stroke();
+                                });
+
+                                ctx.font = 'bold 11px sans-serif';
+                                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                                ctx.fillText('2M', annotPxX + 7, pxMid + 4);
+                                ctx.restore();
+                            }
+                        }
+                    }
+                }]
+            });
+
+            const updateChart = () => {
+                marginDist = parseFloat(document.getElementById('marginSlider').value);
+                currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+                currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+                
+                updateLabels();
+
+                // 更新決策邊界 (線段)
+                chart.data.datasets[1].data = getLinePoints(currentSlope, currentIntercept);
+
+                // 計算支持向量並更新點的樣式與 Loss
+                const styles = getPointStyles();
+                chart.data.datasets[0].backgroundColor = styles.bg;
+                chart.data.datasets[0].borderColor = styles.border;
+                chart.data.datasets[0].borderWidth = styles.bw;
+                chart.data.datasets[0].pointRadius = styles.radii;
+
+                // 更新三格統計數字
+                const lossBadge = document.getElementById('lossBadge');
+                lossBadge.innerText = styles.loss.toFixed(2);
+                lossBadge.className = styles.loss <= 0.01
+                    ? 'text-base font-bold text-emerald-700 transition-colors duration-300'
+                    : 'text-base font-bold text-red-700 transition-colors duration-300';
+
+                document.getElementById('svCount').innerText =
+                    `${styles.svCount} / ${allPoints.length}`;
+
+                const vOff = marginDist * Math.sqrt(currentSlope * currentSlope + 1);
+                document.getElementById('marginDisplay').innerText = (2 * vOff).toFixed(2);
+
+                // 更新方程式顯示
+                const signStr = currentIntercept >= 0
+                    ? `+ ${currentIntercept.toFixed(1)}`
+                    : `- ${Math.abs(currentIntercept).toFixed(1)}`;
+                document.getElementById('modelEquation').innerText =
+                    `X2 = ${currentSlope.toFixed(1)}\u00d7X1 ${signStr}`;
+
+                chart.update();
+            };
+
+            document.getElementById('marginSlider').addEventListener('input', updateChart);
+            document.getElementById('slopeSlider').addEventListener('input', updateChart);
+            document.getElementById('interceptSlider').addEventListener('input', updateChart);
+
+            // 綁定按鈕事件
+            document.getElementById('btnReset').addEventListener('click', () => {
+                document.getElementById('marginSlider').value = 2.0;
+                document.getElementById('slopeSlider').value = -1.0;
+                document.getElementById('interceptSlider').value = 20.0;
+                updateChart();
+            });
+
+            document.getElementById('btnOptimal').addEventListener('click', () => {
+                // 完美分隔此資料集的參數
+                document.getElementById('marginSlider').value = 3.5;
+                document.getElementById('slopeSlider').value = 1.0;
+                document.getElementById('interceptSlider').value = 1.0;
+                updateChart();
+            });
+
+            document.getElementById('btnRandom').addEventListener('click', () => {
+                // 重新產生線性可分的兩群資料
+                allPoints.length = 0;
+                for (let i = 0; i < 12; i++) {
+                    allPoints.push({
+                        x: 2  + Math.random() * 6,
+                        y: 12 + Math.random() * 8,
+                        label: 1
+                    });
+                }
+                for (let i = 0; i < 12; i++) {
+                    allPoints.push({
+                        x: 11 + Math.random() * 8,
+                        y: 2  + Math.random() * 8,
+                        label: -1
+                    });
+                }
+                chart.data.datasets[0].data = allPoints;
+                updateChart();
+            });
+
+            // 初始執行
+            updateChart();
+        });
+    </script>
+</body>
+</html>

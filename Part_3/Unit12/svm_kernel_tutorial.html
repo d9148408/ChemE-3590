@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：SVM 核函數 (Kernel) 與 Gamma 參數</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .slider-container {
+            width: 100%;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #d946ef; /* Tailwind fuchsia-500 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        
+        /* 隱藏 Radio Input，自訂樣式 */
+        .kernel-radio:checked + label {
+            background-color: #d946ef; /* Fuchsia-500 */
+            color: white;
+            border-color: #d946ef;
+        }
+    </style>
+
+    <!-- 引入 MathJax 來渲染 LaTeX 數學公式 -->
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body class="p-6 md:p-12 min-h-screen">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- 標題區塊 -->
+        <div class="bg-fuchsia-600 text-white p-6 md:p-8">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">SVM 魔法：核函數 (Kernel Trick)</h1>
+            <p class="text-fuchsia-100 text-lg">直觀理解：當直線切不開時怎麼辦？RBF Kernel 與 Gamma ($γ$) 的影響力</p>
+        </div>
+
+        <!-- 內容區塊 -->
+        <div class="flex flex-col md:flex-row p-6 md:p-8 gap-8">
+            
+            <!-- 左側：互動圖表 (手動繪製熱圖與資料點) -->
+            <div class="w-full md:w-3/5 flex flex-col items-center">
+                <!-- 容器需保持正方形以配合環狀資料 -->
+                <div class="w-full relative aspect-square max-w-[500px] border border-slate-200 rounded overflow-hidden shadow-inner bg-white">
+                    <!-- 底層 Canvas 用於畫決策熱圖 -->
+                    <canvas id="heatmapCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    <!-- 上層 Canvas 用於畫資料點 -->
+                    <canvas id="pointsCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    <!-- 載入中遮罩 -->
+                    <div id="loadingOverlay" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden">
+                        <span class="text-fuchsia-600 font-bold animate-pulse">運算決策邊界中...</span>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-slate-500 text-center w-full">
+                    <p>🔵 藍點：內圈類別 | 🟠 橘點：外圈類別</p>
+                    <p class="mt-1">背景顏色代表模型在該區域預測的類別傾向（深色 = 信心高）</p>
+                </div>
+            </div>
+
+            <!-- 右側：控制面板與教學說明 -->
+            <div class="w-full md:w-2/5 flex flex-col justify-start">
+                
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 shadow-inner">
+                    <h2 class="text-xl font-semibold mb-4 text-slate-800 border-b pb-2">
+                        互動控制面板
+                    </h2>
+
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-2 gap-2 mb-4 text-center">
+                        <div class="bg-fuchsia-50 p-2 rounded border border-fuchsia-200 shadow-sm">
+                            <p class="text-xs text-fuchsia-500 font-bold uppercase">分類準確率</p>
+                            <p id="accuracyBadge" class="text-base font-bold text-fuchsia-700">--.--%</p>
+                        </div>
+                        <div class="bg-white p-2 rounded border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 font-bold uppercase">當前核函數</p>
+                            <p id="kernelBadge" class="text-base font-bold text-slate-700">Linear</p>
+                        </div>
+                    </div>
+
+                    <!-- 選擇核函數 -->
+                    <div class="mb-5">
+                        <p class="font-medium text-slate-700 mb-2">1. 選擇核函數 (Kernel Type):</p>
+                        <div class="flex gap-2">
+                            <div>
+                                <input type="radio" id="kernelLinear" name="kernel" value="linear" class="hidden kernel-radio" checked>
+                                <label for="kernelLinear" class="px-4 py-2 border border-slate-300 rounded cursor-pointer transition-colors text-slate-600 font-medium hover:bg-slate-100 block text-center">
+                                    線性 (Linear)
+                                </label>
+                            </div>
+                            <div class="flex-1">
+                                <input type="radio" id="kernelRBF" name="kernel" value="rbf" class="hidden kernel-radio">
+                                <label for="kernelRBF" class="px-4 py-2 border border-slate-300 rounded cursor-pointer transition-colors text-slate-600 font-medium hover:bg-slate-100 block text-center">
+                                    高斯徑向 (RBF)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 調整 Gamma (僅 RBF 有效) -->
+                    <div class="slider-container" id="gammaContainer" style="opacity: 0.4; pointer-events: none;">
+                        <label for="gammaSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>2. 影響範圍 Gamma ($\gamma$):</span>
+                            <span id="gammaValue" class="text-fuchsia-600 font-bold bg-fuchsia-100 px-2 rounded">0.1</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mb-2 h-8">控制單一資料點的影響半徑。<br>$\gamma$ 越小影響越遠；$\gamma$ 越大影響越侷限。</p>
+                        <input type="range" id="gammaSlider" min="-2" max="2" step="0.1" value="-1">
+                        <!-- 註：slider value 為對數尺度 (10^value)，-1 代表 gamma=0.1 -->
+                    </div>
+                    
+                    <!-- 調整 C 參數 (簡化版，用來搭配展示 RBF) -->
+                    <div class="slider-container mt-4">
+                        <label for="cSlider" class="flex justify-between text-sm font-medium text-slate-700 mb-1">
+                            <span>懲罰參數 (C):</span>
+                            <span id="cValue">10.0</span>
+                        </label>
+                        <input type="range" id="cSlider" min="-1" max="3" step="0.5" value="1">
+                         <!-- 註：slider value 為對數尺度 (10^value)，1 代表 C=10 -->
+                    </div>
+
+                    <!-- 重設按鈕 -->
+                    <div class="mt-3 p-2 bg-white rounded border border-slate-200 text-center">
+                        <p class="text-xs text-slate-500 mb-1">當前核函數公式</p>
+                        <span id="kernelFormula" class="font-mono text-xs font-bold text-slate-700">K(xᵢ,xⱼ) = xᵢ·xⱼ</span>
+                    </div>
+
+                    <!-- 按鈕組 -->
+                    <div class="flex gap-2 mt-4">
+                        <button id="btnPlayRBF" class="flex-1 bg-fuchsia-100 hover:bg-fuchsia-200 text-fuchsia-700 font-semibold py-2 px-2 rounded transition duration-150 border border-fuchsia-300 text-sm">
+                            ★ 啟動 RBF 魔法
+                        </button>
+                        <button id="btnRandom" class="flex-1 bg-violet-100 hover:bg-violet-200 text-violet-700 font-semibold py-2 px-2 rounded transition duration-150 text-sm shadow-sm active:scale-95">
+                            🎲 新資料
+                        </button>
+                    </div>
+                </div>
+
+                <div class="prose prose-slate prose-sm max-w-none">
+                    <h3 class="text-lg font-semibold text-fuchsia-700">① 為什麼需要 Kernel？</h3>
+                    <p>
+                        看看左邊的環狀資料（藍點被橘點包圍）。如果你選擇 <strong>「線性 (Linear)」</strong>，無論你怎麼畫直線，都不可能把這兩圈完美分開，因為這本來就不是一個線性問題。
+                    </p>
+                    <p>
+                        這時我們切換到 <strong>「高斯徑向 (RBF)」</strong>。Kernel Trick 就像是帶上 3D 眼鏡，它將資料投影到更高維度的空間中，讓原本糾纏的資料在空中被一個平面切開，再投射回我們看到的 2D 畫面，就變成了一個漂亮的圓圈邊界！
+                    </p>
+
+                    <div class="not-prose bg-fuchsia-50 border border-fuchsia-200 rounded-lg p-3 my-3 text-center">
+                        <p class="text-xs text-fuchsia-500 font-semibold mb-1">RBF 核函數公式</p>
+                        <p class="font-mono text-sm text-slate-800">K(xᵢ, xⱼ) = exp(−γ ‖xᵢ − xⱼ‖²)</p>
+                        <p class="text-xs text-slate-500 mt-1">γ 控制單一資料點的影響半徑大小</p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-fuchsia-700 mt-4">② Gamma ($\gamma$) 的勢力範圍</h3>
+                    <p>
+                        在使用 RBF 時，$\gamma$ (Gamma) 是決定成敗的關鍵參數，它定義了「一個點的影響力能傳遞多遠」。
+                    </p>
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li><strong>$\gamma$ 很小 (如 0.01)：</strong> 影響範圍很大。模型會看整體大局，畫出平滑的邊界。</li>
+                        <li><strong>$\gamma$ 很大 (如 100)：</strong> 影響範圍極小。每個點只顧自己周圍一小圈，模型邊界會變得坑坑疤疤，像小島一樣包住每個藍點（非常容易 <strong>Overfitting</strong>）。</li>
+                    </ul>
+                    <p class="bg-yellow-50 p-3 rounded border border-yellow-200 mt-4 text-yellow-800">
+                        <strong>💡 動手試試看：</strong> 選擇 RBF 後，試著把 Gamma 拉到最大 (右側)，觀察背景熱圖是如何碎裂成一個個「專屬藍點的小島」。或按 🎲 新資料 生成不同形狀的環狀資料。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- STREAMING_CHUNK: 建立非線性(環狀)資料集 ---
+            const points = [];
+            const numPointsInner = 30;
+            const numPointsOuter = 50;
+            
+            // 將座標正規化到 [-1, 1] 以方便計算，渲染時再對應到 Canvas 座標
+            // 內圈 (藍色, Label 1)
+            for(let i=0; i<numPointsInner; i++) {
+                const r = Math.random() * 0.4; 
+                const theta = Math.random() * 2 * Math.PI;
+                points.push({
+                    x: r * Math.cos(theta),
+                    y: r * Math.sin(theta),
+                    label: 1
+                });
+            }
+            
+            // 外圈 (橘色, Label -1)
+            for(let i=0; i<numPointsOuter; i++) {
+                const r = 0.6 + Math.random() * 0.35; 
+                const theta = Math.random() * 2 * Math.PI;
+                points.push({
+                    x: r * Math.cos(theta),
+                    y: r * Math.sin(theta),
+                    label: -1
+                });
+            }
+
+            // --- STREAMING_CHUNK: 獲取 Canvas 與 UI 元件 ---
+            const heatmapCanvas = document.getElementById('heatmapCanvas');
+            const pointsCanvas = document.getElementById('pointsCanvas');
+            const ctxHeat = heatmapCanvas.getContext('2d');
+            const ctxPoints = pointsCanvas.getContext('2d');
+            
+            // 解析度設定
+            const RESOLUTION = 50; // 熱圖網格解析度 (50x50 網格)
+            let canvasWidth, canvasHeight;
+
+            // 調整 Canvas 尺寸以符合容器
+            function resizeCanvas() {
+                const rect = heatmapCanvas.parentElement.getBoundingClientRect();
+                canvasWidth = rect.width;
+                canvasHeight = rect.height;
+                heatmapCanvas.width = canvasWidth;
+                heatmapCanvas.height = canvasHeight;
+                pointsCanvas.width = canvasWidth;
+                pointsCanvas.height = canvasHeight;
+            }
+            
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                drawPoints(); // 重劃點，熱圖為求效能暫不重畫，由使用者互動觸發
+            });
+            resizeCanvas();
+
+            // UI Elements
+            const radios = document.querySelectorAll('input[name="kernel"]');
+            const gammaSlider = document.getElementById('gammaSlider');
+            const gammaContainer = document.getElementById('gammaContainer');
+            const cSlider = document.getElementById('cSlider');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+
+            let currentKernel = 'linear';
+            let currentGamma = Math.pow(10, parseFloat(gammaSlider.value));
+            let currentC = Math.pow(10, parseFloat(cSlider.value));
+            
+            // 更新 UI 數字
+            const updateUIValues = () => {
+                document.getElementById('gammaValue').innerText = currentGamma.toFixed(2);
+                document.getElementById('cValue').innerText = currentC.toFixed(1);
+            };
+
+            // 計算訓練點的分類準確率與更新指標卡片
+            const computeAccuracy = () => {
+                let correct = 0;
+                points.forEach(p => {
+                    const score = simulatePrediction(p.x, p.y);
+                    const predicted = score >= 0 ? 1 : -1;
+                    if (predicted === p.label) correct++;
+                });
+                const acc = (correct / points.length * 100).toFixed(1);
+                const badge = document.getElementById('accuracyBadge');
+                badge.innerText = acc + '%';
+                badge.className = parseFloat(acc) >= 80
+                    ? 'text-base font-bold text-emerald-700 transition-colors duration-300'
+                    : 'text-base font-bold text-fuchsia-700 transition-colors duration-300';
+
+                const kName = currentKernel === 'rbf' ? 'RBF' : 'Linear';
+                document.getElementById('kernelBadge').innerText = kName;
+
+                const formula = currentKernel === 'rbf'
+                    ? `K(xᵢ,xⱼ) = exp(−${currentGamma.toFixed(2)}‖xᵢ−xⱼ‖²)`
+                    : 'K(xᵢ,xⱼ) = xᵢ·xⱼ';
+                document.getElementById('kernelFormula').innerText = formula;
+            };
+
+            // --- STREAMING_CHUNK: 繪製資料點 ---
+            function drawPoints() {
+                ctxPoints.clearRect(0, 0, canvasWidth, canvasHeight);
+                
+                points.forEach(p => {
+                    // 座標轉換：從 [-1, 1] 映射到 [0, CanvasSize]
+                    const px = (p.x + 1) / 2 * canvasWidth;
+                    const py = (1 - (p.y + 1) / 2) * canvasHeight; // Y軸反轉
+                    
+                    ctxPoints.beginPath();
+                    ctxPoints.arc(px, py, 6, 0, 2 * Math.PI);
+                    
+                    if(p.label === 1) {
+                        ctxPoints.fillStyle = 'rgba(59, 130, 246, 0.9)'; // Blue
+                        ctxPoints.strokeStyle = 'rgba(255,255,255,0.8)';
+                    } else {
+                        ctxPoints.fillStyle = 'rgba(249, 115, 22, 0.9)'; // Orange
+                        ctxPoints.strokeStyle = 'rgba(255,255,255,0.8)';
+                    }
+                    ctxPoints.fill();
+                    ctxPoints.lineWidth = 1;
+                    ctxPoints.stroke();
+                });
+            }
+
+            // --- STREAMING_CHUNK: 簡易 SVM 分類器 (用於前端展示) ---
+            // 由於在前端實現完整的 SMO SVM 訓練演算法會造成瀏覽器卡頓，
+            // 這裡我們使用一種基於 Kernel Density Estimation (KDE) 概念的啟發式替代方案，
+            // 來「視覺上模擬」 RBF Kernel 和 Linear Kernel 的行為。
+            // 它的數學基礎類似於 Parzen-window 分類器，其行為在視覺上與調參後的 SVM 極度相似，
+            // 且能達到即時 (Real-time) 運算的目的，非常適合教學互動展示。
+            
+            function simulatePrediction(gridX, gridY) {
+                if (currentKernel === 'linear') {
+                    // 線性模型模擬：環狀資料中，線性模型通常會找不到邊界，
+                    // 這裡我們模擬它嘗試用一條穿過原點附近的線切開 (結果當然很糟)
+                    // 故意給一個稍微傾斜的權重
+                    let score = 0.5 * gridX + 0.5 * gridY;
+                    return score; // 回傳決策值
+                } 
+                else if (currentKernel === 'rbf') {
+                    // RBF 模擬：計算測試點與所有訓練點的 RBF 核加權總和
+                    let score = 0;
+                    // C 參數在這裡模擬為全局的拉伸倍率
+                    const scaleC = currentC * 0.1; 
+                    
+                    for(let i=0; i<points.length; i++) {
+                        const p = points[i];
+                        const distSq = (gridX - p.x)*(gridX - p.x) + (gridY - p.y)*(gridY - p.y);
+                        // RBF 核函數核心公式：exp(-gamma * ||x - x'||^2)
+                        const kernelVal = Math.exp(-currentGamma * distSq);
+                        
+                        // 依照該點的類別給予正負貢獻
+                        score += p.label * kernelVal;
+                    }
+                    return score * scaleC;
+                }
+                return 0;
+            }
+
+            // --- STREAMING_CHUNK: 繪製背景決策熱圖 ---
+            function drawHeatmap() {
+                loadingOverlay.classList.remove('hidden');
+                
+                // 使用 setTimeout 讓 UI 先渲染 Loading 畫面，再進行運算
+                setTimeout(() => {
+                    const stepW = canvasWidth / RESOLUTION;
+                    const stepH = canvasHeight / RESOLUTION;
+                    
+                    ctxHeat.clearRect(0, 0, canvasWidth, canvasHeight);
+                    
+                    for(let i=0; i<RESOLUTION; i++) {
+                        for(let j=0; j<RESOLUTION; j++) {
+                            // 計算網格中心點的 Canvas 像素座標
+                            const px = i * stepW + stepW / 2;
+                            const py = j * stepH + stepH / 2;
+                            
+                            // 將像素座標轉換回 [-1, 1] 邏輯座標
+                            const logicX = (px / canvasWidth) * 2 - 1;
+                            const logicY = 1 - (py / canvasHeight) * 2;
+                            
+                            // 預測分數
+                            const score = simulatePrediction(logicX, logicY);
+                            
+                            // 將分數轉換為顏色 (Sigmoid-like 壓平，避免極值過亮)
+                            // 分數為正 (偏藍)，分數為負 (偏橘)，越接近 0 (邊界) 顏色越淡 (白)
+                            
+                            let alpha = Math.abs(score);
+                            // 限制 alpha 值
+                            if (alpha > 1) alpha = 1;
+                            if (alpha < 0) alpha = 0;
+
+                            // 分界線附近的特別處理 (視覺強化決策邊界)
+                            let isBoundary = false;
+                            if(Math.abs(score) < 0.05) isBoundary = true;
+
+                            if (isBoundary) {
+                                ctxHeat.fillStyle = 'rgba(15, 23, 42, 0.5)'; // 深色邊界線
+                            } else if (score > 0) {
+                                // 預測為 Label 1 (藍區塊)
+                                // Tailwind blue-100 to blue-400
+                                ctxHeat.fillStyle = `rgba(147, 197, 253, ${alpha * 0.7})`; 
+                            } else {
+                                // 預測為 Label -1 (橘區塊)
+                                // Tailwind orange-100 to orange-400
+                                ctxHeat.fillStyle = `rgba(253, 186, 116, ${alpha * 0.7})`;
+                            }
+                            
+                            // 繪製網格方塊
+                            ctxHeat.fillRect(i * stepW, j * stepH, stepW+1, stepH+1); // +1 避免網格縫隙
+                        }
+                    }
+                    loadingOverlay.classList.add('hidden');
+                    computeAccuracy();
+                }, 50);
+            }
+
+            // --- STREAMING_CHUNK: 綁定事件 ---
+            const triggerUpdate = () => {
+                currentGamma = Math.pow(10, parseFloat(gammaSlider.value));
+                currentC = Math.pow(10, parseFloat(cSlider.value));
+                updateUIValues();
+                drawHeatmap();
+            };
+
+            radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentKernel = e.target.value;
+                    if(currentKernel === 'rbf') {
+                        gammaContainer.style.opacity = '1';
+                        gammaContainer.style.pointerEvents = 'auto';
+                    } else {
+                        gammaContainer.style.opacity = '0.4';
+                        gammaContainer.style.pointerEvents = 'none';
+                    }
+                    triggerUpdate();
+                });
+            });
+
+            gammaSlider.addEventListener('change', triggerUpdate); // 避免拖曳時瘋狂重繪，改用 change
+            cSlider.addEventListener('change', triggerUpdate);
+
+            // 啟動 RBF 按鈕
+            document.getElementById('btnPlayRBF').addEventListener('click', () => {
+                document.getElementById('kernelRBF').checked = true;
+                currentKernel = 'rbf';
+                gammaContainer.style.opacity = '1';
+                gammaContainer.style.pointerEvents = 'auto';
+                
+                // 設定一組看起來最漂亮的初始 RBF 參數
+                gammaSlider.value = 0.5; // 10^0.5 約 3.16
+                cSlider.value = 1.0;     // 10^1 = 10
+                
+                triggerUpdate();
+            });
+
+            // 🎲 新資料 按鈕：重新產生環狀資料
+            document.getElementById('btnRandom').addEventListener('click', () => {
+                points.length = 0;
+                for (let i = 0; i < 30; i++) {
+                    const r = Math.random() * 0.4;
+                    const theta = Math.random() * 2 * Math.PI;
+                    points.push({ x: r * Math.cos(theta), y: r * Math.sin(theta), label: 1 });
+                }
+                for (let i = 0; i < 50; i++) {
+                    const r = 0.6 + Math.random() * 0.35;
+                    const theta = Math.random() * 2 * Math.PI;
+                    points.push({ x: r * Math.cos(theta), y: r * Math.sin(theta), label: -1 });
+                }
+                drawPoints();
+                triggerUpdate();
+            });
+
+            // 初始化畫面
+            drawPoints();
+            triggerUpdate(); // 會觸發 drawHeatmap
+        });
+    </script>
+</body>
+</html>

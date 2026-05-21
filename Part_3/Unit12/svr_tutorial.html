@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：了解支持向量回歸 (SVR) 與 ε-insensitive tube</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 載入 Chart.js 註解外掛，用於繪製管道 -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc; /* Tailwind slate-50 */
+            color: #334155; /* Tailwind slate-700 */
+        }
+        .slider-container {
+            width: 100%;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        /* 美化 input range */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6; /* Tailwind blue-500 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1; /* Tailwind slate-300 */
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 min-h-screen">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- 標題區塊 -->
+        <div class="bg-blue-600 text-white p-6 md:p-8">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">支持向量回歸 (Support Vector Regression, SVR)</h1>
+            <p class="text-blue-100 text-lg">直觀理解：甚麼是寬度為 2ε 的「不敏感管道」？</p>
+        </div>
+
+        <!-- 內容區塊：分兩欄，左側圖表，右側控制與說明 -->
+        <div class="flex flex-col md:flex-row p-6 md:p-8 gap-8">
+            
+            <!-- 左側：互動圖表 -->
+            <div class="w-full md:w-2/3 flex flex-col items-center">
+                <div class="w-full relative h-[400px] md:h-[500px]">
+                    <canvas id="svrChart"></canvas>
+                </div>
+                <div class="mt-3 text-xs text-slate-400 text-center w-full space-y-0.5">
+                    <p>
+                        <span class="inline-flex items-center gap-1 mr-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>綠點：管道內（Loss=0）</span>
+                        <span class="inline-flex items-center gap-1 mr-2"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block border-2 border-red-500"></span>藍點紅框：支持向量（管道外）</span>
+                    </p>
+                    <p>紅線：SVR 預測線 ｜ 淺紅區域：ε-不敏感管道 ｜ <span class="text-indigo-400">紫色箭頭：2ε 寬度</span> ｜ <span class="text-red-400">紅色虛線：鬆弛變數 ξ</span></p>
+                </div>
+            </div>
+
+            <!-- 右側：控制面板與教學說明 -->
+            <div class="w-full md:w-1/3 flex flex-col justify-start">
+                
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 shadow-inner">
+                    <h2 class="text-xl font-semibold mb-3 text-slate-800 border-b pb-2">互動控制面板</h2>
+                    <!-- 三格統計摘要 -->
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <div class="bg-red-50 rounded-lg p-2 text-center border border-red-100">
+                            <div class="text-xs text-red-400 font-medium">總 Loss</div>
+                            <div id="lossBadge" class="text-base font-bold text-red-700 transition-colors duration-300">0.00</div>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-2 text-center border border-blue-100">
+                            <div class="text-xs text-blue-400 font-medium">支持向量</div>
+                            <div id="svCount" class="text-base font-bold text-blue-700">0 / 40</div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-100">
+                            <div class="text-xs text-emerald-500 font-medium">管道覆蓋率</div>
+                            <div id="coverage" class="text-base font-bold text-emerald-700">0%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 調整 Epsilon (ε) -->
+                    <div class="slider-container">
+                        <label for="epsilonSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>調整 Epsilon (ε) 值:</span>
+                            <span id="epsilonValue" class="text-blue-600 font-bold">1.5</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mb-2">控制「不敏感管道」的寬度。管道內的誤差將被忽略。</p>
+                        <input type="range" id="epsilonSlider" min="0" max="5" step="0.1" value="1.5">
+                    </div>
+
+                    <!-- 調整斜率 (模擬模型學習) -->
+                    <div class="slider-container mt-6">
+                        <label for="slopeSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>調整預測線斜率:</span>
+                            <span id="slopeValue" class="text-blue-600 font-bold">1.0</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mb-2">手動模擬 SVR 尋找最佳平面的過程。</p>
+                        <input type="range" id="slopeSlider" min="0" max="2" step="0.1" value="1.0">
+                    </div>
+
+                    <!-- 調整截距 -->
+                    <div class="slider-container mt-6">
+                        <label for="interceptSlider" class="flex justify-between font-medium text-slate-700 mb-1">
+                            <span>調整預測線截距:</span>
+                            <span id="interceptValue" class="text-blue-600 font-bold">2.0</span>
+                        </label>
+                        <input type="range" id="interceptSlider" min="-5" max="10" step="0.5" value="2.0">
+                    </div>
+
+                    <!-- 目前模型方程式 -->
+                    <div class="mt-4 p-2 bg-slate-100 rounded-lg text-center border border-slate-200">
+                        <span class="text-xs text-slate-400 block mb-0.5">目前預測線方程式</span>
+                        <span id="modelEquation" class="font-mono text-sm font-bold text-slate-700">f(x) = 1.00x + 2.0</span>
+                    </div>
+                    <!-- 控制按鈕 -->
+                    <div class="flex gap-2 mt-4">
+                        <button id="btnRandom" class="flex-1 bg-violet-100 hover:bg-violet-200 text-violet-700 font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            🎲 新資料
+                        </button>
+                        <button id="btnReset" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            ↺ 重置
+                        </button>
+                        <button id="btnOptimal" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-1 rounded transition duration-150 ease-in-out shadow-sm active:scale-95 text-sm">
+                            ★ 最佳解
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-4 text-sm text-slate-700">
+
+                    <!-- 概念 ① -->
+                    <div>
+                        <h3 class="text-base font-bold text-blue-700 mb-1">① ε-不敏感管道是什麼？</h3>
+                        <p class="text-slate-600">SVR 以預測線為中心，上下各延伸 <strong>ε</strong> 的距離建立「管道」：</p>
+                        <ul class="mt-2 space-y-1 pl-1">
+                            <li class="flex gap-2 items-start">
+                                <span class="mt-0.5 text-emerald-500 font-bold shrink-0">●</span>
+                                <span><strong>管道內（綠點）</strong>：|y − f(x)| ≤ ε，Loss = 0，不產生懲罰</span>
+                            </li>
+                            <li class="flex gap-2 items-start">
+                                <span class="mt-0.5 text-red-500 font-bold shrink-0">●</span>
+                                <span><strong>管道外（藍點紅框）</strong>：|y − f(x)| &gt; ε，Loss = |y − f(x)| − ε = <strong>ξ</strong></span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 概念 ② -->
+                    <div>
+                        <h3 class="text-base font-bold text-blue-700 mb-1">② 鬆弛變數 ξ 是什麼？</h3>
+                        <p class="text-slate-600">管道外的每個支持向量上，可見一條<strong class="text-red-500">紅色虛線段</strong>，連接到管道邊界 —— 這段距離即為鬆弛變數 <strong>ξᵢ</strong>，表示樣本 i 超出管道的量。<strong class="text-indigo-500">紫色雙向箭頭</strong>則標示管道總寬度 2ε。</p>
+                    </div>
+
+                    <!-- 最佳化目標 -->
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">SVR 最小化目標</p>
+                        <p class="font-mono text-sm text-center text-slate-800">½‖w‖² + C × Σ (ξᵢ⁺ + ξᵢ⁻)</p>
+                        <p class="text-xs text-slate-400 mt-2 text-center">ε 決定管道寬度；C 決定超出懲罰強度</p>
+                    </div>
+
+                    <!-- 互動提示 -->
+                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                        <p class="text-xs font-bold text-amber-700 mb-2">🔬 動手試試看：</p>
+                        <ol class="text-xs text-amber-800 space-y-1 list-decimal pl-4">
+                            <li>調大 ε（如 3.0）→ 管道變寬，綠點增加，ξ 虛線消失</li>
+                            <li>調斜率/截距遠離最佳值 → 紅框藍點增多，觀察 ξ 線增長</li>
+                            <li>點「最佳解」後再點「新資料」→ 觀察不同雜訊下的差異</li>
+                        </ol>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- 1. 產生模擬資料 ---
+            const dataPoints = [];
+            const numPoints = 40;
+            // 真實模型：y = 1.2x + 1.5 加上雜訊
+            const trueSlope = 1.2;
+            const trueIntercept = 1.5;
+            
+            // 使用固定的種子或簡單的雜訊產生可預期的點，方便教學
+            const xValues = Array.from({length: numPoints}, (_, i) => (i / numPoints) * 20);
+            const noise = [
+                0.5, -1.2, 2.1, -0.8, 1.5, -2.5, 0.9, 0.2, -1.8, 3.0,
+                -0.5, 1.1, -2.0, 0.4, 2.5, -1.1, 0.7, -2.8, 1.9, 0.1,
+                -0.9, 2.2, -1.5, 0.6, 1.8, -0.3, 1.2, -2.1, 2.8, -0.7,
+                1.4, -1.9, 0.3, 2.4, -1.0, 0.8, -2.4, 1.7, 0.0, -1.3
+            ]; // 手動設定雜訊，確保有些點偏離較多
+
+            for (let i = 0; i < numPoints; i++) {
+                const x = xValues[i];
+                // 加上一些變異，讓資料不要太完美呈現一直線
+                const y = trueSlope * x + trueIntercept + noise[i%noise.length];
+                dataPoints.push({ x: x, y: y });
+            }
+
+            // --- 2. 獲取 DOM 元素與初始狀態 ---
+            const ctx = document.getElementById('svrChart').getContext('2d');
+            let epsilon = parseFloat(document.getElementById('epsilonSlider').value);
+            let currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+            let currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+
+            // 更新顯示數值的函數
+            const updateLabels = () => {
+                document.getElementById('epsilonValue').innerText = epsilon.toFixed(1);
+                document.getElementById('slopeValue').innerText = currentSlope.toFixed(1);
+                document.getElementById('interceptValue').innerText = currentIntercept.toFixed(1);
+            };
+
+            // --- STREAMING_CHUNK:設定 Chart.js 圖表... ---
+            // 計算回歸線的兩端點
+            const getLinePoints = (slope, intercept) => {
+                const xMin = 0;
+                const xMax = 20;
+                return [
+                    { x: xMin, y: slope * xMin + intercept },
+                    { x: xMax, y: slope * xMax + intercept }
+                ];
+            };
+
+            // 判斷哪些點是支持向量 (在 tube 外面)
+            const getPointColorsAndBorders = () => {
+                const backgroundColors = [];
+                const borderColors = [];
+                const borderWs = [];
+                const pointRadii = [];
+                let currentLoss = 0;
+                let svCountVar = 0;
+                let insideCount = 0;
+
+                dataPoints.forEach(p => {
+                    const predictedY = currentSlope * p.x + currentIntercept;
+                    const error = Math.abs(p.y - predictedY);
+
+                    if (error > epsilon) {
+                        // 在管道外 -> 支持向量
+                        currentLoss += (error - epsilon);
+                        svCountVar++;
+                        backgroundColors.push('rgba(59, 130, 246, 1)');   // 藍點
+                        borderColors.push('rgba(239, 68, 68, 1)');        // 紅邊
+                        borderWs.push(3);
+                        pointRadii.push(6);
+                    } else {
+                        // 在管道內 -> Loss = 0
+                        insideCount++;
+                        backgroundColors.push('rgba(34, 197, 94, 0.6)');  // 綠點：直覺區分內/外
+                        borderColors.push('rgba(255, 255, 255, 0.9)');
+                        borderWs.push(1);
+                        pointRadii.push(4);
+                    }
+                });
+                const coverage = Math.round(insideCount / dataPoints.length * 100);
+                return { bg: backgroundColors, border: borderColors, bw: borderWs, radii: pointRadii,
+                         loss: currentLoss, svCount: svCountVar, coverage };
+            };
+
+            // 初始化圖表
+            let chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: '資料點',
+                            data: dataPoints,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'white',
+                            borderWidth: 1,
+                            pointRadius: 5,
+                            order: 2 // 確保點畫在線的上面
+                        },
+                        {
+                            label: 'SVR 預測線',
+                            data: getLinePoints(currentSlope, currentIntercept),
+                            type: 'line',
+                            borderColor: 'rgba(239, 68, 68, 1)', // 紅色線
+                            borderWidth: 3,
+                            fill: false,
+                            pointRadius: 0, // 不顯示線條端點
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 300 // 讓調整時有滑順的動畫
+                    },
+                    scales: {
+                        x: {
+                            min: 0,
+                            max: 20,
+                            title: { display: true, text: '特徵 (X)', font: { size: 14 } }
+                        },
+                        y: {
+                            min: -5,
+                            max: 30,
+                            title: { display: true, text: '目標值 (Y)', font: { size: 14 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { enabled: false }, // 關閉 tooltip 以免干擾視覺
+                        annotation: {
+                            annotations: {
+                                tube: {
+                                    type: 'polygon',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.15)', // 淺紅色區域
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                    drawTime: 'beforeDatasetsDraw', // 畫在資料點下方
+                                    xScaleID: 'x',
+                                    yScaleID: 'y',
+                                    // 多邊形的頂點，動態計算
+                                    xMin: 0,
+                                    xMax: 20,
+                                    // 雖然是 polygon，但利用 beforeDatasetsDraw 和動態更新點來畫一個斜著的矩形/平行四邊形
+                                    // 在 updateChart 中我們會自訂這個 annotation 的形狀
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    // 自訂一個 plugin 來動態畫 tube，因為 Chart.js 的 annotation polygon 設定稍微複雜，
+                    // 直接用自訂 plugin 在 background 畫斜的帶狀區域最簡單直觀
+                    id: 'customTubeDrawer',
+                    beforeDatasetsDraw(chart, args, options) {
+                        const { ctx, chartArea: { top, bottom, left, right, width, height }, scales: { x, y } } = chart;
+                        
+                        ctx.save();
+                        
+                        // 設定管子顏色
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'; 
+                        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                        ctx.setLineDash([5, 5]); // 虛線邊界
+                        ctx.lineWidth = 1;
+
+                        ctx.beginPath();
+                        
+                        // 計算四個角落 (左上、右上、右下、左下) 在畫布上的座標
+                        // y 軸座標轉換
+                        const yAtX0 = currentSlope * 0 + currentIntercept;
+                        const yAtX20 = currentSlope * 20 + currentIntercept;
+                        
+                        // Tube 的上邊界 (y + epsilon)
+                        const pixelYUpperX0 = y.getPixelForValue(yAtX0 + epsilon);
+                        const pixelYUpperX20 = y.getPixelForValue(yAtX20 + epsilon);
+                        
+                        // Tube 的下邊界 (y - epsilon)
+                        const pixelYLowerX20 = y.getPixelForValue(yAtX20 - epsilon);
+                        const pixelYLowerX0 = y.getPixelForValue(yAtX0 - epsilon);
+
+                        const pixelX0 = x.getPixelForValue(0);
+                        const pixelX20 = x.getPixelForValue(20);
+
+                        // 畫多邊形
+                        ctx.moveTo(pixelX0, pixelYUpperX0);
+                        ctx.lineTo(pixelX20, pixelYUpperX20);
+                        ctx.lineTo(pixelX20, pixelYLowerX20);
+                        ctx.lineTo(pixelX0, pixelYLowerX0);
+                        ctx.closePath();
+                        
+                        ctx.fill();
+                        
+                        // 畫上下虛線邊界
+                        ctx.beginPath();
+                        ctx.moveTo(pixelX0, pixelYUpperX0);
+                        ctx.lineTo(pixelX20, pixelYUpperX20);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(pixelX0, pixelYLowerX0);
+                        ctx.lineTo(pixelX20, pixelYLowerX20);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    },
+
+                    // --- 在資料點之後繪製 ξ_i 線段 與 2ε 標注 ---
+                    afterDatasetsDraw(chart) {
+                        const { ctx, scales: { x, y } } = chart;
+
+                        // ① 繪製鬆弛變數 ξ_i 線段（支持向量到管道邊界的紅色虛線）
+                        ctx.save();
+                        dataPoints.forEach(p => {
+                            const predictedY = currentSlope * p.x + currentIntercept;
+                            const error = Math.abs(p.y - predictedY);
+                            if (error > epsilon) {
+                                const px  = x.getPixelForValue(p.x);
+                                const py  = y.getPixelForValue(p.y);
+                                const tubeBoundaryY = (p.y > predictedY)
+                                    ? predictedY + epsilon
+                                    : predictedY - epsilon;
+                                const pTube = y.getPixelForValue(tubeBoundaryY);
+
+                                ctx.strokeStyle = 'rgba(220, 38, 38, 0.55)';
+                                ctx.setLineDash([3, 3]);
+                                ctx.lineWidth = 1.5;
+                                ctx.beginPath();
+                                ctx.moveTo(px, py);
+                                ctx.lineTo(px, pTube);
+                                ctx.stroke();
+
+                                // ξ 標籤
+                                ctx.setLineDash([]);
+                                ctx.font = 'bold 10px serif';
+                                ctx.fillStyle = 'rgba(185, 28, 28, 0.85)';
+                                ctx.fillText('\u03be', px + 3, (py + pTube) / 2 + 4);
+                            }
+                        });
+                        ctx.restore();
+
+                        // ② 繪製 2ε 雙向箭頭標注
+                        if (epsilon > 0.25) {
+                            const annotDataX = 16.5;
+                            const annotPxX   = x.getPixelForValue(annotDataX) + 10;
+                            const midY  = currentSlope * annotDataX + currentIntercept;
+                            const pxTop = y.getPixelForValue(midY + epsilon);
+                            const pxBot = y.getPixelForValue(midY - epsilon);
+                            const pxMid = y.getPixelForValue(midY);
+                            const arh   = 5; // arrowhead size
+
+                            if (Math.abs(pxBot - pxTop) > 14) {
+                                ctx.save();
+                                ctx.strokeStyle = 'rgba(99, 102, 241, 0.75)';
+                                ctx.fillStyle   = 'rgba(99, 102, 241, 0.75)';
+                                ctx.lineWidth   = 1.5;
+                                ctx.setLineDash([]);
+
+                                // 垂直主軸
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxTop + arh * 1.5);
+                                ctx.lineTo(annotPxX, pxBot - arh * 1.5);
+                                ctx.stroke();
+
+                                // 上箭頭
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxTop);
+                                ctx.lineTo(annotPxX - arh * 0.8, pxTop + arh * 1.5);
+                                ctx.lineTo(annotPxX + arh * 0.8, pxTop + arh * 1.5);
+                                ctx.closePath(); ctx.fill();
+
+                                // 下箭頭
+                                ctx.beginPath();
+                                ctx.moveTo(annotPxX, pxBot);
+                                ctx.lineTo(annotPxX - arh * 0.8, pxBot - arh * 1.5);
+                                ctx.lineTo(annotPxX + arh * 0.8, pxBot - arh * 1.5);
+                                ctx.closePath(); ctx.fill();
+
+                                // 水平刻度線
+                                [[annotPxX, pxTop], [annotPxX, pxBot]].forEach(([px2, py2]) => {
+                                    ctx.beginPath();
+                                    ctx.moveTo(px2 - 5, py2);
+                                    ctx.lineTo(px2 + 5, py2);
+                                    ctx.stroke();
+                                });
+
+                                // "2ε" 標籤
+                                ctx.font = 'bold 11px sans-serif';
+                                ctx.fillStyle = 'rgba(67, 56, 202, 0.9)';
+                                ctx.fillText('2\u03b5', annotPxX + 7, pxMid + 4);
+                                ctx.restore();
+                            }
+                        }
+                    }
+                }]
+            });
+
+            // --- STREAMING_CHUNK:處理拉桿更新事件... ---
+            const updateChart = () => {
+                // 更新參數
+                epsilon = parseFloat(document.getElementById('epsilonSlider').value);
+                currentSlope = parseFloat(document.getElementById('slopeSlider').value);
+                currentIntercept = parseFloat(document.getElementById('interceptSlider').value);
+                
+                updateLabels();
+
+                // 更新線段資料
+                chart.data.datasets[1].data = getLinePoints(currentSlope, currentIntercept);
+
+                // 更新點的顏色 (判斷是否為 Support Vector)
+                const pointStyles = getPointColorsAndBorders();
+                chart.data.datasets[0].backgroundColor = pointStyles.bg;
+                chart.data.datasets[0].borderColor = pointStyles.border;
+                chart.data.datasets[0].borderWidth = pointStyles.bw;
+                chart.data.datasets[0].pointRadius = pointStyles.radii;
+
+                // 更新三格統計數字
+                const lossBadge = document.getElementById('lossBadge');
+                lossBadge.innerText = pointStyles.loss.toFixed(2);
+                lossBadge.className = pointStyles.loss <= 0.5
+                    ? 'text-base font-bold text-emerald-700 transition-colors duration-300'
+                    : 'text-base font-bold text-red-700 transition-colors duration-300';
+
+                document.getElementById('svCount').innerText =
+                    `${pointStyles.svCount} / ${dataPoints.length}`;
+
+                const covEl = document.getElementById('coverage');
+                covEl.innerText = `${pointStyles.coverage}%`;
+                covEl.className = pointStyles.coverage >= 75
+                    ? 'text-base font-bold text-emerald-700'
+                    : 'text-base font-bold text-amber-600';
+
+                // 更新方程式顯示
+                const sign = currentIntercept >= 0
+                    ? `+ ${currentIntercept.toFixed(1)}`
+                    : `- ${Math.abs(currentIntercept).toFixed(1)}`;
+                document.getElementById('modelEquation').innerText =
+                    `f(x) = ${currentSlope.toFixed(2)}x ${sign}`;
+
+                // 重新渲染圖表 (會自動觸發 customTubeDrawer 重新畫 tube)
+                chart.update();
+            };
+
+            // 綁定事件監聽器
+            document.getElementById('epsilonSlider').addEventListener('input', updateChart);
+            document.getElementById('slopeSlider').addEventListener('input', updateChart);
+            document.getElementById('interceptSlider').addEventListener('input', updateChart);
+
+            // 綁定按鈕事件
+            document.getElementById('btnReset').addEventListener('click', () => {
+                document.getElementById('epsilonSlider').value = 1.5;
+                document.getElementById('slopeSlider').value = 1.0;
+                document.getElementById('interceptSlider').value = 2.0;
+                updateChart();
+            });
+
+            document.getElementById('btnOptimal').addEventListener('click', () => {
+                // 自動帶入這組模擬資料的真實參數 (最佳解)
+                document.getElementById('epsilonSlider').value = 1.2;
+                document.getElementById('slopeSlider').value = 1.2;
+                document.getElementById('interceptSlider').value = 1.5;
+                updateChart();
+            });
+
+            document.getElementById('btnRandom').addEventListener('click', () => {
+                // 重新產生帶有不同雜訊的資料集
+                dataPoints.length = 0;
+                for (let i = 0; i < numPoints; i++) {
+                    const xv = xValues[i];
+                    const n  = (Math.random() - 0.5) * 7;
+                    dataPoints.push({ x: xv, y: trueSlope * xv + trueIntercept + n });
+                }
+                chart.data.datasets[0].data = [...dataPoints];
+                updateChart();
+            });
+
+            // 初始執行一次以設定初始狀態的顏色
+            updateChart();
+        });
+    </script>
+</body>
+</html>
