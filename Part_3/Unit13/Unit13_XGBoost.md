@@ -106,130 +106,505 @@
 
 ## 2. XGBoost 的數學原理
 
+> 💡 **學習建議**：本節公式較多，建議先閱讀每個小節的「直覺說明」，掌握概念後再研讀數學推導。完整流程詳見 2.9 節總結。
+
+---
+
+### 2.0 整體概念：XGBoost 如何學習？
+
+在進入公式之前，先用一個化工廠的比喻理解 XGBoost 的核心思想：
+
+> **比喻**：想像你在預測化學反應器的產率，找了一組工程師依序協作：第一位工程師給出初步估計；第二位專門**糾正第一位的誤差**；第三位再修正前兩位的殘餘誤差……每位工程師只需聚焦於修正前人累積的誤差。K 位工程師的結果加總，就是最終預測值。
+
+這就是 **XGBoost（加法訓練）** 的核心思想——每輪訓練一棵樹，專門修正當前預測的誤差。
+
+**XGBoost 訓練流程（大局觀）**：
+
+```
+初始預測 ŷ⁽⁰⁾（如訓練集均值）
+    ↓
+計算每個樣本的誤差資訊（梯度 gᵢ 和 Hessian hᵢ）
+    ↓
+訓練第 1 棵樹 f₁，修正當前誤差
+    ↓
+更新預測：ŷ⁽¹⁾ = ŷ⁽⁰⁾ + η ⋅ f₁
+    ↓
+再計算殘餘誤差，訓練第 2 棵樹 f₂
+    ↓
+⋮（重複 K 次）
+    ↓
+最終預測：ŷ = ŷ⁽⁰⁾ + η⋅f₁ + η⋅f₂ + ⋯ + η⋅fₖ
+```
+
+其中 $\eta$ 是學習率（`learning_rate`），控制每棵樹對最終預測的貢獻比例。 $\eta$ 越小，每棵樹修正幅度越保守，需要更多棵樹才能收斂，但通常泛化性能更好。
+
+**與 Unit 11 決策樹的連結**：
+
+XGBoost 的每一棵 $f_k$ 本質上就是 Unit 11 學過的**回歸決策樹（CART）**，只是被賦予了新的訓練目標——擬合當前的預測誤差：
+
+| 第幾棵樹 | 訓練目標 | 效果 |
+|---------|---------|------|
+| $f_1$（第 1 棵） | 直接預測 $y_i$ | 粗估，誤差大 |
+| $f_2$（第 2 棵） | 擬合殘差 $y_i - \hat{y}_i^{(1)}$ | 修正第 1 棵的誤差 |
+| $f_3$（第 3 棵） | 擬合殘差 $y_i - \hat{y}_i^{(2)}$ | 再修正殘餘誤差 |
+| $\vdots$ | $\vdots$ | 逐步收斂 |
+| $f_K$（第 $K$ 棵） | 擬合殘差 $y_i - \hat{y}_i^{(K-1)}$ | 精細修正 |
+
+最終預測為所有樹的加總：
+
+$$
+\hat{y}_i = \underbrace{\eta \cdot f_1(x_i)}_{\text{第 1 棵}} + \underbrace{\eta \cdot f_2(x_i)}_{\text{修正殘差}} + \cdots + \underbrace{\eta \cdot f_K(x_i)}_{\text{第 } K \text{ 棵}}
+$$
+
+**XGBoost vs. Random Forest：同為決策樹集成，差異在哪？**
+
+兩者都是多棵決策樹的集成，關鍵差異在於樹與樹之間的**相依性**：
+
+| 比較維度 | Random Forest | XGBoost（GBDT） |
+|---------|--------------|----------------|
+| 樹的訓練方式 | **並行**（每棵樹互相獨立） | **串行**（每棵樹依賴前一棵的誤差） |
+| 修正誤差？ | 否（平均 / 投票降低方差） | ✅ 是（逐步降低偏差） |
+| 偏差（Bias） | 較高 | 低（逐步修正至收斂） |
+| 方差（Variance） | 低（大量樹平均後穩定） | 需靠正則化控制 |
+| 訓練順序 | 可平行加速 | 串行，但 XGBoost 在節點分裂層面有並行優化 |
+
+> 💡 **一句話總結**：XGBoost = **K 棵小決策樹的串行加法集成**，每棵樹只做「當前誤差的一小步修正」，K 步累加後獲得強大預測力。Random Forest 則是 K 棵樹的**並行平均**，各自獨立訓練。
+
+> ⚠️ **精確補充**：嚴格來說，XGBoost 並非直接擬合原始殘差 $y_i - \hat{y}_i$，而是擬合**損失函數對預測值的負梯度**（以二階泰勒展開近似，產生梯度 $g_i$ 與 Hessian $h_i$，詳見 2.3 節）。這讓它能統一處理 MSE、Log loss 等任意可微損失函數，是 XGBoost 相比傳統 GBDT 的核心創新。
+
+---
+
 ### 2.1 目標函數
+
+**直覺說明**：XGBoost 希望預測準確（損失小），同時避免模型過複雜（正則化），兩者需要取得平衡。
 
 XGBoost 的目標是最小化以下目標函數：
 
 $$
-\mathcal{L}(\phi) = \sum_{i=1}^{n} l(y_i, \hat{y}_i) + \sum_{k=1}^{K} \Omega(f_k)
+\mathcal{L}(\phi) = \underbrace{\sum_{i=1}^{n} l(y_i, \hat{y}_i)}_{\text{損失項：衡量預測準確度}} + \underbrace{\sum_{k=1}^{K} \Omega(f_k)}_{\text{正則化項：懲罰模型複雜度}}
 $$
 
 其中：
-- $l(y_i, \hat{y}_i)$ ：損失函數（如 MSE、Log Loss）
-- $\Omega(f_k)$ ：正則化項（控制模型複雜度）
-- $K$ ：樹的數量
-- $f_k$ ：第 $k$ 棵樹
+- $l(y_i, \hat{y}_i)$ ：損失函數，衡量第 $i$ 個樣本的預測誤差
+- $\Omega(f_k)$ ：第 $k$ 棵樹的複雜度懲罰（詳見 2.5 節）
+- $K$ ：樹的總數量； $n$ ：訓練樣本數
 
-**預測值**為所有樹的加總：
+**最終預測值**為所有樹輸出（乘以學習率 $\eta$ ）的加總：
 
 $$
-\hat{y}_i = \sum_{k=1}^{K} f_k(x_i) = \hat{y}_i^{(0)} + f_1(x_i) + f_2(x_i) + \ldots + f_K(x_i)
+\hat{y}_i = \sum_{k=1}^{K} \eta \cdot f_k(x_i)
 $$
+
+> 💡 **兩項的平衡**：損失項太大 → 預測不準（欠擬合）；正則化項太大 → 模型太簡單；兩者同時最小化，在準確度與泛化能力之間取得最佳平衡。
+
+**常見損失函數對照**：
+
+| 任務 | 損失函數 $l(y_i, \hat{y}_i)$ | `objective` 參數 |
+|------|-----------------------------|----------------|
+| 回歸（MSE） | $\dfrac{1}{2}(y_i - \hat{y}_i)^2$ | `reg:squarederror` |
+| 二元分類 | $-[y_i \log \hat{p}_i + (1-y_i)\log(1-\hat{p}_i)]$ | `binary:logistic` |
+| 多元分類 | $-\sum_c y_{ic} \log \hat{p}_{ic}$ | `multi:softprob` |
+
+#### 補充：樹函數 $f_k(x_i)$ 的結構
+
+$f_k(x_i)$ 是一棵**回歸決策樹**，接受 $d$ 維特徵向量 $x_i \in \mathbb{R}^d$ 並輸出一個純量。其正式定義為：
+
+$$
+f_k(x_i) = w_{q(x_i)}
+$$
+
+其中：
+- $q: \mathbb{R}^d \to \{1, 2, \ldots, T\}$ ：**樹結構函數**，根據 $x_i$ 的特徵值沿分支路由到某葉節點編號
+- $w \in \mathbb{R}^T$ ：**葉節點權重向量**，每個葉節點對應一個純量輸出值
+- $T$ ：葉節點總數
+
+等價地，可展開為**分段常數函數**：
+
+$$
+f_k(x_i) = \sum_{t=1}^{T} w_t \cdot \mathbf{1}\bigl[x_i \in R_t\bigr]
+$$
+
+每個 $R_t$ 是 $\mathbb{R}^d$ 中的**軸對齊超矩形（axis-aligned hyper-rectangle）**，由一連串二元分割條件的交集定義。
+
+**高維情況下的分割路徑**：對深度為 $D$ 的樹，根節點到某葉節點的路徑由 $D$ 個分割條件串接，每次分割只針對**單一特徵** $x_{(j)}$ ：
+
+$$
+\bigl(x_{(j_1)} \leq \theta_1\bigr) \;\cap\; \bigl(x_{(j_2)} > \theta_2\bigr) \;\cap\; \cdots \;\cap\; \bigl(x_{(j_D)} \leq \theta_D\bigr) \;\Rightarrow\; x_i \in R_t,\quad f_k(x_i) = w_t
+$$
+
+例如 $d=3$（溫度 $T$、壓力 $P$、流量 $F$）、深度 $D=3$ 的一條路徑可能是：
+
+$$
+(T \leq 320) \;\cap\; (P > 2.5) \;\cap\; (F \leq 150) \;\Rightarrow\; w_t = -3.2
+$$
+
+**幾何直觀**：
+
+| 輸入維度 | $f_k(x_i)$ 的幾何形狀 |
+|---------|----------------------|
+| $d=1$（1 個特徵） | 數線上的分段常數階梯函數 |
+| $d=2$（2 個特徵） | 平面上的矩形格子，每格一個常數 |
+| $d \geq 3$（多特徵） | $d$ 維超空間中的超矩形分割，每個超矩形輸出常數 $w_t$ |
+
+> 💡 **高維度的關鍵洞察**：雖然輸入空間是 $d$ 維，但每次分割**只看一個維度**（軸對齊）。深度 $D$ 的樹最多涉及 $D$ 個特徵（可重複）。多棵樹累加後，複雜的特徵交互效應從眾多簡單軸對齊分割的組合中湧現，這正是 GBDT 系列方法強大的根源。
+
+---
 
 ### 2.2 加法訓練策略
 
-XGBoost 採用 **加法訓練 (Additive Training)**，每次添加一棵新樹：
+**直覺說明**：不要一次學好所有東西，而是每輪只訓練一棵「專門糾正當前誤差」的新樹。
 
-在第 $t$ 輪迭代，目標函數為：
+XGBoost 採用 **加法訓練 (Additive Training)**，第 $t$ 輪在前一輪預測基礎上疊加新樹：
 
 $$
-\mathcal{L}^{(t)} = \sum_{i=1}^{n} l(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)) + \Omega(f_t)
+\hat{y}_i^{(t)} = \hat{y}_i^{(t-1)} + \eta \cdot f_t(x_i)
 $$
 
-其中 $\hat{y}_i^{(t-1)}$ 是前 $t-1$ 棵樹的預測值。
+在第 $t$ 輪，固定前 $t-1$ 棵樹的預測結果 $\hat{y}_i^{(t-1)}$ ，只優化新加入的第 $t$ 棵樹 $f_t$ ：
+
+$$
+\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\!\left(y_i,\; \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t) + \text{常數}
+$$
+
+> 💡 **每輪只需優化一棵樹，問題大幅簡化！** 但損失函數 $l(\cdot)$ 中的 $f_t$ 仍難以直接求解，因為 $f_t$ 是一個樹狀函數。XGBoost 的解法是用**泰勒展開近似**將其轉化為簡單的二次問題（下一節）。
+
+---
 
 ### 2.3 二階泰勒展開（XGBoost 核心創新）
 
-**傳統 GBDT** 使用一階導數（梯度）：
+**直覺說明**：
+- 損失函數 $l(\cdot)$ 形狀複雜，難以直接對樹結構優化
+- 用泰勒展開把複雜函數「局部近似」成簡單的二次多項式
+- 二次多項式有**解析解**，計算快速且精確
+
+#### 2.3.1 泰勒展開回顧
+
+對函數 $f(x + \Delta)$ 在 $x$ 處進行泰勒展開：
 
 $$
-l(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)) \approx l(y_i, \hat{y}_i^{(t-1)}) + g_i \cdot f_t(x_i)
+f(x + \Delta) \approx f(x) + f'(x) \cdot \Delta + \frac{1}{2} f''(x) \cdot \Delta^2
 $$
 
-其中 $g_i = \frac{\partial l(y_i, \hat{y})}{\partial \hat{y}} \bigg|_{\hat{y}=\hat{y}^{(t-1)}}$
+- **一階近似**（只取 $\Delta$ 項）：直線近似（切線），較粗糙
+- **二階近似**（取到 $\Delta^2$ 項）：拋物線近似，精度更高
 
-**XGBoost** 使用 **二階泰勒展開**，加入二階導數（Hessian）：
+直覺示意（沿預測值 $\hat{y}$ 方向展開）：
+
+```
+損失曲線 l(ŷ)
+  │            ● 真實損失曲線（複雜）
+  │         /     \
+  │      /   ─────── 二階近似（拋物線，較精確）
+  │   /    ─ ─ ─ ─── 一階近似（直線，較粗糙）
+  │ /
+  └────────────────────── ŷ
+       ŷ⁽ᵗ⁻¹⁾（展開點）
+```
+
+#### 2.3.2 應用到損失函數
+
+令 $\Delta = f_t(x_i)$ （第 $t$ 棵樹的輸出），在當前預測值 $\hat{y}_i^{(t-1)}$ 處展開：
+
+**傳統 GBDT**（一階近似）：
 
 $$
-l(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)) \approx l(y_i, \hat{y}_i^{(t-1)}) + g_i \cdot f_t(x_i) + \frac{1}{2} h_i \cdot f_t^2(x_i)
+l(y_i,\, \hat{y}_i^{(t-1)} + f_t(x_i)) \approx l(y_i,\, \hat{y}_i^{(t-1)}) + g_i \cdot f_t(x_i)
 $$
 
-其中：
-- $g_i = \frac{\partial l}{\partial \hat{y}} \bigg|_{\hat{y}=\hat{y}^{(t-1)}}$ ：一階導數（梯度）
-- $h_i = \frac{\partial^2 l}{\partial \hat{y}^2} \bigg|_{\hat{y}=\hat{y}^{(t-1)}}$ ：二階導數（Hessian）
-
-**為什麼使用二階導數？**
-- 提供更多曲率資訊，更精確的近似
-- 加快收斂速度
-- 支援更廣泛的損失函數
-
-### 2.4 簡化目標函數
-
-移除常數項後，第 $t$ 輪的目標函數簡化為：
+**XGBoost**（二階近似）：
 
 $$
-\tilde{\mathcal{L}}^{(t)} = \sum_{i=1}^{n} \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \Omega(f_t)
+l(y_i,\, \hat{y}_i^{(t-1)} + f_t(x_i)) \approx l(y_i,\, \hat{y}_i^{(t-1)}) + g_i \cdot f_t(x_i) + \frac{1}{2} h_i \cdot [f_t(x_i)]^2
 $$
 
-### 2.5 正則化項
+其中一階導數（梯度） $g_i$ 與二階導數（Hessian） $h_i$ 定義為：
+
+$$
+g_i = \frac{\partial\, l(y_i,\, \hat{y})}{\partial \hat{y}} \Bigg|_{\hat{y} = \hat{y}_i^{(t-1)}}
+\qquad
+h_i = \frac{\partial^2 l(y_i,\, \hat{y})}{\partial \hat{y}^2} \Bigg|_{\hat{y} = \hat{y}_i^{(t-1)}}
+$$
+
+#### 2.3.3 以 MSE 損失為例計算 $g_i$ 和 $h_i$
+
+XGBoost 回歸預設使用 $l(y_i, \hat{y}_i) = \dfrac{1}{2}(y_i - \hat{y}_i)^2$ ，因此：
+
+$$
+g_i = \frac{\partial}{\partial \hat{y}_i}\frac{1}{2}(y_i - \hat{y}_i)^2 = -(y_i - \hat{y}_i) = \hat{y}_i^{(t-1)} - y_i
+$$
+
+$$
+h_i = \frac{\partial^2}{\partial \hat{y}_i^2}\frac{1}{2}(y_i - \hat{y}_i)^2 = 1
+$$
+
+> 💡 **直覺解釋**：
+> - $g_i = \hat{y}_i^{(t-1)} - y_i$ 就是當前的**預測殘差**（預測值 $-$ 真實值）
+> - $h_i = 1$ 代表 MSE 損失是一個標準拋物線（曲率均勻）
+> - XGBoost 讓每棵新樹去**修正這些殘差** $g_i$ ——這與傳統 GBDT 的負梯度擬合本質相同，但推導更一般化
+
+**常見損失函數的 $g_i$ 和 $h_i$**：
+
+| 損失函數 | $g_i$ | $h_i$ | 備註 |
+|---------|-------|-------|------|
+| MSE（回歸） | $\hat{y}_i - y_i$ | $1$ | 最簡單 |
+| Log Loss（二元分類） | $\hat{p}_i - y_i$ | $\hat{p}_i (1 - \hat{p}_i)$ | $\hat{p}_i = \sigma(\hat{y}_i)$ |
+| Huber Loss | 分段線性 | 分段常數 | 對異常值穩健 |
+
+> 💡 **為什麼二階導數如此重要？**
+> 1. **更精確的近似**：拋物線比直線更貼近真實損失曲線，尤其在非線性損失函數中
+> 2. **支援任意損失函數**：只要能計算 $g_i$ 和 $h_i$ ，XGBoost 即可優化任何可微損失函數（包括自訂損失）
+> 3. **加快收斂**：二階資訊提供「下降方向的曲率」，以更少迭代次數達到更好效果
+
+---
+
+### 2.4 簡化目標函數（逐步推導）
+
+將二階泰勒近似代入第 $t$ 輪目標函數，移除與 $f_t$ 無關的常數項 $l(y_i, \hat{y}_i^{(t-1)})$ ：
+
+$$
+\tilde{\mathcal{L}}^{(t)} = \sum_{i=1}^{n} \left[ g_i f_t(x_i) + \frac{1}{2} h_i \cdot [f_t(x_i)]^2 \right] + \Omega(f_t)
+$$
+
+**關鍵觀察**：每個樣本 $x_i$ 被樹的結構 $q$ 分配到某個**葉節點** $j$ ，同一葉節點內所有樣本輸出相同的值 $w_j$ ，即 $f_t(x_i) = w_j$ 。
+
+因此，可以將「**按樣本加總**」改為「**按葉節點加總**」（下一節展開推導）。
+
+---
+
+### 2.5 正則化項（懲罰過複雜的樹）
+
+**直覺說明**：葉節點數量過多或葉節點權重過大的樹，容易記住訓練資料但泛化能力差（過擬合）。正則化項就是對這類樹額外扣分。
 
 XGBoost 定義樹的複雜度為：
 
 $$
-\Omega(f_t) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2
+\Omega(f_t) = \underbrace{\gamma T}_{\text{葉節點數量懲罰}} + \underbrace{\frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2}_{\text{葉節點權重懲罰（L2）}}
 $$
 
-其中：
-- $T$ ：樹的葉節點數量
-- $w_j$ ：第 $j$ 個葉節點的權重（預測值）
-- $\gamma$ ：葉節點懲罰係數（控制樹的大小）
-- $\lambda$ ：L2 正則化係數（控制葉節點權重）
+| 符號 | 意義 | 對應超參數 | 效果 |
+|------|------|----------|------|
+| $T$ | 葉節點數量 | `gamma`（ $\gamma$ ） | $\gamma$ 越大，越不願意分裂，樹越淺 |
+| $w_j$ | 葉節點輸出值 | `reg_lambda`（ $\lambda$ ） | $\lambda$ 越大，葉節點值越趨近 0（預測更保守） |
 
-**正則化的作用**：
-- $\gamma$ ：避免樹過深（類似 `min_child_weight` ）
-- $\lambda$ ：避免葉節點權重過大（平滑預測值）
+> 💡 **類比**：
+> - $\gamma$ （葉節點懲罰）≈ 每多一個葉節點就要多付 $\gamma$ 元的「開店成本」，只有帶來足夠利潤（損失減少量 $>$ $\gamma$ ）的分裂才值得做
+> - $\lambda$ （L2 懲罰）≈ Ridge Regression 中的正則化效果，讓每個葉節點的預測值不要太極端
 
-### 2.6 樹結構學習
+---
 
-對於一棵樹，將樣本分配到各葉節點後，定義：
-- $I_j = \{i | q(x_i) = j\}$ ：分配到葉節點 $j$ 的樣本集合
-- $G_j = \sum_{i \in I_j} g_i$ ：該葉節點的一階梯度和
-- $H_j = \sum_{i \in I_j} h_i$ ：該葉節點的二階梯度和
+### 2.6 樹結構學習（求最優葉節點輸出值）
 
-目標函數可重寫為：
+#### 2.6.1 改寫目標函數（按葉節點分組）
+
+定義第 $j$ 個葉節點上的樣本集合與梯度統計量：
+
+$$
+I_j = \{i \mid q(x_i) = j\}, \qquad G_j = \sum_{i \in I_j} g_i, \qquad H_j = \sum_{i \in I_j} h_i
+$$
+
+其中 $q(x_i)$ 是樣本 $x_i$ 所在的葉節點編號。將「按樣本加總」改為「按葉節點加總」，並代入正則化項：
 
 $$
 \tilde{\mathcal{L}}^{(t)} = \sum_{j=1}^{T} \left[ G_j w_j + \frac{1}{2} (H_j + \lambda) w_j^2 \right] + \gamma T
 $$
 
-對 $w_j$ 求偏導並令其為 0，得到 **最優葉節點權重**：
+> 💡 **這是一個關於 $w_j$ 的二次函數（拋物線），且各葉節點相互獨立！** 對每個葉節點 $j$ ，可以分別求其最優值。
+
+#### 2.6.2 求最優葉節點輸出值（解析解推導）
+
+對每個葉節點 $j$ ，對 $w_j$ 求偏導並令其為零：
 
 $$
-w_j^* = -\frac{G_j}{H_j + \lambda}
+\frac{\partial \tilde{\mathcal{L}}^{(t)}}{\partial w_j} = G_j + (H_j + \lambda)\, w_j = 0
 $$
 
-代回目標函數，得到 **最優目標函數值**：
+解得**最優葉節點輸出值**：
+
+$$
+\boxed{w_j^* = -\frac{G_j}{H_j + \lambda}}
+$$
+
+**直覺解釋**：
+- 分子 $G_j = \sum_{i \in I_j} g_i$ ：該節點上所有樣本的梯度之和，代表「應該往哪個方向修正」
+- 分母 $H_j + \lambda$ ：Hessian 之和加上正則化，代表「修正的力度應被縮放多少」
+- 負號：梯度指向損失增加的方向，輸出值應往**相反方向**走
+
+> 💡 **MSE 損失的直覺**：當 $h_i = 1$ 時， $H_j = |I_j|$ （節點樣本數）， $G_j = \sum_{i \in I_j}(\hat{y}_i^{(t-1)} - y_i)$ （殘差和），因此：
+>
+> $$w_j^* \approx -\frac{\text{殘差和}}{\text{樣本數}} = \text{平均殘差的反方向}$$
+>
+> 即葉節點輸出的就是「把平均殘差補回來的修正量」（類似在殘差上再做一次均值回歸）。
+
+#### 2.6.3 評估樹結構好壞的分數
+
+將最優 $w_j^*$ 代回目標函數，化簡得**樹結構評分**：
 
 $$
 \tilde{\mathcal{L}}^{(t)}(q) = -\frac{1}{2} \sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T
 $$
 
-### 2.7 分裂增益
+- $\tilde{\mathcal{L}}^{(t)}(q)$ 越小（越負）→ 這棵樹的結構越好
+- XGBoost 透過搜尋不同分裂方式，找到讓 $\tilde{\mathcal{L}}^{(t)}$ 最小的樹結構 $q^*$
 
-評估是否分裂某個節點的 **增益 (Gain)**：
+---
+
+### 2.7 分裂增益（決定是否分裂一個節點）
+
+**直覺說明**：把一個節點（Parent）分裂成左右兩個子節點後，目標函數值能降低多少？降低越多，這個分裂越值得。
+
+#### 2.7.1 增益公式推導
+
+設 Parent 節點（未分裂）的梯度統計量為 $G_P = G_L + G_R$ ， $H_P = H_L + H_R$ ：
+
+| 狀態 | 目標函數貢獻 |
+|------|------------|
+| **分裂前**（Parent） | $-\dfrac{1}{2} \cdot \dfrac{G_P^2}{H_P + \lambda}$ |
+| **分裂後**（Left + Right） | $-\dfrac{1}{2} \cdot \dfrac{G_L^2}{H_L + \lambda} - \dfrac{1}{2} \cdot \dfrac{G_R^2}{H_R + \lambda}$ |
+
+損失的實際減少量（分裂前 $-$ 分裂後），再扣除新增葉節點的懲罰 $\gamma$ ，即得**分裂增益**：
 
 $$
+\boxed{
 \text{Gain} = \frac{1}{2} \left[ \frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda} \right] - \gamma
+}
 $$
 
-其中：
-- $G_L, H_L$ ：左子樹的梯度和、Hessian 和
-- $G_R, H_R$ ：右子樹的梯度和、Hessian 和
-- $\gamma$ ：葉節點懲罰
+> 💡 **公式中每一項的意義**：
+> - $\dfrac{G_L^2}{H_L + \lambda}$ ：左子樹的「純度分數」，梯度越集中（同向），分數越高
+> - $\dfrac{G_R^2}{H_R + \lambda}$ ：右子樹的「純度分數」
+> - $\dfrac{(G_L+G_R)^2}{H_L+H_R+\lambda}$ ：分裂前（Parent）的分數
+> - $\gamma$ ：新增一個葉節點的懲罰成本（門檻值）
 
-**分裂決策**：
-- 若 $\text{Gain} > 0$ ，則分裂
-- 否則，停止分裂
+#### 2.7.2 分裂決策規則
+
+| 條件 | 決策 | 原因 |
+|------|------|------|
+| $\text{Gain} > 0$ | ✅ 執行分裂 | 損失減少量 $>$ 葉節點懲罰，值得分裂 |
+| $\text{Gain} \leq 0$ | ❌ 停止分裂（剪枝） | 損失減少不足以抵消額外的模型複雜度 |
+
+> 💡 **$\gamma$ 的作用**： $\gamma$ 越大，「門檻越高」，只有帶來顯著改善的分裂才被執行 → 樹越淺 → 正則化效果越強。這就是 `gamma` 超參數防止過擬合的機制。
+
+#### 2.7.3 如何找到最佳分裂點
+
+XGBoost 對每個特徵的每個可能分裂值，計算 Gain，選擇 **Gain 最大的特徵與分裂閾值**：
+
+```
+對每個特徵 f：
+    對每個候選分裂值 v（將樣本分為 L: x_f < v，R: x_f ≥ v）：
+        計算 G_L, H_L, G_R, H_R
+        計算 Gain(f, v)
+選擇最大 Gain 對應的 (f*, v*) 作為此節點的分裂點
+若最大 Gain ≤ 0，此節點成為葉節點，停止生長
+```
+
+XGBoost 使用 **Histogram-based 演算法**（`tree_method='hist'`）將連續特徵離散化分箱，大幅加速分裂點搜尋，這也是 XGBoost 速度遠超傳統 GBDT 的關鍵之一。
+
+---
+
+### 2.8 具體數值計算範例
+
+**情境**：MSE 回歸，當前節點有 6 個樣本，考慮某特徵的一個分裂點（設 $\lambda = 1$ ， $\gamma = 0$ ）。
+
+**樣本資料（第 $t$ 輪， $\hat{y}_i^{(t-1)}$ 為當前預測值）**：
+
+| 樣本 $i$ | 真實值 $y_i$ | 當前預測 $\hat{y}_i^{(t-1)}$ | $g_i = \hat{y}_i^{(t-1)} - y_i$ | $h_i$ |
+|---------|------------|--------------------------|--------------------------------|-------|
+| 1 | 5.0 | 3.0 | −2.0 | 1 |
+| 2 | 4.0 | 3.5 | −0.5 | 1 |
+| 3 | 6.0 | 4.0 | −2.0 | 1 |
+| 4 | 8.0 | 7.5 | −0.5 | 1 |
+| 5 | 9.0 | 8.5 | −0.5 | 1 |
+| 6 | 7.0 | 7.8 | +0.8 | 1 |
+
+**某特徵的分裂點**：樣本 1–3 分到左子節點，樣本 4–6 分到右子節點。
+
+**Step 1：計算梯度統計量**：
+
+$$
+G_L = (-2.0) + (-0.5) + (-2.0) = -4.5, \quad H_L = 3
+$$
+
+$$
+G_R = (-0.5) + (-0.5) + 0.8 = -0.2, \quad H_R = 3
+$$
+
+**Step 2：計算最優葉節點輸出值**：
+
+$$
+w_L^* = -\frac{G_L}{H_L + \lambda} = -\frac{-4.5}{3 + 1} = +1.125 \quad \text{（往上修正 1.125）}
+$$
+
+$$
+w_R^* = -\frac{G_R}{H_R + \lambda} = -\frac{-0.2}{3 + 1} = +0.05 \quad \text{（往上微幅修正 0.05）}
+$$
+
+**Step 3：計算分裂增益**：
+
+$$
+\text{Gain} = \frac{1}{2}\left[\frac{(-4.5)^2}{3+1} + \frac{(-0.2)^2}{3+1} - \frac{(-4.7)^2}{6+1}\right] - 0 = \frac{1}{2}\left[5.0625 + 0.01 - 3.1557\right] \approx 0.958
+$$
+
+∵ Gain $= 0.958 > 0$ ，∴ **執行分裂**，左子節點預測值修正 $+1.125$ ，右子節點修正 $+0.05$ 。
+
+---
+
+### 2.9 完整訓練演算法流程
+
+```
+╔══════════════════════════════════════════════════════╗
+║          XGBoost 完整訓練流程（Boosting Loop）          ║
+╠══════════════════════════════════════════════════════╣
+║ 初始化：ŷᵢ⁽⁰⁾ = 常數（如訓練集的 y 均值）               ║
+║                                                      ║
+║ For t = 1, 2, ..., K（重複 K 次，K = n_estimators）：  ║
+║                                                      ║
+║   Step 1 計算梯度資訊                                  ║
+║     對每個樣本 i：                                     ║
+║       gᵢ = ∂l(yᵢ, ŷᵢ⁽ᵗ⁻¹⁾)/∂ŷᵢ   ← 誤差方向（一階）  ║
+║       hᵢ = ∂²l(yᵢ, ŷᵢ⁽ᵗ⁻¹⁾)/∂ŷᵢ²  ← 誤差曲率（二階）  ║
+║                                                      ║
+║   Step 2 建立最優決策樹 fₜ（貪婪地逐節點分裂）           ║
+║     For 每個候選節點：                                 ║
+║       For 每個特徵，每個分裂值：                        ║
+║         Gain = ½[G_L²/(H_L+λ) + G_R²/(H_R+λ)        ║
+║                 - G_P²/(H_P+λ)] - γ                  ║
+║       選擇最大 Gain 的分裂                             ║
+║       若最大 Gain ≤ 0，停止分裂（成為葉節點）           ║
+║                                                      ║
+║   Step 3 計算葉節點輸出值（解析解）                     ║
+║       wⱼ* = -Gⱼ / (Hⱼ + λ)                           ║
+║                                                      ║
+║   Step 4 更新預測值                                    ║
+║       ŷᵢ⁽ᵗ⁾ = ŷᵢ⁽ᵗ⁻¹⁾ + η ⋅ fₜ(xᵢ)                   ║
+║                                                      ║
+║ 輸出：最終模型 F(x) = Σₜ η ⋅ fₜ(x)                    ║
+╚══════════════════════════════════════════════════════╝
+```
+
+**XGBoost 與傳統 GBDT 的關鍵差異對比**：
+
+| 步驟 | 傳統 GBDT | XGBoost |
+|------|---------|---------|
+| 損失近似 | 一階泰勒（只用 $g_i$ ） | 二階泰勒（同時用 $g_i$ 和 $h_i$ ） |
+| 葉節點值 | 殘差平均值估計 | 解析解 $w_j^* = -G_j/(H_j+\lambda)$ |
+| 分裂準則 | 殘差 MSE 最小化 | 通用增益公式（支援任意損失函數） |
+| 正則化 | 無（或外部限制樹深） | 內建 $\gamma T + \frac{1}{2}\lambda\|w\|^2$ |
+| 特徵搜尋 | 逐特徵逐值遍歷（串行） | 並行 Histogram 演算法 |
+
+---
+
+### 2.10 數學原理小結
+
+| 概念 | 核心公式 | 物理意義 |
+|------|---------|---------|
+| **目標函數** | $\mathcal{L} = \sum l(y_i, \hat{y}_i) + \sum \Omega(f_k)$ | 準確度 + 複雜度的平衡 |
+| **加法訓練** | $\hat{y}^{(t)} = \hat{y}^{(t-1)} + \eta \cdot f_t$ | 每輪修正當前誤差 |
+| **梯度（一階）** | $g_i = \partial l / \partial \hat{y}_i$ | 當前誤差的方向 |
+| **Hessian（二階）** | $h_i = \partial^2 l / \partial \hat{y}_i^2$ | 當前誤差的曲率 |
+| **最優葉節點值** | $w_j^* = -G_j/(H_j + \lambda)$ | 修正殘差的最佳幅度 |
+| **分裂增益** | $\text{Gain} = \frac{1}{2}[\cdots] - \gamma$ | 分裂帶來的損失減少量 |
+
+> 💡 **最重要的理解**：XGBoost 的核心創新不在於使用多複雜的樹，而在於用**二階泰勒展開推導出一套統一的優化框架**，使得任何可微損失函數都能高效優化，並配合正則化項和 Histogram 演算法，同時達到高精度與高速度。
 
 ---
 
@@ -254,8 +629,8 @@ pip install xgboost[gpu]
 import xgboost as xgb
 print(f"XGBoost version: {xgb.__version__}")
 
-# 檢查 GPU 支援
-print(f"GPU available: {xgb.get_config()['use_rmm']}")
+# 檢查 XGBoost 建構資訊（含 GPU 支援）
+print(xgb.build_info())
 ```
 
 ### 3.3 主要 API 介面
@@ -475,6 +850,62 @@ print(f"最佳分數: {model.best_score:.4f}")
 
 ### 5.3 特徵重要性分析
 
+XGBoost 訓練完成後，每棵決策樹的每次**節點分裂**都會記錄是哪個特徵、分裂帶來多少收益、影響多少樣本。將所有樹的資訊彙總，就能計算出三種特徵重要性指標。
+
+#### 5.3.1 三種重要性計算方式
+
+**① Weight（使用次數）**
+
+$$\text{Weight}(f) = \sum_{k=1}^{K} \sum_{t \in \mathcal{T}_k} \mathbf{1}[f_t = f]$$
+
+統計特徵 $f$ 在所有 $K$ 棵樹中，被選為**分裂條件的總次數**。
+
+- 計算最簡單，直覺易懂
+- **缺點**：連續型特徵的可能分裂點多，容易使次數虛高；對稀疏特徵有偏
+
+---
+
+**② Gain（平均增益）**
+
+$$\text{Gain}(f) = \frac{\sum_{\text{使用 } f \text{ 分裂的節點}} \text{Gain}_\text{split}}{\text{使用 } f \text{ 的分裂次數}}$$
+
+其中每次分裂的增益（來自 Section 2.8）為：
+
+$$\text{Gain}_\text{split} = \frac{1}{2}\left[\frac{G_L^2}{H_L+\lambda} + \frac{G_R^2}{H_R+\lambda} - \frac{G_P^2}{H_P+\lambda}\right] - \gamma$$
+
+統計特徵 $f$ 每次分裂帶來的**目標函數平均改善量**。
+
+- 直接反映特徵對模型預測的貢獻
+- **推薦使用**：能真實反映特徵的預測能力，不受分裂次數影響
+
+---
+
+**③ Cover（覆蓋樣本數）**
+
+$$\text{Cover}(f) = \frac{\sum_{\text{使用 } f \text{ 分裂的節點}} \sum_{i \in \text{節點}} h_i}{\text{使用 } f \text{ 的分裂次數}}$$
+
+統計特徵 $f$ 每次分裂平均影響多少樣本（以 Hessian $h_i$ 加權計算）。
+
+- 對於 MSE 回歸：$h_i = 1$，等同於樣本數
+- 對於 Logistic 分類：$h_i = \hat{p}_i(1-\hat{p}_i)$，反映預測不確定性
+- **用途**：了解特徵在資料分布上的「覆蓋廣度」
+
+---
+
+#### 5.3.2 三種指標比較
+
+| 指標 | 計算基礎 | 優點 | 缺點 | 適用場景 |
+|------|---------|------|------|---------|
+| **Weight** | 分裂次數 | 計算快、直觀 | 偏向高基數特徵 | 快速初步篩選 |
+| **Gain** | 目標函數改善 | 最能反映預測貢獻 | 稀疏特徵可能被高估 | **一般首選** |
+| **Cover** | 影響樣本數 | 反映資料覆蓋廣度 | 直覺較弱 | 分析特徵影響範圍 |
+
+> **建議**：使用 `importance_type='gain'` 作為主要分析依據，同時參考 `weight` 交叉驗證。
+
+---
+
+#### 5.3.3 程式碼實作
+
 ```python
 import matplotlib.pyplot as plt
 
@@ -579,8 +1010,7 @@ model = XGBClassifier(
     learning_rate=0.1,
     max_depth=5,
     random_state=42,
-    eval_metric='auc',
-    use_label_encoder=False
+    eval_metric='auc'
 )
 
 # 訓練模型
@@ -898,14 +1328,14 @@ model = XGBClassifier(
     learning_rate=0.03,
     max_depth=5,
     subsample=0.8,
-    eval_metric='auc'
+    eval_metric='auc',
+    early_stopping_rounds=50
 )
 
-# 使用早停
+# 使用驗證集與早停
 model.fit(
     X_train, y_train,
     eval_set=[(X_test, y_test)],
-    early_stopping_rounds=50,
     verbose=10
 )
 
@@ -996,6 +1426,8 @@ y_pred = model.predict(X_test)
 
 **處理類別不平衡的方法**：
 ```python
+from sklearn.utils.class_weight import compute_sample_weight
+
 # 1. 計算樣本權重
 sample_weights = compute_sample_weight('balanced', y_train)
 
@@ -1004,14 +1436,15 @@ xgb_model = XGBClassifier(
     n_estimators=300,
     max_depth=8,
     learning_rate=0.05,
-    tree_method='gpu_hist'  # GPU 加速
+    tree_method='gpu_hist',  # GPU 加速
+    gpu_id=0,
+    early_stopping_rounds=30  # 早停（置於建構子）
 )
 
 xgb_model.fit(
     X_train, y_train,
     eval_set=[(X_val, y_val)],
-    sample_weight=sample_weights,  # 關鍵：處理不平衡
-    early_stopping_rounds=30
+    sample_weight=sample_weights  # 關鍵：處理不平衡
 )
 ```
 
@@ -1034,7 +1467,7 @@ xgb_model.fit(
 | Logistic Regression | 0.8051 | 0.7196 | 0.8159 | 13.54 |
 | SVM | 0.7938 | 0.7295 | 0.8090 | 123.24 |
 
-![模型性能比較](../Unit13/outputs/P3_Unit13_XGBoost_Classification_Advanced/figs/model_comparison.png)
+![模型性能比較](outputs/P3_Unit13_XGBoost_Classification_Advanced/figs/model_comparison.png)
 
 #### 10.1.4 關鍵發現與分析
 
@@ -1091,11 +1524,13 @@ xgb_model = XGBClassifier(
     colsample_bytree=0.7,
     reg_alpha=0.5,     # 增加 L1 正則化（特徵選擇）
     reg_lambda=2.0,    # 增加 L2 正則化（平滑）
-    tree_method='gpu_hist'
+    tree_method='gpu_hist'  # GPU 加速
 )
 ```
 
 #### 10.1.5 混淆矩陣分析
+
+![Confusion Matrix](outputs/P3_Unit13_XGBoost_Classification_Advanced/figs/confusion_matrix_xgboost.png)
 
 **觀察重點**：
 - 正常運行（Class 0）：準確率最高
@@ -1103,6 +1538,8 @@ xgb_model = XGBClassifier(
 - 主要混淆：相鄰嚴重程度的類別（如 Class 5 vs 6）
 
 #### 10.1.6 特徵重要性分析
+
+![Feature Importance](outputs/P3_Unit13_XGBoost_Classification_Advanced/figs/feature_importance.png)
 
 **Top 10 最重要特徵**：
 
@@ -1132,6 +1569,8 @@ xgb_model = XGBClassifier(
 4. **溫度差異監控**：Temp_Diff_IO 異常表示熱交換問題
 
 #### 10.1.7 數據規模影響分析
+
+![Data Scaling Analysis](outputs/P3_Unit13_XGBoost_Classification_Advanced/figs/data_scaling_analysis.png)
 
 訓練不同樣本數量的模型：
 
@@ -1181,60 +1620,56 @@ threshold = {
 
 ---
 
-### 10.2 案例二：化工反應器產率預測（回歸任務）
+### 10.2 案例二：化工廠能源消耗預測（回歸任務）
 
 #### 10.2.1 案例背景
 
-**問題描述**：預測化學反應器的產物產率（化工製程優化核心任務）  
+**問題描述**：預測化工廠每小時能源消耗（化工製程能效優化核心任務）  
 **數據規模**：100,000 筆歷史生產數據  
-**特徵數量**：20 個（9 操作參數 + 4 時間特徵 + 7 衍生特徵）  
-**預測目標**：產率 (Yield, %) - 連續值回歸  
-**挑戰**：含 5% 缺失值、10% 異常值、季節性波動
+**特徵數量**：27 個（10 基礎 + 15 衍生 + 2 類別）  
+**預測目標**：每小時能源消耗 (Energy_Consumption, kWh) - 連續值回歸  
+**挑戰**：含 5% 缺失值、10% 異常值、日內週期性與季節性波動
 
 **特徵分類**：
 
-1. **連續操作參數（6個）**：
-   - Feed_Flow (原料流量, kg/h)
+1. **基礎特徵（10個）**：
+   - Feed_Flow (進料流量, kg/h)
    - Feed_Temp (進料溫度, °C)
    - Pressure (反應壓力, bar)
+   - Composition (進料組成, mol fraction)
    - Steam_Flow (蒸汽流量, kg/h)
-   - Cooling_Water (冷卻水流量, L/min)
-   - Load_Factor (負載因子, 0-1)
-
-2. **類別操作參數（3個）**：
-   - Equipment_Status (設備狀態：Good/Warn/Critical)
-   - Operation_Mode (操作模式：Normal/Intensive/Maintenance)
-   - Composition (原料組成：A/B/C/D)
-
-3. **時間特徵（4個）**：
-   - Operating_Hours (累計運行時數)
-   - Season (季節：Spring/Summer/Fall/Winter)
-   - Month (月份：1-12)
+   - Cooling_Water (冷卻水流量, m³/h)
    - Ambient_Temp (環境溫度, °C)
+   - Humidity (濕度, %)
+   - Operating_Hours (累計運行時間, h)
+   - Load_Factor (負載率, 0-1)
 
-4. **衍生特徵（7個）**：
-   - Temp_Squared (溫度平方)
-   - Temp_Flow_Interaction (溫度×流量交互作用)
-   - Pressure_Composition_Interaction (壓力×組成交互作用)
-   - Flow_Cubed (流量三次方，捕捉非線性)
-   - Equipment_Status_Encoded (設備狀態編碼)
-   - Operation_Mode_Encoded (操作模式編碼)
-   - Composition_Encoded (組成編碼)
+2. **類別特徵（2個）**：
+   - Equipment_Status (設備狀態：A/B/C)
+   - Operation_Mode (操作模式：1/2/3)
+
+3. **衍生特徵（15個）**（含時間特徵）：
+   - 時間特徵：Hour, Day_of_Week, Month, Season
+   - 滾動統計：Feed_Flow_Mean, Feed_Flow_Std, Feed_Temp_Max, Feed_Temp_Min
+   - 交互特徵：Temp_Flow_Interaction, Pressure_Composition_Interaction
+   - 多項式特徵：Temp_Squared, Flow_Cubed（捕捉非線性）
+   - 滯後特徵：Feed_Flow_Lag1, Feed_Temp_Lag2（t-1, t-2 時刻）
+   - 溫差特徵：Temp_Diff_Ambient（進料溫度 - 環境溫度）
 
 #### 10.2.2 數據探索性分析
 
 **數據分布特徵**：
-- 產率範圍：60-95%（均值：78.2%，標準差：6.8%）
-- 存在明顯的季節性效應（夏季產率偏低）
-- 設備狀態 Good (70%) vs Warn (20%) vs Critical (10%)
+- 能源消耗範圍：約 200-700 kWh（均值約 480 kWh，含日內週期性）
+- 存在明顯的日內週期性效應（日間用電高）與季節性效應
+- 設備狀態 Equipment_Status 的三個類別：A/B/C
 - 5% 缺失值集中在 Feed_Flow、Pressure、Cooling_Water
 
 **相關性分析（Top 5）**：
-1. Pressure - Yield: **r = 0.68** ⭐ 最強正相關
-2. Feed_Temp - Yield: **r = 0.54**
-3. Ambient_Temp - Yield: **r = -0.42** （負相關，夏季產率低）
-4. Equipment_Status - Yield: **r = 0.51**
-5. Load_Factor - Yield: **r = 0.39**
+1. Feed_Flow - Energy_Consumption: **r = 0.70** ⭐ 最強正相關
+2. Steam_Flow - Energy_Consumption: **r = 0.55**
+3. Pressure - Energy_Consumption: **r = 0.50** （高壓操作耗能增加）
+4. Equipment_Status - Energy_Consumption: **r = 0.48** （C 狀態用電最高）
+5. Load_Factor - Energy_Consumption: **r = 0.35**
 
 #### 10.2.3 XGBoost 模型訓練策略
 
@@ -1255,13 +1690,14 @@ xgb_model.fit(X_train, y_train)  # X_train 可包含 NaN
 ```python
 from sklearn.preprocessing import LabelEncoder
 
-# 對 3 個類別特徵進行編碼
+# 對 2 個類別特徵進行編碼
 label_encoders = {}
-categorical_cols = ['Equipment_Status', 'Operation_Mode', 'Composition']
+categorical_cols = ['Equipment_Status', 'Operation_Mode']
 
 for col in categorical_cols:
     le = LabelEncoder()
     X_train[col] = le.fit_transform(X_train[col])
+    X_val[col] = le.transform(X_val[col])    # 驗證集同步編碼
     X_test[col] = le.transform(X_test[col])
     label_encoders[col] = le
 ```
@@ -1295,7 +1731,7 @@ for col in categorical_cols:
 
 4. **Random Forest 表現異常**：
    - 訓練時間長（8.49s）但性能最差（RMSE 16.46）
-   - 原因：高維數據（20 特徵）+ 複雜非線性關係，RF 不足以捕捉
+   - 原因：RF 每節點隨機抽取 $\sqrt{27} \approx 5$ 個特徵，使得主導性特徵 Flow_Cubed（60% 重要性）在大多數分裂點中無法入選，削弱了對此強非線性效應的學習能力
 
 #### 10.2.5 特徵重要性分析
 
@@ -1315,8 +1751,8 @@ for col in categorical_cols:
 | 10 | Pressure | 0.0075 | 反應壓力 |
 
 **關鍵洞察**：
-- **Flow_Cubed** 重要性高達 60.19%，說明產率與流量存在強烈的非線性關係（三次方效應）
-- **Operating_Hours** 排名第二（11.58%），設備老化對產率影響顯著
+- **Flow_Cubed** 重要性高達 60.19%，說明能源消耗與流量存在強烈的非線性關係（三次方效應）
+- **Operating_Hours** 排名第二（11.58%），設備老化對能源消耗影響顯著
 - **交互作用特徵** 排名靠前（Pressure_Composition: 5.9%），證明特徵工程成功
 - **原始特徵** 重要性反而較低（Feed_Flow: 5.09%），衍生特徵捕捉更多信息
 
@@ -1359,7 +1795,7 @@ print(f"Shapiro-Wilk Test: p-value = {p_value:.4f}")
 
 # 檢查異質變異（heteroscedasticity）
 plt.scatter(y_pred, residuals, alpha=0.3)
-plt.xlabel('Predicted Yield (%)')
+plt.xlabel('Predicted Energy Consumption (kWh)')
 plt.ylabel('Residuals')
 plt.axhline(0, color='red', linestyle='--')
 plt.title('Residual Plot')
@@ -1394,13 +1830,13 @@ plt.show()
 
 **2. 監控與告警**：
 ```python
-# 即時預測產率並告警
+# 即時預測能源消耗並告警
 def predict_with_monitoring(model, X_new):
     y_pred = model.predict(X_new)
     
-    # 產率過低告警
-    if y_pred < 70:
-        print(f"⚠️ 警告：預測產率 {y_pred:.2f}% < 70%")
+    # 能源消耗過高告警
+    if y_pred > 600:
+        print(f"⚠️ 警告：預測能耗 {y_pred:.2f} kWh > 600")
         # 分析原因
         feature_contrib = model.get_booster().predict(
             xgb.DMatrix(X_new), pred_contribs=True
@@ -1413,7 +1849,7 @@ def predict_with_monitoring(model, X_new):
 
 **3. 持續優化**：
 - **特徵工程**：嘗試更高階交互作用（如 Temperature × Pressure × Composition）
-- **時序建模**：加入滯後特徵（產率_lag1, 產率_lag7）捕捉時間依賴
+- **時序建模**：加入更多滯後特徵（Energy_Consumption_lag1, Energy_Consumption_lag7）捕捉時間依賴
 - **在線學習**：每週用新數據微調模型（增量訓練）
 
 **4. A/B 測試結果**：
@@ -1426,58 +1862,26 @@ improvement = (baseline_mae - xgboost_mae) / baseline_mae * 100
 print(f"MAE 改善: {improvement:.1f}%")  # 39.2% ⭐
 
 # 經濟效益
-# 假設每 1% 產率提升價值 10,000 USD/年
-# MAE 降低 4.9% → 潛在年收益: 49,000 USD
+# 假設 MAE 降低 4.9 kWh，8760 小時/年，電價 0.1 USD/kWh
+# 年節省: 4.9 * 8760 * 0.1 = 4,292 USD/年（單機台）
 ```
 
 #### 10.2.9 與分類任務的對比總結
 
-| 維度 | 回歸任務（產率預測） | 分類任務（故障診斷） |
+| 維度 | 回歸任務（能耗預測） | 分類任務（故障診斷） |
 |------|---------------------|---------------------|
 | **數據規模** | 100,000 筆 | 150,000 筆 |
-| **特徵數量** | 20 個 | 30 個 |
-| **目標變數** | 連續值（60-95%） | 7 類別（極度不平衡） |
+| **特徵數量** | 27 個 | 30 個 |
+| **目標變數** | 連續值（kWh） | 7 類別（極度不平衡） |
 | **最佳模型** | XGBoost GPU (R²=0.987) | XGBoost GPU (F1-Weighted=0.847) |
 | **訓練時間** | 3.34s | 9.50s |
 | **GPU 加速** | 1.55x | 1.39x |
-| **vs sklearn GBDT** | 快 28.5x，準確度高 10.6% | 快 60.9x，準確度高 5.2% |
+| **vs sklearn GBDT** | 快 28.5x，RMSE 改善 10.6% | 快 60.9x，F1 (Weighted) 高 1.45% |
 | **vs Random Forest** | 準確度高 2.45% | 準確度高 0.46% |
 | **特徵工程影響** | 關鍵（衍生特徵 Top 3） | 關鍵（Health_Index 最重要） |
 | **缺失值處理** | XGBoost 自動（5%） | XGBoost 自動（5%） |
 | **類別不平衡** | 不適用 | 使用 sample_weight（70:1） |
-| **關鍵超參數** | n_estimators=500, max_depth=6 | n_estimators=300, max_depth=5 |
-| **早停機制** | 第 487 輪停止 | 第 158 輪停止 |
-
-**共同結論**：
-1. **XGBoost 全面優於傳統算法**（sklearn GBDT, Random Forest）
-2. **GPU 加速適中**（1.4-1.6x），大數據集優勢更明顯
-3. **特徵工程是成功關鍵**（衍生特徵重要性極高）
-4. **可解釋性強**（特徵重要性分析與化工原理一致）
-
----
-
-### 10.3 兩個案例的深度對比與總結
-
-#### 10.3.1 技術層面對比
-
-**模型配置差異**：
-
-| 比較維度 | 回歸任務 | 分類任務 |
-|---------|---------|---------|
-| **數據規模** | 100,000 筆 | 150,000 筆 |
-| **特徵數量** | 20 | 30 |
-| **目標變數** | 連續值（產率%） | 7 類別（故障類型） |
-| **評估指標** | R², RMSE, MAE | F1-Score, Accuracy |
-| **類別不平衡** | 不適用 | 嚴重（70:1） |
-| **最佳模型** | XGBoost GPU (R²=0.987) | XGBoost GPU (F1-Weighted=0.847) |
-| **訓練時間** | 3.34s | 9.50s |
-| **GPU 加速** | 1.55x | 1.39x |
-| **vs sklearn GBDT** | 快 28.5x，準確度高 10.6% | 快 60.9x，準確度高 5.2% |
-| **vs Random Forest** | 準確度高 2.45% | 準確度高 0.46% |
-| **特徵工程影響** | 關鍵（衍生特徵 Top 3） | 關鍵（Health_Index 最重要） |
-| **缺失值處理** | XGBoost 自動（5%） | XGBoost 自動（5%） |
-| **類別不平衡** | 不適用 | 使用 sample_weight（70:1） |
-| **關鍵超參數** | n_estimators=500, max_depth=6 | n_estimators=300, max_depth=5 |
+| **關鍵超參數** | n_estimators=500, max_depth=7 | n_estimators=300, max_depth=8 |
 | **早停機制** | 第 487 輪停止 | 第 158 輪停止 |
 
 **共同結論**：
@@ -1552,10 +1956,10 @@ model = XGBRegressor(n_jobs=-1)  # 使用所有 CPU 核心
 **3. 早停**：
 
 ```python
+model = XGBRegressor(early_stopping_rounds=50)  # XGBoost 1.7+ 支援早停置於建構子
 model.fit(
     X_train, y_train,
-    eval_set=[(X_val, y_val)],
-    early_stopping_rounds=50
+    eval_set=[(X_val, y_val)]
 )
 ```
 
@@ -1666,11 +2070,10 @@ print(f"\n最佳參數: {grid_search.best_params_}")
 final_model = grid_search.best_estimator_
 
 # 使用早停訓練
-final_model.set_params(n_estimators=1000)
+final_model.set_params(n_estimators=1000, early_stopping_rounds=50)
 final_model.fit(
     X_train, y_train,
     eval_set=[(X_val, y_val)],
-    early_stopping_rounds=50,
     verbose=False
 )
 
@@ -1715,7 +2118,6 @@ print("\n模型已保存")
 - [ ] 確認類別是否平衡，不平衡則使用 scale_pos_weight
 - [ ] 選擇適當的 objective（binary:logistic 或 multi:softprob）
 - [ ] 選擇適當的 eval_metric（auc、logloss、error）
-- [ ] 設定 use_label_encoder=False（避免警告）
 - [ ] 使用 predict_proba 獲取機率
 - [ ] 繪製 ROC 曲線、PR 曲線
 - [ ] 分析混淆矩陣
@@ -1783,7 +2185,7 @@ print("\n模型已保存")
 ### 15.1 配套程式碼
 
 本單元提供以下程式範例：
-- `Unit13_XGBoost_Regression.ipynb` - 回歸任務完整演練（化工反應器產率預測）
+- `Unit13_XGBoost_Regression.ipynb` - 回歸任務完整演練（化工廠能源消耗預測）
 - `Unit13_XGBoost_Classification.ipynb` - 分類任務完整演練（設備故障診斷，150K 樣本）
 
 **實戰案例執行結果摘要**：
@@ -1800,8 +2202,8 @@ print("\n模型已保存")
 - **模型對比**：XGBoost 僅比 Random Forest 高 0.46%（特徵工程成功，RF 已足夠好）
 - **類別不平衡處理**：使用 `sample_weight` 成功處理 70:1 不平衡比例
 
-#### 回歸任務 - 反應器產率預測
-- **數據規模**：100,000 筆，20 特徵
+#### 回歸任務 - 化工廠能源消耗預測
+- **數據規模**：100,000 筆，27 特徵
 - **最佳模型**：XGBoost (GPU) - R²: 0.9870, RMSE: 9.70, MAE: 7.64
 - **性能提升**：
   - 相較 Linear Regression RMSE 改善 **15.3%** (11.44 → 9.70)
@@ -1825,11 +2227,9 @@ print("\n模型已保存")
 7. `data_scaling_analysis.png` - 數據規模對性能的影響（5K → 85K）
 
 回歸任務圖表：
-1. `parity_plot.png` - 預測值 vs 實際值散點圖（R²=0.9870）
-2. `residual_plot.png` - 殘差分析（隨機分佈，無異質變異）
-3. `learning_curve.png` - 訓練與驗證曲線（早停於第 487 輪）
-4. `feature_importance_regression.png` - 特徵重要性（Flow_Cubed 60.19%）
-5. `shap_summary.png` - SHAP 值全局重要性分析
+1. `model_comparison.png` - 5 個模型性能對比（訓練時間、RMSE、R²）
+2. `feature_importance.png` - 特徵重要性排名（Flow_Cubed 60.19%）
+3. `data_scaling_analysis.png` - 數據規模對性能的影響（訓練時間與預測誤差趨勢）
 
 ### 15.2 練習作業
 
@@ -1869,12 +2269,15 @@ A: 根據實戰案例分析，可能原因：
 A: 根據實戰數據：
    - **150K 樣本**：GPU 加速 **1.39x**（9.50s vs 13.21s）- 優勢不明顯
    - **建議閾值**：資料量 > 500K 或特徵數 > 100 時使用 GPU
-   - **設定方法**：`tree_method='gpu_hist'`（XGBoost 2.x）
+   - **設定方法（XGBoost 1.x）**：`tree_method='gpu_hist'`
+   - **設定方法（XGBoost 2.x 推薦）**：`tree_method='hist', device='cuda'`
    - **注意事項**：需要 CUDA 環境，小數據集 GPU 初始化開銷反而更慢
 
 **Q6: 如何處理極度不平衡的多分類問題（如 70:1）？**  
 A: 實戰驗證的有效策略：
    ```python
+   from sklearn.utils.class_weight import compute_sample_weight
+
    # 1. 計算樣本權重（最有效）
    sample_weights = compute_sample_weight('balanced', y_train)
    
@@ -1987,7 +2390,7 @@ A: 持續監控與更新策略：
 | **忽略訓練時間** | sklearn GBDT 太慢 | 使用 XGBoost 或 LightGBM | 60.9x 加速 |
 | **GPU 盲目使用** | 小數據反而慢 | > 500K 樣本再用 GPU | 150K: 僅 1.39x 加速 |
 | **不監控驗證集** | 訓練集完美但過擬合 | early_stopping_rounds | 158 輪自動停止 |
-| **忽略可解釋性** | 黑盒模型不被接受 | SHAP + Feature Importance | 溫度 28.5% 最重要 |
+| **忽略可解釋性** | 黑盒模型不被接受 | SHAP + Feature Importance | Flow_Cubed 60.19% 最重要 |
 
 ### 16.3 化工領域特殊考量
 
@@ -2023,8 +2426,8 @@ class ProductionModel:
 ```
 
 **領域知識驗證**：
-- 特徵重要性需符合化工原理（✅ 溫度最重要）
-- 預測範圍需在物理限制內（產率 0-100%）
+- 特徵重要性需符合化工原理（✅ 回歸案例 Flow_Cubed 最重要、分類案例 Health_Index 最重要）
+- 預測範圍需在物理限制內（能耗 200-700 kWh）
 - 異常值檢測與處理（SHAP 值輔助）
 
 ### 16.4 後續學習路徑
@@ -2075,4 +2478,18 @@ XGBoost 是**表格數據的瑞士軍刀**，但不是萬能藥：
 **本單元完**
 
 下一單元：Unit14_LightGBM
+
+---
+
+**課程資訊**
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
+- 課程單元：Unit 13 - XGBoost 模型 (Extreme Gradient Boosting)
+- 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
+- 授課教師：莊曜禎 助理教授
+- 更新日期：2026-05-27
+
+**課程授權 [CC BY-NC-SA 4.0]**
+ - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
+
+---
 
