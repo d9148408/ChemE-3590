@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多層感知機 (MLP) 互動式教學</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            height: fit-content;
+        }
+
+        .control-section {
+            margin-bottom: 25px;
+        }
+
+        .control-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .control-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .visualization-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .network-canvas-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        #networkCanvas {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            min-height: 400px;
+        }
+
+        .chart-container.loss-chart {
+            min-height: 300px;
+        }
+
+        .chart-container.decision-chart {
+            min-height: 500px;
+        }
+
+        .chart-container h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .status-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .status-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .training-progress {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 多層感知機 (MLP) 互動式教學</h1>
+            <p>探索神經網絡的運作原理 - 調整參數，觀察學習過程</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 控制面板 -->
+            <div class="control-panel">
+                <div class="info-box">
+                    <h4>💡 教學目標</h4>
+                    <p>透過互動式調整網絡架構和訓練參數，直觀理解MLP如何學習和預測。</p>
+                </div>
+
+                <div class="control-section">
+                    <h3>📊 資料集選擇</h3>
+                    <div class="control-group">
+                        <label for="dataset">選擇問題類型：</label>
+                        <select id="dataset">
+                            <option value="xor">XOR 問題（非線性）</option>
+                            <option value="circle">圓形分類</option>
+                            <option value="spiral">螺旋分類</option>
+                            <option value="linear">線性分類</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>🏗️ 網絡架構</h3>
+                    <div class="control-group">
+                        <label>
+                            隱藏層神經元數量：
+                            <span class="value-display" id="hiddenNeuronsValue">8</span>
+                        </label>
+                        <input type="range" id="hiddenNeurons" min="2" max="16" value="8" step="1">
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            隱藏層數量：
+                            <span class="value-display" id="hiddenLayersValue">2</span>
+                        </label>
+                        <input type="range" id="hiddenLayers" min="1" max="4" value="2" step="1">
+                    </div>
+                    <div class="control-group">
+                        <label for="activation">激活函數：</label>
+                        <select id="activation">
+                            <option value="relu">ReLU</option>
+                            <option value="sigmoid">Sigmoid</option>
+                            <option value="tanh">Tanh</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>⚙️ 訓練參數</h3>
+                    <div class="control-group">
+                        <label>
+                            學習率：
+                            <span class="value-display" id="learningRateValue">0.1</span>
+                        </label>
+                        <input type="range" id="learningRate" min="0.001" max="0.5" value="0.1" step="0.001">
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            訓練批次數量：
+                            <span class="value-display" id="epochsValue">100</span>
+                        </label>
+                        <input type="range" id="epochs" min="50" max="500" value="100" step="50">
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>🎮 控制</h3>
+                    <button class="btn btn-primary" id="trainBtn">🚀 開始訓練</button>
+                    <button class="btn btn-secondary" id="stopBtn" disabled>⏸️ 停止訓練</button>
+                    <button class="btn btn-success" id="resetBtn">🔄 重置模型</button>
+                </div>
+
+                <div class="status-box">
+                    <h4 style="color: #667eea; margin-bottom: 10px;">📈 訓練狀態</h4>
+                    <div class="status-item">
+                        <span class="status-label">當前 Epoch：</span>
+                        <span class="status-value" id="currentEpoch">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">損失值：</span>
+                        <span class="status-value" id="currentLoss">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">準確率：</span>
+                        <span class="status-value" id="currentAccuracy">-</span>
+                    </div>
+                    <div class="training-progress">
+                        <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 視覺化區域 -->
+            <div class="visualization-area">
+                <div class="network-canvas-container">
+                    <h3 style="color: #667eea; margin-bottom: 15px; text-align: center;">🔷 神經網絡架構視覺化</h3>
+                    <canvas id="networkCanvas"></canvas>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-container loss-chart">
+                        <h3>📉 訓練損失曲線</h3>
+                        <canvas id="lossChart"></canvas>
+                    </div>
+                    <div class="chart-container decision-chart">
+                        <h3>🎯 決策邊界視覺化</h3>
+                        <canvas id="decisionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局變數
+        let model = null;
+        let trainingData = null;
+        let isTraining = false;
+        let stopTraining = false;
+        let lossHistory = [];
+        let accuracyHistory = [];
+
+        // Chart.js 圖表
+        let lossChart = null;
+        let decisionChart = null;
+
+        // 獲取DOM元素
+        const elements = {
+            dataset: document.getElementById('dataset'),
+            hiddenNeurons: document.getElementById('hiddenNeurons'),
+            hiddenLayers: document.getElementById('hiddenLayers'),
+            activation: document.getElementById('activation'),
+            learningRate: document.getElementById('learningRate'),
+            epochs: document.getElementById('epochs'),
+            trainBtn: document.getElementById('trainBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            networkCanvas: document.getElementById('networkCanvas'),
+            currentEpoch: document.getElementById('currentEpoch'),
+            currentLoss: document.getElementById('currentLoss'),
+            currentAccuracy: document.getElementById('currentAccuracy'),
+            progressBar: document.getElementById('progressBar')
+        };
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            initializeCharts();
+            generateDataset();
+            createModel();
+            drawNetwork();
+        }
+
+        // 設置事件監聽器
+        function setupEventListeners() {
+            // 更新顯示值
+            elements.hiddenNeurons.addEventListener('input', (e) => {
+                document.getElementById('hiddenNeuronsValue').textContent = e.target.value;
+            });
+            elements.hiddenLayers.addEventListener('input', (e) => {
+                document.getElementById('hiddenLayersValue').textContent = e.target.value;
+            });
+            elements.learningRate.addEventListener('input', (e) => {
+                document.getElementById('learningRateValue').textContent = parseFloat(e.target.value).toFixed(3);
+            });
+            elements.epochs.addEventListener('input', (e) => {
+                document.getElementById('epochsValue').textContent = e.target.value;
+            });
+
+            // 按鈕事件
+            elements.trainBtn.addEventListener('click', trainModel);
+            elements.stopBtn.addEventListener('click', () => { stopTraining = true; });
+            elements.resetBtn.addEventListener('click', resetModel);
+            elements.dataset.addEventListener('change', () => {
+                generateDataset();
+                resetModel();
+            });
+
+            // 架構變更時重新繪製網絡
+            [elements.hiddenNeurons, elements.hiddenLayers, elements.activation].forEach(el => {
+                el.addEventListener('change', () => {
+                    createModel();
+                    drawNetwork();
+                });
+            });
+        }
+
+        // 生成資料集
+        function generateDataset() {
+            const datasetType = elements.dataset.value;
+            const numPoints = 200;
+            const inputs = [];
+            const labels = [];
+
+            for (let i = 0; i < numPoints; i++) {
+                let x, y, label;
+
+                switch(datasetType) {
+                    case 'xor':
+                        x = Math.random() * 2 - 1;
+                        y = Math.random() * 2 - 1;
+                        label = (x > 0) !== (y > 0) ? 1 : 0;
+                        break;
+                    case 'circle':
+                        x = Math.random() * 2 - 1;
+                        y = Math.random() * 2 - 1;
+                        const dist = Math.sqrt(x*x + y*y);
+                        label = dist < 0.6 ? 1 : 0;
+                        break;
+                    case 'spiral':
+                        const angle = Math.random() * 4 * Math.PI;
+                        const radius = Math.random() * 0.8;
+                        const spiralClass = i % 2;
+                        x = radius * Math.cos(angle + spiralClass * Math.PI);
+                        y = radius * Math.sin(angle + spiralClass * Math.PI);
+                        label = spiralClass;
+                        break;
+                    case 'linear':
+                        x = Math.random() * 2 - 1;
+                        y = Math.random() * 2 - 1;
+                        label = (y > x + 0.1) ? 1 : 0;
+                        break;
+                }
+
+                inputs.push([x, y]);
+                labels.push(label);
+            }
+
+            trainingData = {
+                inputs: tf.tensor2d(inputs),
+                labels: tf.tensor2d(labels, [labels.length, 1])
+            };
+
+            updateDecisionBoundary();
+        }
+
+        // 創建模型
+        function createModel() {
+            if (model) {
+                model.dispose();
+            }
+
+            const hiddenNeurons = parseInt(elements.hiddenNeurons.value);
+            const hiddenLayers = parseInt(elements.hiddenLayers.value);
+            const activation = elements.activation.value;
+
+            model = tf.sequential();
+            
+            // 輸入層
+            model.add(tf.layers.dense({
+                inputShape: [2],
+                units: hiddenNeurons,
+                activation: activation
+            }));
+
+            // 隱藏層
+            for (let i = 1; i < hiddenLayers; i++) {
+                model.add(tf.layers.dense({
+                    units: hiddenNeurons,
+                    activation: activation
+                }));
+            }
+
+            // 輸出層
+            model.add(tf.layers.dense({
+                units: 1,
+                activation: 'sigmoid'
+            }));
+
+            const learningRate = parseFloat(elements.learningRate.value);
+            model.compile({
+                optimizer: tf.train.adam(learningRate),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+        }
+
+        // 訓練模型
+        async function trainModel() {
+            if (isTraining) return;
+
+            isTraining = true;
+            stopTraining = false;
+            elements.trainBtn.disabled = true;
+            elements.stopBtn.disabled = false;
+            lossHistory = [];
+            accuracyHistory = [];
+
+            const epochs = parseInt(elements.epochs.value);
+
+            for (let epoch = 0; epoch < epochs; epoch++) {
+                if (stopTraining) break;
+
+                const history = await model.fit(trainingData.inputs, trainingData.labels, {
+                    epochs: 1,
+                    shuffle: true,
+                    verbose: 0
+                });
+
+                const loss = history.history.loss[0];
+                const accuracy = history.history.acc[0];
+                
+                lossHistory.push(loss);
+                accuracyHistory.push(accuracy);
+
+                // 更新UI
+                elements.currentEpoch.textContent = epoch + 1;
+                elements.currentLoss.textContent = loss.toFixed(4);
+                elements.currentAccuracy.textContent = (accuracy * 100).toFixed(2) + '%';
+                
+                const progress = ((epoch + 1) / epochs * 100).toFixed(0);
+                elements.progressBar.style.width = progress + '%';
+                elements.progressBar.textContent = progress + '%';
+
+                // 每10個epoch更新一次視覺化
+                if (epoch % 10 === 0 || epoch === epochs - 1) {
+                    updateLossChart();
+                    updateDecisionBoundary();
+                    drawNetwork();
+                }
+
+                await tf.nextFrame();
+            }
+
+            isTraining = false;
+            elements.trainBtn.disabled = false;
+            elements.stopBtn.disabled = true;
+        }
+
+        // 重置模型
+        function resetModel() {
+            stopTraining = true;
+            createModel();
+            lossHistory = [];
+            accuracyHistory = [];
+            elements.currentEpoch.textContent = '0';
+            elements.currentLoss.textContent = '-';
+            elements.currentAccuracy.textContent = '-';
+            elements.progressBar.style.width = '0%';
+            elements.progressBar.textContent = '0%';
+            updateLossChart();
+            updateDecisionBoundary();
+            drawNetwork();
+        }
+
+        // 繪製神經網絡
+        function drawNetwork() {
+            const canvas = elements.networkCanvas;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const hiddenNeurons = parseInt(elements.hiddenNeurons.value);
+            const hiddenLayers = parseInt(elements.hiddenLayers.value);
+            
+            const layers = [2, ...Array(hiddenLayers).fill(hiddenNeurons), 1];
+            const layerSpacing = canvas.width / (layers.length + 1);
+            const positions = [];
+
+            // 計算神經元位置
+            layers.forEach((count, layerIdx) => {
+                const layerPositions = [];
+                const neuronSpacing = canvas.height / (count + 1);
+                for (let i = 0; i < count; i++) {
+                    layerPositions.push({
+                        x: layerSpacing * (layerIdx + 1),
+                        y: neuronSpacing * (i + 1)
+                    });
+                }
+                positions.push(layerPositions);
+            });
+
+            // 繪製連接線
+            ctx.strokeStyle = 'rgba(102, 126, 234, 0.3)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < positions.length - 1; i++) {
+                positions[i].forEach(startPos => {
+                    positions[i + 1].forEach(endPos => {
+                        ctx.beginPath();
+                        ctx.moveTo(startPos.x, startPos.y);
+                        ctx.lineTo(endPos.x, endPos.y);
+                        ctx.stroke();
+                    });
+                });
+            }
+
+            // 繪製神經元
+            positions.forEach((layer, layerIdx) => {
+                layer.forEach((pos, neuronIdx) => {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 15, 0, 2 * Math.PI);
+                    
+                    if (layerIdx === 0) {
+                        ctx.fillStyle = '#4CAF50'; // 輸入層
+                    } else if (layerIdx === positions.length - 1) {
+                        ctx.fillStyle = '#FF5722'; // 輸出層
+                    } else {
+                        ctx.fillStyle = '#667eea'; // 隱藏層
+                    }
+                    
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                });
+            });
+
+            // 繪製標籤
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Input Layer', layerSpacing, canvas.height - 10);
+            ctx.fillText('Output Layer', layerSpacing * (layers.length), canvas.height - 10);
+            if (hiddenLayers > 0) {
+                ctx.fillText('Hidden Layers', canvas.width / 2, canvas.height - 10);
+            }
+        }
+
+        // 初始化圖表
+        function initializeCharts() {
+            // 損失曲線圖表
+            const lossCtx = document.getElementById('lossChart').getContext('2d');
+            lossChart = new Chart(lossCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Training Loss',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Loss', font: { size: 14, weight: 'bold' } }
+                        },
+                        x: {
+                            title: { display: true, text: 'Epoch', font: { size: 14, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+
+            // 決策邊界圖表
+            const decisionCtx = document.getElementById('decisionChart').getContext('2d');
+            decisionChart = new Chart(decisionCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1.5,
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            min: -1,
+                            max: 1,
+                            title: { display: true, text: 'X', font: { size: 14, weight: 'bold' } }
+                        },
+                        y: {
+                            min: -1,
+                            max: 1,
+                            title: { display: true, text: 'Y', font: { size: 14, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新損失圖表
+        function updateLossChart() {
+            lossChart.data.labels = lossHistory.map((_, i) => i + 1);
+            lossChart.data.datasets[0].data = lossHistory;
+            lossChart.update('none');
+        }
+
+        // 更新決策邊界
+        async function updateDecisionBoundary() {
+            if (!trainingData) return;
+
+            const resolution = 60;
+            const backgroundPoints = [];
+            
+            for (let i = 0; i < resolution; i++) {
+                for (let j = 0; j < resolution; j++) {
+                    const x = (i / resolution) * 2 - 1;
+                    const y = (j / resolution) * 2 - 1;
+                    backgroundPoints.push([x, y]);
+                }
+            }
+
+            const predictions = await model.predict(tf.tensor2d(backgroundPoints)).data();
+            
+            const class0Background = [];
+            const class1Background = [];
+            
+            backgroundPoints.forEach((point, idx) => {
+                const pred = predictions[idx];
+                if (pred < 0.5) {
+                    class0Background.push({ x: point[0], y: point[1] });
+                } else {
+                    class1Background.push({ x: point[0], y: point[1] });
+                }
+            });
+
+            // 訓練資料點
+            const inputs = await trainingData.inputs.array();
+            const labels = await trainingData.labels.array();
+            
+            const class0Points = [];
+            const class1Points = [];
+            
+            inputs.forEach((point, idx) => {
+                if (labels[idx][0] === 0) {
+                    class0Points.push({ x: point[0], y: point[1] });
+                } else {
+                    class1Points.push({ x: point[0], y: point[1] });
+                }
+            });
+
+            decisionChart.data.datasets = [
+                {
+                    label: 'Class 0 Region',
+                    data: class0Background,
+                    backgroundColor: 'rgba(255, 99, 132, 0.15)',
+                    pointRadius: 4,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Class 1 Region',
+                    data: class1Background,
+                    backgroundColor: 'rgba(54, 162, 235, 0.15)',
+                    pointRadius: 4,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Class 0 Data',
+                    data: class0Points,
+                    backgroundColor: 'rgba(255, 99, 132, 1)',
+                    borderColor: 'white',
+                    borderWidth: 2,
+                    pointRadius: 7,
+                    pointStyle: 'circle'
+                },
+                {
+                    label: 'Class 1 Data',
+                    data: class1Points,
+                    backgroundColor: 'rgba(54, 162, 235, 1)',
+                    borderColor: 'white',
+                    borderWidth: 2,
+                    pointRadius: 7,
+                    pointStyle: 'circle'
+                }
+            ];
+            
+            decisionChart.update('none');
+        }
+
+        // 頁面載入時初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

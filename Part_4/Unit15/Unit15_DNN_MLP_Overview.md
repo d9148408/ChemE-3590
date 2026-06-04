@@ -62,6 +62,8 @@
 
 **深度神經網路(Deep Neural Network, DNN)** 是指具有**多個隱藏層**的神經網路。當隱藏層數量增加時，網路能夠學習更複雜、更抽象的特徵表示。
 
+https://playground.tensorflow.org/
+
 ### 1.2 歷史發展
 
 - **1943**: McCulloch & Pitts 提出第一個神經元數學模型
