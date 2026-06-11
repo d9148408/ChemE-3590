@@ -180,13 +180,13 @@ $$
 $$
 
 **參數說明**:
-- $\mathbf{W}_{xh}$: 輸入到隱藏層的權重矩陣 (shape: `[input_dim, hidden_dim]`)
-- $\mathbf{W}_{hh}$: 隱藏層到隱藏層的循環權重矩陣 (shape: `[hidden_dim, hidden_dim]`)
-- $\mathbf{W}_{hy}$: 隱藏層到輸出的權重矩陣 (shape: `[hidden_dim, output_dim]`)
-- $\mathbf{b}_h, \mathbf{b}_y$: 偏差項
-- $\mathbf{h}_t$: 隱藏狀態向量 (shape: `[hidden_dim]`)
-- $\mathbf{x}_t$: 輸入向量 (shape: `[input_dim]`)
-- $\mathbf{y}_t$: 輸出向量 (shape: `[output_dim]`)
+- $\mathbf{W}_{xh}$ : 輸入到隱藏層的權重矩陣 (shape: `[input_dim, hidden_dim]`)
+- $\mathbf{W}_{hh}$ : 隱藏層到隱藏層的循環權重矩陣 (shape: `[hidden_dim, hidden_dim]`)
+- $\mathbf{W}_{hy}$ : 隱藏層到輸出的權重矩陣 (shape: `[hidden_dim, output_dim]`)
+- $\mathbf{b}_h, \mathbf{b}_y$ : 偏差項
+- $\mathbf{h}_t$ : 隱藏狀態向量 (shape: `[hidden_dim]`)
+- $\mathbf{x}_t$ : 輸入向量 (shape: `[input_dim]`)
+- $\mathbf{y}_t$ : 輸出向量 (shape: `[output_dim]`)
 
 **關鍵理解**:
 
@@ -240,12 +240,15 @@ $$
 $$
 
 3. **產生最終輸出** (依任務類型):
-   - **多對一**: 只使用最後的隱藏狀態 $\mathbf{h}_T$ $$
-\mathbf{y} = f(\mathbf{W}_{hy} \mathbf{h}_T + \mathbf{b}_y)
+   - **多對一**: 只使用最後的隱藏狀態 $\mathbf{h}_T$
 
 $$
+\mathbf{y} = f(\mathbf{W}_{hy} \mathbf{h}_T + \mathbf{b}_y)
+$$
    
-   - **多對多**: 每個時間步都產生輸出 $\mathbf{y}_t$ $$
+   - **多對多**: 每個時間步都產生輸出 $\mathbf{y}_t$
+
+$$
 \mathbf{y}_t = f(\mathbf{W}_{hy} \mathbf{h}_t + \mathbf{b}_y)
 $$
 
@@ -432,22 +435,24 @@ $$
 - ❌ 梯度容易消失
 
 LSTM的解決方案：
-- ✅ 分離**短期記憶** ($\mathbf{h}_t$) 和**長期記憶** ($\mathbf{c}_t$)
+- ✅ 分離**短期記憶** ( $\mathbf{h}_t$ ) 和**長期記憶** ( $\mathbf{c}_t$ )
 - ✅ 使用**門控機制**選擇性地保留/遺忘/更新資訊
 - ✅ 梯度可以通過記憶細胞"快速通道"流動，緩解消失問題
 
 #### LSTM的結構
 
 LSTM在每個時間步維護兩個狀態：
-- **記憶細胞狀態** $\mathbf{c}_t$: 長期記憶（類似傳送帶）
-- **隱藏狀態** $\mathbf{h}_t$: 短期記憶（輸出給下一層）
+- **記憶細胞狀態** $\mathbf{c}_t$ : 長期記憶（類似傳送帶）
+- **隱藏狀態** $\mathbf{h}_t$ : 短期記憶（輸出給下一層）
 
 並使用三個門控單元：
-1. **遺忘門 (Forget Gate)** $\mathbf{f}_t$: 決定從 $\mathbf{c}_{t-1}$ 中遺忘多少資訊
-2. **輸入門 (Input Gate)** $\mathbf{i}_t$: 決定將多少新資訊加入 $\mathbf{c}_t$
-3. **輸出門 (Output Gate)** $\mathbf{o}_t$: 決定從 $\mathbf{c}_t$ 中輸出多少資訊到 $\mathbf{h}_t$ #### LSTM的數學方程
+1. **遺忘門 (Forget Gate)** $\mathbf{f}_t$ : 決定從 $\mathbf{c}_{t-1}$ 中遺忘多少資訊
+2. **輸入門 (Input Gate)** $\mathbf{i}_t$ : 決定將多少新資訊加入 $\mathbf{c}_t$
+3. **輸出門 (Output Gate)** $\mathbf{o}_t$ : 決定從 $\mathbf{c}_t$ 中輸出多少資訊到 $\mathbf{h}_t$
 
-在時間步 $t$ ，給定輸入 $\mathbf{x}_t$ 和前一狀態 $\mathbf{h}_{t-1}, \mathbf{c}_{t-1}$：
+#### LSTM的數學方程
+
+在時間步 $t$ ，給定輸入 $\mathbf{x}_t$ 和前一狀態 $\mathbf{h}_{t-1}, \mathbf{c}_{t-1}$ ：
 
 **1. 遺忘門** (Forget Gate):
 
@@ -455,7 +460,7 @@ $$
 \mathbf{f}_t = \sigma(\mathbf{W}_f [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_f)
 $$
 
-- $\mathbf{f}_t \in (0, 1)^{h}$: 每個元素在0到1之間
+- $\mathbf{f}_t \in (0, 1)^{h}$ : 每個元素在0到1之間
 - 接近0：遺忘對應位置的記憶
 - 接近1：保留對應位置的記憶
 
@@ -469,8 +474,8 @@ $$
 \tilde{\mathbf{c}}_t = \tanh(\mathbf{W}_c [\mathbf{h}_{t-1}, \mathbf{x}_t] + \mathbf{b}_c)
 $$
 
-- $\mathbf{i}_t \in (0, 1)^{h}$: 控制新資訊的接受程度
-- $\tilde{\mathbf{c}}_t \in (-1, 1)^{h}$: 候選的新記憶內容
+- $\mathbf{i}_t \in (0, 1)^{h}$ : 控制新資訊的接受程度
+- $\tilde{\mathbf{c}}_t \in (-1, 1)^{h}$ : 候選的新記憶內容
 
 **3. 更新記憶細胞**:
 
@@ -492,14 +497,14 @@ $$
 \mathbf{h}_t = \mathbf{o}_t \odot \tanh(\mathbf{c}_t)
 $$
 
-- $\mathbf{o}_t \in (0, 1)^{h}$: 控制輸出程度
-- $\mathbf{h}_t$: 經過輸出門篩選的記憶細胞內容
+- $\mathbf{o}_t \in (0, 1)^{h}$ : 控制輸出程度
+- $\mathbf{h}_t$ : 經過輸出門篩選的記憶細胞內容
 
 **符號說明**:
-- $\sigma$: Sigmoid函數，輸出範圍 (0, 1)
-- $[\mathbf{h}_{t-1}, \mathbf{x}_t]$: 拼接向量，shape = `[hidden_dim + input_dim]`
-- $\mathbf{W}_f, \mathbf{W}_i, \mathbf{W}_c, \mathbf{W}_o$: 權重矩陣
-- $\mathbf{b}_f, \mathbf{b}_i, \mathbf{b}_c, \mathbf{b}_o$: 偏差向量
+- $\sigma$ : Sigmoid函數，輸出範圍 (0, 1)
+- $[\mathbf{h}_{t-1}, \mathbf{x}_t]$ : 拼接向量，shape = `[hidden_dim + input_dim]`
+- $\mathbf{W}_f, \mathbf{W}_i, \mathbf{W}_c, \mathbf{W}_o$ : 權重矩陣
+- $\mathbf{b}_f, \mathbf{b}_i, \mathbf{b}_c, \mathbf{b}_o$ : 偏差向量
 
 #### LSTM工作機制直覺理解
 
@@ -560,7 +565,7 @@ $$
 - ❌ 傳統RNN: 梯度必須經過 $\tanh$ 和 $\mathbf{W}_{hh}$ 的連乘
 - ✅ LSTM: 梯度可以通過**接近1的遺忘門**直接傳遞
 
-如果遺忘門學習到保持開啟狀態 ($\mathbf{f}_t \approx 1$ )，則：
+如果遺忘門學習到保持開啟狀態 ( $\mathbf{f}_t \approx 1$ )，則：
 
 $$
 \frac{\partial \mathbf{c}_t}{\partial \mathbf{c}_0} = \mathbf{f}_t \cdot \mathbf{f}_{t-1} \cdot ... \cdot \mathbf{f}_1 \approx 1
@@ -579,7 +584,7 @@ $$
 
 | 特性 | LSTM | GRU |
 |-----|------|-----|
-| **狀態數量** | 2個 ($\mathbf{h}_t, \mathbf{c}_t$) | 1個 ($\mathbf{h}_t$) |
+| **狀態數量** | 2個 ( $\mathbf{h}_t, \mathbf{c}_t$ ) | 1個 ( $\mathbf{h}_t$ ) |
 | **門的數量** | 3個 (遺忘、輸入、輸出) | 2個 (重置、更新) |
 | **參數量** | 更多 | 更少 (約75%) |
 | **計算速度** | 較慢 | 較快 |
