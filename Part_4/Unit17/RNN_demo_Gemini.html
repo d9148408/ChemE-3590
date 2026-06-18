@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>循環神經網路 (RNN) 視覺化教學</title>
+    
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 載入 React (使用穩定版本 CDN) -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- 載入 Babel 以便在瀏覽器中編譯 JSX (使用指定穩定版本) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+
+    <style>
+        /* 隱藏未載入完成時的閃爍 */
+        body { margin: 0; background-color: #020617; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
+        #root { min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- 加上 data-type="module" 與 data-presets="react" 避免 Babel 內部環境報錯 -->
+    <script type="text/babel" data-type="module" data-presets="react">
+        const { useState, useEffect } = React;
+
+        // --- 共用 UI 元件 ---
+        const IconButton = ({ onClick, icon, text, active, disabled }) => (
+            <button
+                onClick={onClick}
+                disabled={disabled}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                disabled ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-400' :
+                active 
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+            >
+                {icon}
+                {text && <span>{text}</span>}
+            </button>
+        );
+
+        // 簡單的數學格式化元件
+        const M = ({ children }) => {
+            const text = children.toString();
+            const parts = text.split(/(_[{]?[a-zA-Z0-9+-]+[}]?)/g);
+            
+            return (
+                <span className="font-mono text-cyan-200 bg-slate-900/50 px-1 rounded">
+                {parts.map((part, i) => {
+                    if (part.startsWith('_')) {
+                    const subText = part.replace(/[_]/g, '').replace(/[{}]/g, '');
+                    return <sub key={i} className="text-[0.75em] relative -bottom-1">{subText}</sub>;
+                    }
+                    return <span key={i}>{part}</span>;
+                })}
+                </span>
+            );
+        };
+
+        // --- SVG 繪圖輔助元件 ---
+        const GateNode = ({ x, y, label, active, color = "blue", type = "gate" }) => {
+            const colors = {
+                blue: { bg: 'fill-blue-900', border: 'stroke-blue-500', text: 'fill-blue-100' },
+                green: { bg: 'fill-emerald-900', border: 'stroke-emerald-500', text: 'fill-emerald-100' },
+                purple: { bg: 'fill-purple-900', border: 'stroke-purple-500', text: 'fill-purple-100' },
+                yellow: { bg: 'fill-yellow-900', border: 'stroke-yellow-500', text: 'fill-yellow-100' },
+                red: { bg: 'fill-red-900', border: 'stroke-red-500', text: 'fill-red-100' },
+            };
+            const c = colors[color];
+
+            if (type === "op") {
+                return (
+                <g className={`transition-all duration-500 ${active ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                    {active && <circle cx={x} cy={y} r="16" className={`fill-transparent ${c.border} stroke-2 animate-ping opacity-30`} />}
+                    <circle cx={x} cy={y} r="16" className={`${c.bg} ${c.border} stroke-2`} />
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className={`${c.text} text-xl font-bold font-mono`}>{label}</text>
+                </g>
+                );
+            }
+
+            return (
+                <g className={`transition-all duration-500 ${active ? 'opacity-100 scale-110' : 'opacity-40 scale-100 grayscale'}`} style={{ transformOrigin: `${x}px ${y}px` }}>
+                {active && <rect x={x-24} y={y-18} width="48" height="36" rx="6" className={`fill-transparent ${c.border} stroke-2 animate-ping opacity-20`} />}
+                <rect x={x-24} y={y-18} width="48" height="36" rx="6" className={`${c.bg} ${c.border} stroke-2`} />
+                <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className={`${c.text} text-sm font-bold font-mono`}>{label}</text>
+                </g>
+            );
+        };
+
+        const SignalPath = ({ d, active, color = "stroke-slate-500", dashed = false, animate = false }) => (
+            <g>
+                {/* 1. 靜態底線 (顯示線路軌道) */}
+                <path 
+                    d={d} 
+                    fill="none" 
+                    className={`${color} stroke-2 ${dashed ? 'stroke-dasharray-4' : ''} transition-opacity duration-300 ${active ? 'opacity-80' : 'opacity-20'}`} 
+                    style={dashed ? {strokeDasharray: '4,4'} : {}} 
+                />
+                
+                {/* 2. 動態流向指示 (所有啟動的線段都會有微小的光點不斷向前流動，指示方向) */}
+                {active && (
+                <path 
+                    d={d} 
+                    fill="none" 
+                    className="stroke-white stroke-[2px] opacity-40"
+                    strokeDasharray="4 16"
+                >
+                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
+                </path>
+                )}
+
+                {/* 3. 當前步驟的高光強調 (流星效果，凸顯當下正在發生的運算) */}
+                {active && animate && (
+                <path 
+                    d={d} 
+                    fill="none" 
+                    className="stroke-white stroke-[4px] opacity-90"
+                    strokeDasharray="20 1000"
+                >
+                    <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="1.5s" repeatCount="indefinite" />
+                </path>
+                )}
+            </g>
+        );
+
+        const TextLabel = ({ x, y, children, active }) => (
+            <text x={x} y={y} fill="white" className={`font-mono text-sm transition-all duration-300 ${active ? 'opacity-100 font-bold' : 'opacity-40'}`}>
+                {children}
+            </text>
+        );
+
+        // --- 模型定義與動畫步驟 ---
+        const MODELS = {
+            RNN: {
+                id: 'RNN',
+                name: '基礎循環神經網路 (Simple RNN)',
+                analogy: '化工類比：未配備智慧控制的連續攪拌反應器(CSTR)，只能記住前一瞬間的狀態，久了就忘記(梯度消失)。',
+                steps: [
+                    { id: 0, title: '接收輸入', desc: '接收當前時間步的輸入 ', eq1: 'x_t', desc2: ' 與前一時間步的隱藏狀態 ', eq2: 'h_{t-1}' },
+                    { id: 1, title: '線性組合與激活', desc: '將兩者拼接後乘上權重，並通過 tanh 函數將值壓縮到 [-1, 1] 之間。', eq1: 'h_t = tanh(W_{hh}h_{t-1} + W_{xh}x_t + b)' },
+                    { id: 2, title: '更新與輸出', desc: '產生新的隱藏狀態 ', eq1: 'h_t', desc2: '，這將成為下一時間步的記憶，同時也作為目前的輸出。' }
+                ],
+                Diagram: ({ step }) => (
+                    <svg viewBox="0 0 800 500" className="w-full h-full">
+                        <rect x="250" y="100" width="300" height="300" rx="20" fill="none" className="stroke-slate-700 stroke-2" strokeDasharray="10,5" />
+                        <text x="400" y="90" fill="#94a3b8" textAnchor="middle" className="text-sm font-bold tracking-widest">RNN CELL</text>
+                        
+                        <SignalPath d="M 100 250 L 350 250" active={step >= 0} animate={step === 0} color="stroke-emerald-400" />
+                        <SignalPath d="M 400 450 L 400 286" active={step >= 0} animate={step === 0} color="stroke-cyan-400" />
+                        <SignalPath d="M 400 250 L 400 150" active={step >= 1} animate={step >= 1} color="stroke-blue-400" />
+                        <SignalPath d="M 400 150 L 400 50" active={step >= 2} animate={step === 2} color="stroke-purple-400" />
+                        <SignalPath d="M 400 150 L 700 150" active={step >= 2} animate={step === 2} color="stroke-emerald-400" />
+
+                        <GateNode x={400} y={250} label="tanh" active={step >= 1} color="blue" />
+                        
+                        <TextLabel x={100} y={240} active={step >= 0}>h(t-1)</TextLabel>
+                        <TextLabel x={410} y={440} active={step >= 0}>x(t)</TextLabel>
+                        <TextLabel x={650} y={140} active={step >= 2}>h(t)</TextLabel>
+                        <TextLabel x={410} y={60} active={step >= 2}>y(t)</TextLabel>
+                    </svg>
+                )
+            },
+            LSTM: {
+                id: 'LSTM',
+                name: '長短期記憶網路 (LSTM)',
+                analogy: '化工類比：配備智慧閥門的緩衝槽。有專門的傳送帶(細胞狀態)來保留長期趨勢，並透過遺忘閥、輸入閥、輸出閥來控制物料進出。',
+                steps: [
+                    { id: 0, title: '接收輸入', desc: '接收當前輸入 ', eq1: 'x_t', desc2: '、前一短期記憶 ', eq3: 'h_{t-1}', desc4: ' 與長期記憶 ', eq4: 'C_{t-1}' },
+                    { id: 1, title: '遺忘門 (Forget Gate)', desc: '決定長期記憶中哪些資訊過時需要丟棄(乘以 0~1 的值)。', eq1: 'f_t = σ(W_f[h_{t-1}, x_t] + b_f)' },
+                    { id: 2, title: '輸入門與候選記憶 (Input Gate)', desc: '產生新的候選記憶，並由輸入門決定要寫入多少新資訊到長期記憶中。', eq1: 'i_t = σ(...)', eq2: 'C~_t = tanh(...)' },
+                    { id: 3, title: '更新細胞狀態 (Cell State)', desc: '舊記憶經過遺忘，加上篩選過的新記憶，形成當前時間步的長期記憶。', eq1: 'C_t = f_t × C_{t-1} + i_t × C~_t' },
+                    { id: 4, title: '輸出門 (Output Gate)', desc: '決定從長期記憶中提取哪些特徵作為當前的短期記憶(隱藏狀態)與輸出。', eq1: 'o_t = σ(...)', eq2: 'h_t = o_t × tanh(C_t)' }
+                ],
+                Diagram: ({ step }) => (
+                    <svg viewBox="0 0 800 500" className="w-full h-full">
+                        <rect x="180" y="80" width="530" height="380" rx="20" fill="none" className="stroke-slate-700 stroke-2" strokeDasharray="10,5" />
+                        <text x="445" y="70" fill="#94a3b8" textAnchor="middle" className="text-sm font-bold tracking-widest">LSTM CELL</text>
+                        
+                        {/* --- Cell State (C) Top Line --- */}
+                        <SignalPath d="M 50 150 L 244 150" active={step >= 0} animate={step === 3} color="stroke-blue-400" />
+                        <SignalPath d="M 276 150 L 424 150" active={step >= 3} animate={step === 3} color="stroke-blue-400" />
+                        <SignalPath d="M 456 150 L 750 150" active={step >= 3} animate={step === 3} color="stroke-blue-400" />
+                        
+                        {/* --- Hidden State & Input (h, x) Bottom Bus --- */}
+                        <SignalPath d="M 50 400 L 200 400" active={step >= 0} animate={step === 0} color="stroke-emerald-400" />
+                        <SignalPath d="M 200 480 L 200 400" active={step >= 0} animate={step === 0} color="stroke-cyan-400" />
+                        <SignalPath d="M 200 400 L 620 400" active={step >= 1} animate={step === 0} color="stroke-slate-400" />
+                        
+                        {/* Forget Gate Flow (f) */}
+                        <SignalPath d="M 260 400 L 260 318" active={step >= 1} animate={step === 1} color="stroke-slate-400" />
+                        <SignalPath d="M 260 282 L 260 166" active={step >= 1} animate={step === 1} color="stroke-red-400" />
+                        
+                        {/* Input Gate & Candidate Flow (i, C~) */}
+                        <SignalPath d="M 380 400 L 380 318" active={step >= 2} animate={step === 2} color="stroke-slate-400" />
+                        <SignalPath d="M 500 400 L 500 318" active={step >= 2} animate={step === 2} color="stroke-slate-400" />
+                        
+                        <SignalPath d="M 380 282 L 380 240 L 424 240" active={step >= 2} animate={step === 2} color="stroke-yellow-400" />
+                        <SignalPath d="M 500 282 L 500 240 L 456 240" active={step >= 2} animate={step === 2} color="stroke-emerald-400" />
+                        <SignalPath d="M 440 224 L 440 166" active={step >= 3} animate={step === 3} color="stroke-green-400" />
+                        
+                        {/* Output Gate Flow (o) */}
+                        <SignalPath d="M 620 400 L 620 318" active={step >= 4} animate={step === 4} color="stroke-slate-400" />
+                        <SignalPath d="M 620 282 L 620 260 L 664 260" active={step >= 4} animate={step === 4} color="stroke-purple-400" />
+                        
+                        {/* Cell State extracted to output */}
+                        <SignalPath d="M 680 150 L 680 182" active={step >= 4} animate={step === 4} color="stroke-blue-400" />
+                        <SignalPath d="M 680 218 L 680 244" active={step >= 4} animate={step === 4} color="stroke-blue-400" />
+                        
+                        {/* Final Hidden State Output (h) */}
+                        <SignalPath d="M 680 276 L 680 400 L 750 400" active={step >= 4} animate={step === 4} color="stroke-emerald-400" />
+                        <SignalPath d="M 680 400 L 680 480" active={step >= 4} animate={step === 4} color="stroke-emerald-400" />
+
+                        {/* --- Nodes --- */}
+                        <GateNode x={260} y={150} label="×" active={step >= 1} color="red" type="op" />
+                        <GateNode x={440} y={150} label="+" active={step >= 3} color="green" type="op" />
+                        
+                        <GateNode x={260} y={300} label="σ" active={step >= 1} color="red" />
+                        <GateNode x={380} y={300} label="σ" active={step >= 2} color="yellow" />
+                        <GateNode x={500} y={300} label="tanh" active={step >= 2} color="green" />
+                        <GateNode x={620} y={300} label="σ" active={step >= 4} color="purple" />
+                        
+                        <GateNode x={440} y={240} label="×" active={step >= 3} color="yellow" type="op" />
+                        <GateNode x={680} y={200} label="tanh" active={step >= 4} color="blue" />
+                        <GateNode x={680} y={260} label="×" active={step >= 4} color="purple" type="op" />
+
+                        {/* --- Labels --- */}
+                        <TextLabel x={60} y={140} active={step >= 0}>C(t-1)</TextLabel>
+                        <TextLabel x={60} y={390} active={step >= 0}>h(t-1)</TextLabel>
+                        <TextLabel x={210} y={470} active={step >= 0}>x(t)</TextLabel>
+                        
+                        <TextLabel x={230} y={300} active={step >= 1}>f</TextLabel>
+                        <TextLabel x={350} y={300} active={step >= 2}>i</TextLabel>
+                        <TextLabel x={535} y={300} active={step >= 2}>C~</TextLabel>
+                        <TextLabel x={590} y={300} active={step >= 4}>o</TextLabel>
+                        
+                        <TextLabel x={700} y={140} active={step >= 3}>C(t)</TextLabel>
+                        <TextLabel x={700} y={390} active={step >= 4}>h(t)</TextLabel>
+                    </svg>
+                )
+            },
+            GRU: {
+                id: 'GRU',
+                name: '門控循環單元 (GRU)',
+                analogy: '化工類比：LSTM的精簡版，將遺忘與輸入合併為一個「更新門」，計算更有效率，適合處理一般的化學反應時序資料。',
+                steps: [
+                    { id: 0, title: '接收輸入', desc: '接收當前輸入 ', eq1: 'x_t', desc2: ' 與前一時間步的狀態 ', eq3: 'h_{t-1}', desc4: ' (GRU只有一個狀態)' },
+                    { id: 1, title: '重置門 (Reset Gate)', desc: '決定在計算新候選狀態時，要忽略多少過去的歷史資訊。', eq1: 'r_t = σ(W_r[h_{t-1}, x_t] + b_r)' },
+                    { id: 2, title: '候選隱藏狀態', desc: '利用經過重置門篩選的舊狀態與新輸入，計算出潛在的新狀態。', eq1: 'h~_t = tanh(W_h[r_t * h_{t-1}, x_t] + b_h)' },
+                    { id: 3, title: '更新門 (Update Gate)', desc: '決定舊狀態和新候選狀態的混合比例 (扮演了 LSTM 遺忘和輸入門的雙重角色)。', eq1: 'z_t = σ(W_z[h_{t-1}, x_t] + b_z)' },
+                    { id: 4, title: '計算最終狀態', desc: '依照更新門的比例，混合舊狀態與候選狀態，輸出最新的隱藏狀態。', eq1: 'h_t = (1-z_t) × h_{t-1} + z_t × h~_t' }
+                ],
+                Diagram: ({ step }) => (
+                    <svg viewBox="0 0 800 500" className="w-full h-full">
+                        <rect x="180" y="80" width="460" height="380" rx="20" fill="none" className="stroke-slate-700 stroke-2" strokeDasharray="10,5" />
+                        <text x="410" y="70" fill="#94a3b8" textAnchor="middle" className="text-sm font-bold tracking-widest">GRU CELL</text>
+                        
+                        {/* --- h(t-1) Top Highway --- */}
+                        <SignalPath d="M 50 150 L 384 150" active={step >= 0} animate={step === 0 || step === 4} color="stroke-emerald-400" />
+                        <SignalPath d="M 416 150 L 544 150" active={step >= 4} animate={step === 4} color="stroke-blue-400" />
+                        <SignalPath d="M 576 150 L 750 150" active={step >= 4} animate={step === 4} color="stroke-emerald-400" />
+                        <SignalPath d="M 650 150 L 650 480" active={step >= 4} animate={step === 4} color="stroke-emerald-400" />
+
+                        {/* --- Bus: h(t-1) and x(t) --- */}
+                        {/* 修正的倒 T 字路口匯流 */}
+                        <SignalPath d="M 220 150 L 220 420" active={step >= 0} animate={step === 0} color="stroke-emerald-400" />
+                        <SignalPath d="M 220 480 L 220 420" active={step >= 0} animate={step === 0} color="stroke-cyan-400" />
+                        <SignalPath d="M 220 420 L 560 420" active={step >= 1} color="stroke-slate-400" />
+                        
+                        {/* Branches to Gates */}
+                        <SignalPath d="M 280 420 L 280 338" active={step >= 1} animate={step === 1} color="stroke-slate-400" />
+                        <SignalPath d="M 400 420 L 400 338" active={step >= 3} animate={step === 3} color="stroke-slate-400" />
+                        <SignalPath d="M 560 420 L 560 338" active={step >= 2} animate={step === 2} color="stroke-slate-400" />
+
+                        {/* Reset Flow (r) */}
+                        <SignalPath d="M 280 150 L 280 224" active={step >= 1} animate={step === 1} color="stroke-emerald-400" />
+                        <SignalPath d="M 280 302 L 280 256" active={step >= 1} animate={step === 1} color="stroke-red-400" />
+                        <SignalPath d="M 296 240 L 500 240 L 500 320 L 536 320" active={step >= 2} animate={step === 2} color="stroke-red-400" />
+
+                        {/* Update Flow (z) */}
+                        <SignalPath d="M 400 302 L 400 216" active={step >= 3} animate={step === 3} color="stroke-yellow-400" />
+                        <SignalPath d="M 400 184 L 400 166" active={step >= 3} animate={step === 3} color="stroke-yellow-400" />
+                        <SignalPath d="M 400 280 L 530 280 L 530 240 L 544 240" active={step >= 4} animate={step === 4} color="stroke-yellow-400" />
+
+                        {/* Candidate Flow (h~) */}
+                        <SignalPath d="M 560 302 L 560 256" active={step >= 2} animate={step === 2} color="stroke-green-400" />
+                        <SignalPath d="M 560 224 L 560 166" active={step >= 4} animate={step === 4} color="stroke-green-400" />
+
+                        {/* --- Nodes --- */}
+                        <GateNode x={280} y={320} label="σ" active={step >= 1} color="red" />
+                        <GateNode x={400} y={320} label="σ" active={step >= 3} color="yellow" />
+                        <GateNode x={560} y={320} label="tanh" active={step >= 2} color="green" />
+                        
+                        <GateNode x={280} y={240} label="×" active={step >= 1} color="red" type="op" />
+                        <GateNode x={400} y={200} label="1-" active={step >= 3} color="yellow" type="op" />
+                        <GateNode x={400} y={150} label="×" active={step >= 4} color="blue" type="op" />
+                        <GateNode x={560} y={240} label="×" active={step >= 4} color="green" type="op" />
+                        <GateNode x={560} y={150} label="+" active={step >= 4} color="blue" type="op" />
+
+                        {/* --- Labels --- */}
+                        <TextLabel x={60} y={140} active={step >= 0}>h(t-1)</TextLabel>
+                        <TextLabel x={230} y={470} active={step >= 0}>x(t)</TextLabel>
+                        
+                        <TextLabel x={250} y={320} active={step >= 1}>r</TextLabel>
+                        <TextLabel x={370} y={320} active={step >= 3}>z</TextLabel>
+                        <TextLabel x={595} y={320} active={step >= 2}>h~</TextLabel>
+                        <TextLabel x={700} y={140} active={step >= 4}>h(t)</TextLabel>
+                    </svg>
+                )
+            }
+        };
+
+        const Icons = {
+            Play: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Pause: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Next: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>,
+            Reset: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+            Info: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        };
+
+        // --- 主應用程式 ---
+        function App() {
+            const [activeModel, setActiveModel] = useState('LSTM');
+            const [currentStep, setCurrentStep] = useState(0);
+            const [isPlaying, setIsPlaying] = useState(false);
+
+            const model = MODELS[activeModel];
+            const totalSteps = model.steps.length;
+
+            useEffect(() => {
+                let timer;
+                if (isPlaying) {
+                    timer = setInterval(() => {
+                        setCurrentStep((prev) => {
+                            if (prev >= totalSteps - 1) {
+                                setIsPlaying(false);
+                                return prev;
+                            }
+                            return prev + 1;
+                        });
+                    }, 2500);
+                }
+                return () => clearInterval(timer);
+            }, [isPlaying, totalSteps]);
+
+            const handleModelChange = (id) => {
+                setActiveModel(id);
+                setCurrentStep(0);
+                setIsPlaying(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+                    <header className="bg-slate-900 border-b border-slate-800 p-6">
+                        <div className="w-[95%] max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                                    循環神經網路 (RNN) 視覺化教學
+                                </h1>
+                                <p className="text-slate-400 text-sm mt-1">
+                                    探索時間序列數據在神經網路內部的流動機制與門控運算
+                                </p>
+                            </div>
+                            
+                            <div className="flex bg-slate-800 p-1 rounded-lg">
+                                {Object.keys(MODELS).map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => handleModelChange(key)}
+                                        className={`px-6 py-2 rounded-md font-medium transition-all ${
+                                            activeModel === key 
+                                            ? 'bg-blue-600 text-white shadow-md' 
+                                            : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        {key}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="w-[95%] max-w-[1600px] mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mt-4">
+                        <div className="lg:col-span-2 flex flex-col gap-4">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative flex-1 min-h-[400px] flex items-center justify-center">
+                                <model.Diagram step={currentStep} />
+                                
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-800/80 backdrop-blur-sm p-2 rounded-xl border border-slate-700 flex items-center gap-2 shadow-xl">
+                                    <IconButton 
+                                        icon={Icons.Reset} 
+                                        onClick={() => { setCurrentStep(0); setIsPlaying(false); }} 
+                                        disabled={currentStep === 0 && !isPlaying}
+                                    />
+                                    <IconButton 
+                                        icon={isPlaying ? Icons.Pause : Icons.Play} 
+                                        onClick={() => setIsPlaying(!isPlaying)} 
+                                        active={isPlaying}
+                                        disabled={currentStep >= totalSteps - 1 && !isPlaying}
+                                    />
+                                    <IconButton 
+                                        icon={Icons.Next} 
+                                        onClick={() => { setCurrentStep(p => Math.min(p + 1, totalSteps - 1)); setIsPlaying(false); }} 
+                                        disabled={currentStep >= totalSteps - 1}
+                                    />
+                                    
+                                    <div className="flex gap-1 ml-4 mr-2">
+                                        {model.steps.map((_, i) => (
+                                            <div 
+                                                key={i} 
+                                                className={`h-2 rounded-full transition-all duration-300 ${
+                                                    i === currentStep ? 'w-6 bg-blue-500' : 
+                                                    i < currentStep ? 'w-2 bg-emerald-500' : 'w-2 bg-slate-600'
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-emerald-900/20 border border-emerald-800/30 rounded-xl p-4 flex gap-3 items-start text-emerald-200">
+                                <div className="mt-0.5 text-emerald-400">{Icons.Info}</div>
+                                <p className="text-base leading-relaxed">{model.analogy}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex-1">
+                                <h2 className="text-2xl font-bold mb-6 text-white border-b border-slate-800 pb-4">
+                                    {model.name} 運算步驟
+                                </h2>
+                                
+                                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-700 before:to-transparent">
+                                    {model.steps.map((step, index) => (
+                                        <div 
+                                            key={index} 
+                                            className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group transition-all duration-300 ${
+                                                index > currentStep ? 'opacity-30' : 'opacity-100'
+                                            }`}
+                                        >
+                                            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 shrink-0 z-10 transition-colors duration-300 ${
+                                                index === currentStep ? 'bg-blue-600 border-blue-900 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 
+                                                index < currentStep ? 'bg-emerald-500 border-emerald-900' : 'bg-slate-800 border-slate-900'
+                                            }`}>
+                                                <span className="text-base font-bold text-white">{index + 1}</span>
+                                            </div>
+
+                                            <div className={`w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border transition-all duration-300 ${
+                                                index === currentStep 
+                                                ? 'bg-slate-800 border-blue-500/50 shadow-lg translate-x-1 md:translate-x-0' 
+                                                : index < currentStep
+                                                    ? 'bg-slate-800/50 border-slate-700'
+                                                    : 'bg-transparent border-slate-800'
+                                            }`}>
+                                                <h3 className={`font-bold text-lg mb-2 ${index === currentStep ? 'text-blue-400' : 'text-slate-300'}`}>
+                                                    {step.title}
+                                                </h3>
+                                                <p className="text-base text-slate-300 leading-relaxed mb-2">
+                                                    {step.desc}
+                                                    {step.eq1 && <M>{step.eq1}</M>}
+                                                    {step.desc2}
+                                                    {step.eq2 && <M>{step.eq2}</M>}
+                                                    {step.desc3}
+                                                    {step.eq3 && <M>{step.eq3}</M>}
+                                                    {step.desc4}
+                                                    {step.eq4 && <M>{step.eq4}</M>}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
