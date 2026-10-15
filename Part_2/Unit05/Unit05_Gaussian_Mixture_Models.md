@@ -345,7 +345,7 @@ $$
 - **Full Covariance**: $p = K \times (1 + d + d(d+1)/2) - 1$
 - **Diagonal Covariance**: $p = K \times (1 + 2d) - 1$
 - **Spherical Covariance**: $p = K \times (1 + d + 1) - 1$
-- **Tied Covariance**: $p = K + d + d(d+1)/2$
+- **Tied Covariance**: $p = K \times d + d(d+1)/2 + (K - 1)$
 
 其中 $d$ 是特徵維度， $K$ 是群集數量。
 
@@ -1264,7 +1264,7 @@ max           87.82       98.57       94.04
 
 1. **BIC vs K（左上圖）**：
    - **明顯的肘部點**：K=3 時 BIC 達到最小值（4122.25）
-   - K=2 時 BIC 較高（4313.21），顯示兩個群集不足以描述數據
+   - K=2 時 BIC 較高（4308.78），顯示兩個群集不足以描述數據
    - K>3 後 BIC 持續上升，懲罰過度複雜的模型
    - **結論**：BIC 強烈支持 K=3
 
@@ -1299,7 +1299,7 @@ max           87.82       98.57       94.04
 
 6. **Calinski-Harabasz Index vs K（右下圖）**：
    - **K=3 時最高**：872.03（Best K = 3 標記）
-   - K=2 時為 712.39
+   - K=2 時為 712.44
    - K>3 後持續下降
    - **與 BIC/AIC 一致**：支持 K=3
    - **解釋**：三個群集能更好地區分數據的內部結構
@@ -1455,32 +1455,32 @@ AIC: 3992.4180
 #### 左圖：GMM Elliptical Clusters (Yield vs Purity)
 
 **橢圓形群集的幾何意義**：
-- 每個橢圓代表協方差矩陣 $\Sigma_k$ 的2倍標準差範圍
-- 橢圓內包含約 95% 的群集數據點
+- 每個橢圓代表協方差矩陣 $\Sigma_k$ 的 2 倍標準差範圍
+- 2 倍標準差橢圓在二維下約涵蓋 86% 的群集數據點
 - 橢圓的形狀、大小和方向由協方差矩陣決定
 
 **三個群集的形狀特徵**：
 
 1. **Cluster 1（橘色）- Substandard**：
    - **位置**：左下角（Yield 50-65%, Purity 60-75%）
-   - **橢圓形狀**：較為圓形，略微傾斜
-   - **大小**：中等，標準差較大
+   - **橢圓形狀**：較大的橢圓，沿正相關方向傾斜
+   - **大小**：較大，標準差較高
    - **方向**：正相關（產率增加，純度增加）
    - **數據分散度**：較高，反映次級品的品質變異大
 
-2. **Cluster 0（粉紅色）- Premium**：
-   - **位置**：右上角（Yield 70-85%, Purity 75-95%）
-   - **橢圓形狀**：明顯的橢圓形，長軸傾斜
-   - **大小**：較大，覆蓋範圍廣
-   - **方向**：正相關，斜率較陡
-   - **特點**：橢圓較寬，顯示 Premium 群集的純度變異較大
+2. **Cluster 0（粉紅色）- Standard**：
+   - **位置**：中間區域（Yield 60-80%, Purity 72-88%）
+   - **橢圓形狀**：明顯的橢圓形，長軸沿正相關方向傾斜
+   - **大小**：較大，覆蓋範圍廣（樣本比例最高，47.6%）
+   - **方向**：正相關，橫跨 Premium 與 Substandard 之間
+   - **特點**：位於中間過渡帶，與 Premium 和 Substandard 都有重疊
 
-3. **Cluster 2（綠色）- Standard**：
-   - **位置**：中間上方（Yield 70-82%, Purity 82-95%）
-   - **橢圓形狀**：狹長的橢圓，幾乎水平
-   - **大小**：較小，最為集中
-   - **方向**：接近水平（純度變化較小）
-   - **特點**：與 Premium 有顯著重疊
+3. **Cluster 2（綠色）- Premium**：
+   - **位置**：右上角（Yield 70-88%, Purity 80-97%）
+   - **橢圓形狀**：傾斜的橢圓形，長軸沿正相關方向
+   - **大小**：最為集中（協方差最小，品質最穩定）
+   - **方向**：正相關
+   - **特點**：與 Standard 在中間區域有顯著重疊
 
 **群集重疊分析**：
 - **Premium 與 Standard 重疊區域**：Yield 70-78%, Purity 85-90%
@@ -1497,13 +1497,13 @@ AIC: 3992.4180
    - 符合化工製程原理：反應條件改善同時提升產率和純度
 
 2. **橢圓形狀（特徵變異）**：
-   - Premium 的橢圓較寬：高產率產品純度變異大
-   - Substandard 較為圓形：兩個特徵變異程度相當
-   - Standard 狹長橢圓：純度控制較穩定，但產率變異大
+   - Standard 的橢圓最大：位於中間過渡帶，吸收較多邊界點，產率與純度變異都大
+   - Substandard 橢圓也較大：次級品的品質變異高
+   - Premium 較為集中：純度控制穩定，橢圓面積最小
 
 3. **橢圓大小（群集分散度）**：
-   - Premium 最大：品質變異最高
-   - Standard 最小：製程控制最穩定
+   - Standard 最大（略大於 Substandard）：中間過渡帶吸收邊界點
+   - Premium 最小：製程控制最穩定
    - 反映不同操作條件的穩定性
 
 #### 右圖：GMM Elliptical Clusters (PCA Space)
@@ -1535,7 +1535,7 @@ AIC: 3992.4180
 | 特性 | K-Means | GMM (本案例) |
 |------|---------|--------------|
 | 群集形狀 | 球形 | 橢圓形（形狀各異） |
-| 群集大小 | 相似 | 不同大小（Premium > Substandard > Standard） |
+| 群集大小 | 相似 | 不同大小（Standard > Substandard > Premium） |
 | 群集方向 | 無方向性 | 有明確方向（協方差矩陣決定） |
 | 重疊處理 | 強制硬分類 | 機率軟分群 |
 | 適應性 | 固定假設 | 靈活適應數據 |
@@ -1811,17 +1811,17 @@ X_new = np.array([
 產品 #1:
   Yield: 76.0%, Purity: 86.0%, Selectivity: 80.0%
   Predicted Cluster: 2 (Premium)
-  P(Cluster 0): 0.045  P(Cluster 1): 0.001  P(Cluster 2): 0.954
+  P(Cluster 0): 0.004  P(Cluster 1): 0.000  P(Cluster 2): 0.996
   
 產品 #4:
   Yield: 72.0%, Purity: 82.0%, Selectivity: 76.0%
   Predicted Cluster: 0 (Standard)
-  P(Cluster 0): 0.523  P(Cluster 1): 0.063  P(Cluster 2): 0.414
+  P(Cluster 0): 0.775  P(Cluster 1): 0.000  P(Cluster 2): 0.225
   
-產品 #6:
-  Yield: 60.0%, Purity: 70.0%, Selectivity: 67.0%
+產品 #9:
+  Yield: 62.0%, Purity: 72.0%, Selectivity: 68.0%
   Predicted Cluster: 1 (Substandard)
-  P(Cluster 0): 0.187  P(Cluster 1): 0.672  P(Cluster 2): 0.141
+  P(Cluster 0): 0.367  P(Cluster 1): 0.633  P(Cluster 2): 0.000
 ```
 
 **結果分析**：
@@ -1829,41 +1829,40 @@ X_new = np.array([
 1. **高信心產品（產品 #1）**：
    - **特徵**：Yield 76%, Purity 86%, Selectivity 80%
    - **預測**：Premium（Cluster 2）
-   - **機率分布**：[0.045, 0.001, 0.954]
-   - **信心水平**：95.4%（非常高）
+   - **機率分布**：[0.004, 0.000, 0.996]
+   - **信心水平**：99.6%（非常高）
    - **決策建議**：直接分類為 Premium，無需額外檢測
    - **化工意義**：典型的優良品，品質特徵明確
 
-2. **邊界產品（產品 #4）**：
+2. **輕度邊界產品（產品 #4）**：
    - **特徵**：Yield 72%, Purity 82%, Selectivity 76%
    - **預測**：Standard（Cluster 0）
-   - **機率分布**：[0.523, 0.063, 0.414]
-   - **信心水平**：52.3%（較低）
+   - **機率分布**：[0.775, 0.000, 0.225]
+   - **信心水平**：77.5%（偏高，仍屬 Low Risk）
    - **關鍵觀察**：
-     * 有 41.4% 機率是 Premium
-     * 僅 52.3% 機率是 Standard
-     * 兩者差距僅 10.9%
+     * 主要為 Standard（77.5%）
+     * 仍有 22.5% 機率是 Premium
+     * 位於 Standard 與 Premium 的過渡帶
    - **決策建議**：
-     * **風險評估**：品質分級不確定性高
-     * **操作建議**：進行額外檢測確認品質等級
-     * **定價策略**：考慮中間價格或折扣
+     * **風險評估**：雖屬 Low Risk，但保有升級潛力
+     * **操作建議**：追蹤製程參數，評估是否能穩定進入 Premium
+     * **定價策略**：以 Standard 計價，並留意升級機會
    - **化工意義**：
-     * 製程參數可能處於臨界點
-     * 小幅調整可能進入 Premium 等級
-     * 建議優化製程以穩定在更高等級
+     * 製程表現良好但未達 Premium 核心區
+     * 小幅優化純度與產率有機會進入 Premium 等級
 
-3. **明確次級品（產品 #6）**：
-   - **特徵**：Yield 60%, Purity 70%, Selectivity 67%
+3. **不確定邊界產品（產品 #9）**：
+   - **特徵**：Yield 62%, Purity 72%, Selectivity 68%
    - **預測**：Substandard（Cluster 1）
-   - **機率分布**：[0.187, 0.672, 0.141]
-   - **信心水平**：67.2%（中等）
+   - **機率分布**：[0.367, 0.633, 0.000]
+   - **信心水平**：63.3%（中等，為本批次唯一的 Medium Risk）
    - **觀察**：
-     * 雖然最高機率指向 Substandard
-     * 但也有 18.7% 機率是 Standard
-     * 仍有一定的品質提升空間
+     * 最高機率指向 Substandard（63.3%）
+     * 但有 36.7% 機率是 Standard
+     * 位於 Standard 與 Substandard 的模糊邊界
    - **決策建議**：
-     * 分類為次級品
-     * 評估是否可通過再加工提升品質
+     * **風險評估**：分級不確定性較高，建議額外檢測
+     * 評估是否可透過再加工提升至 Standard
      * 考慮降價銷售或回收處理
 
 #### 8.7.2 風險評估與決策支援系統
@@ -1909,7 +1908,7 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 產品 #1:
   Yield: 76.0%, Purity: 86.0%, Selectivity: 80.0%
   Predicted Cluster: 2 (Premium)
-  Probability Distribution: Cluster 0: 0.045  Cluster 1: 0.001  Cluster 2: 0.954  
+  Probability Distribution: Cluster 0: 0.004  Cluster 1: 0.000  Cluster 2: 0.996  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 2
 ----------------------------------------------------------------------------------------------------
@@ -1917,7 +1916,7 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 產品 #2:
   Yield: 66.0%, Purity: 76.0%, Selectivity: 70.0%
   Predicted Cluster: 0 (Standard)
-  Probability Distribution: Cluster 0: 0.855  Cluster 1: 0.132  Cluster 2: 0.012  
+  Probability Distribution: Cluster 0: 0.978  Cluster 1: 0.022  Cluster 2: 0.000  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 0
 ----------------------------------------------------------------------------------------------------
@@ -1925,7 +1924,7 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 產品 #3:
   Yield: 56.0%, Purity: 66.0%, Selectivity: 63.0%
   Predicted Cluster: 1 (Substandard)
-  Probability Distribution: Cluster 0: 0.022  Cluster 1: 0.971  Cluster 2: 0.007  
+  Probability Distribution: Cluster 0: 0.000  Cluster 1: 1.000  Cluster 2: 0.000  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 1
 ----------------------------------------------------------------------------------------------------
@@ -1933,15 +1932,15 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 產品 #4:
   Yield: 72.0%, Purity: 82.0%, Selectivity: 76.0%
   Predicted Cluster: 0 (Standard)
-  Probability Distribution: Cluster 0: 0.523  Cluster 1: 0.063  Cluster 2: 0.414  
-  Risk Level: Medium Risk
-  Recommendation: Moderate confidence: Product may belong to Cluster 0, consider additional testing
+  Probability Distribution: Cluster 0: 0.775  Cluster 1: 0.000  Cluster 2: 0.225  
+  Risk Level: Low Risk
+  Recommendation: High confidence: Product likely belongs to Cluster 0
 ----------------------------------------------------------------------------------------------------
 
 產品 #5:
   Yield: 82.0%, Purity: 90.0%, Selectivity: 84.0%
   Predicted Cluster: 2 (Premium)
-  Probability Distribution: Cluster 0: 0.136  Cluster 1: 0.001  Cluster 2: 0.862  
+  Probability Distribution: Cluster 0: 0.000  Cluster 1: 0.000  Cluster 2: 1.000  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 2
 ----------------------------------------------------------------------------------------------------
@@ -1949,39 +1948,39 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 產品 #6:
   Yield: 60.0%, Purity: 70.0%, Selectivity: 67.0%
   Predicted Cluster: 1 (Substandard)
-  Probability Distribution: Cluster 0: 0.187  Cluster 1: 0.672  Cluster 2: 0.141  
-  Risk Level: Medium Risk
-  Recommendation: Moderate confidence: Product may belong to Cluster 1, consider additional testing
+  Probability Distribution: Cluster 0: 0.047  Cluster 1: 0.953  Cluster 2: 0.000  
+  Risk Level: Low Risk
+  Recommendation: High confidence: Product likely belongs to Cluster 1
 ----------------------------------------------------------------------------------------------------
 
 產品 #7:
   Yield: 68.0%, Purity: 78.0%, Selectivity: 72.0%
   Predicted Cluster: 0 (Standard)
-  Probability Distribution: Cluster 0: 0.935  Cluster 1: 0.064  Cluster 2: 0.001  
+  Probability Distribution: Cluster 0: 0.997  Cluster 1: 0.002  Cluster 2: 0.000  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 0
 ----------------------------------------------------------------------------------------------------
 
 產品 #8:
   Yield: 74.0%, Purity: 84.0%, Selectivity: 78.0%
-  Predicted Cluster: 0 (Standard)
-  Probability Distribution: Cluster 0: 0.665  Cluster 1: 0.015  Cluster 2: 0.320  
-  Risk Level: Medium Risk
-  Recommendation: Moderate confidence: Product may belong to Cluster 0, consider additional testing
+  Predicted Cluster: 2 (Premium)
+  Probability Distribution: Cluster 0: 0.107  Cluster 1: 0.000  Cluster 2: 0.893  
+  Risk Level: Low Risk
+  Recommendation: High confidence: Product likely belongs to Cluster 2
 ----------------------------------------------------------------------------------------------------
 
 產品 #9:
   Yield: 62.0%, Purity: 72.0%, Selectivity: 68.0%
   Predicted Cluster: 1 (Substandard)
-  Probability Distribution: Cluster 0: 0.236  Cluster 1: 0.741  Cluster 2: 0.023  
-  Risk Level: Low Risk
-  Recommendation: High confidence: Product likely belongs to Cluster 1
+  Probability Distribution: Cluster 0: 0.367  Cluster 1: 0.633  Cluster 2: 0.000  
+  Risk Level: Medium Risk
+  Recommendation: Moderate confidence: Product may belong to Cluster 1, consider additional testing
 ----------------------------------------------------------------------------------------------------
 
 產品 #10:
   Yield: 78.0%, Purity: 88.0%, Selectivity: 82.0%
   Predicted Cluster: 2 (Premium)
-  Probability Distribution: Cluster 0: 0.058  Cluster 1: 0.001  Cluster 2: 0.941  
+  Probability Distribution: Cluster 0: 0.000  Cluster 1: 0.000  Cluster 2: 1.000  
   Risk Level: Low Risk
   Recommendation: High confidence: Product likely belongs to Cluster 2
 ====================================================================================================
@@ -1991,15 +1990,15 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 
 | 風險等級 | 數量 | 比例 | 特徵 |
 |---------|------|------|------|
-| **Low Risk** | 7 | 70% | 機率 ≥ 0.7，品質分級明確 |
-| **Medium Risk** | 3 | 30% | 0.3 ≤ 機率 < 0.7，邊界產品 |
+| **Low Risk** | 9 | 90% | 機率 ≥ 0.7，品質分級明確 |
+| **Medium Risk** | 1 | 10% | 0.3 ≤ 機率 < 0.7，邊界產品 |
 | **High Risk** | 0 | 0% | 機率 < 0.3，高度不確定 |
 
 **風險等級解讀與操作建議**：
 
-1. **Low Risk 產品（70%）**：
+1. **Low Risk 產品（90%）**：
    - **特徵**：機率 ≥ 70%
-   - **範例**：產品 #1 (95.4%), #3 (97.1%), #5 (86.2%)
+   - **範例**：產品 #1 (99.6%), #3 (100%), #5 (100%), #7 (99.7%), #10 (100%)
    - **決策**：
      * ✅ 直接分類到預測的群集
      * ✅ 無需額外檢測
@@ -2008,9 +2007,9 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
      * 常規抽樣檢測即可
      * 重點監控製程穩定性
 
-2. **Medium Risk 產品（30%）**：
+2. **Medium Risk 產品（10%）**：
    - **特徵**：30% ≤ 機率 < 70%
-   - **範例**：產品 #4 (52.3%), #6 (67.2%), #8 (66.5%)
+   - **範例**：產品 #9 (63.3%)
    - **決策**：
      * ⚠️ 進行額外品質檢測
      * ⚠️ 考慮降級或特殊處理
@@ -2055,33 +2054,34 @@ def assess_quality_risk(proba, threshold_high=0.7, threshold_low=0.3):
 - Substandard 價格：$40/單位
 - 檢測成本：$5/單位
 
-**情境 1：產品 #4（Medium Risk）**
+**情境 1：產品 #9（Medium Risk）**
 - **不檢測風險**：
-  * 預測為 Standard（$70）
-  * 但有 41.4% 是 Premium（應為 $100）
-  * 期望損失：0.414 × ($100 - $70) = $12.42
+  * 預測為 Substandard（$40）
+  * 但有 36.7% 是 Standard（應為 $70）
+  * 期望損失：0.367 × ($70 - $40) = $11.01
 - **檢測決策**：
   * 檢測成本：$5
-  * 避免損失：$12.42
-  * **淨收益**：$12.42 - $5 = $7.42
+  * 避免損失：$11.01
+  * **淨收益**：$11.01 - $5 = $6.01
   * **結論**：應該檢測
 
 **情境 2：產品 #1（Low Risk）**
 - **不檢測決策**：
-  * 預測為 Premium（$100），信心 95.4%
-  * 錯誤成本：0.046 × ($100 - $70) = $1.38
+  * 預測為 Premium（$100），信心 99.6%
+  * 錯誤成本：0.004 × ($100 - $70) = $0.12
 - **檢測決策**：
   * 檢測成本：$5
-  * **結論**：不檢測更經濟（節省 $3.62）
+  * **結論**：不檢測更經濟（節省 $4.88）
 
 **3. 製程優化指導**：
 
 **案例：產品 #4 分析**
-- 當前狀態：[72%, 82%, 76%]（Standard，52.3%）
-- 目標：提升到 Premium（需機率 > 70%）
+- 當前狀態：[72%, 82%, 76%]（Standard，77.5%）
+- 潛力：有 22.5% 機率屬於 Premium，具升級空間
+- 目標：提升 Premium 機率 > 50%
 - GMM 提供的洞察：
-  * Premium 中心約在 [78%, 88%, 82%]
-  * 需要提升：Yield +6%, Purity +6%, Selectivity +6%
+  * Premium 中心約在 [78%, 88%, 83%]
+  * 需要提升：Yield +6%, Purity +6%, Selectivity +7%
   * 重點：純度（Purity）的提升最關鍵
 
 **製程調整建議**：
@@ -2105,7 +2105,7 @@ acceptance_rate = (
     0.5 * batch_risk['medium_risk']
 ) / len(risk_levels)
 
-# 輸出：0.85（85% 合格率，考慮 Medium Risk 的折扣）
+# 輸出：0.95（95% 合格率，考慮 Medium Risk 的折扣）
 ```
 
 **批次決策**：
@@ -2169,7 +2169,7 @@ GMM 的風險評估系統提供：
    - **更真實的場景**：實際化工數據往往有類似的複雜性
 
 2. **GMM 的核心優勢驗證**：
-   - **軟分群**：成功提供機率評估，識別 30% 的 Medium Risk 產品
+   - **軟分群**：成功提供機率評估，識別 10% 的 Medium Risk 產品
    - **橢圓形群集**：協方差橢圓精確捕捉不同群集的形狀差異
    - **邊界處理**：在重疊區域的處理優於 K-Means（ARI 0.855 vs 0.850）
    - **機率評估的價值**：將不確定性量化為可操作的風險等級
@@ -2187,7 +2187,7 @@ GMM 的風險評估系統提供：
    - **領域知識的重要性**：結合製程經驗驗證結果
 
 5. **化工應用的具體價值**：
-   - **風險分級管理**：70% Low Risk, 30% Medium Risk
+   - **風險分級管理**：90% Low Risk, 10% Medium Risk
    - **經濟決策支持**：基於機率計算檢測成本-效益
    - **製程優化指導**：識別臨界產品，提供改善方向
    - **不確定性量化**：將"不確定"轉化為"X% 機率"
