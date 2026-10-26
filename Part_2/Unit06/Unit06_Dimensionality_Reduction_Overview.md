@@ -20,7 +20,7 @@
 降維 (Dimensionality Reduction) 是指將高維數據映射到低維空間的過程，同時盡可能保留原始數據的重要資訊。在化工領域，我們經常需要處理來自多個感測器的數據，這些數據可能包含數十甚至數百個變數，降維技術能幫助我們：
 
 1. **簡化數據結構**：降低數據複雜度，便於視覺化與理解
-2. **去除冗餘資訊**：消除變數間的相關性與噪音
+2. **去除冗餘資訊**：降低變數間的相關性與噪音影響
 3. **提升計算效率**：減少後續模型的訓練時間
 4. **避免維度詛咒**：在高維空間中，數據點變得稀疏，距離度量失效
 5. **特徵萃取**：發現數據的潛在結構與模式
@@ -35,7 +35,9 @@
 
 **數學表達**：
 
-假設在 $d$ 維超立方體中均勻分布 $n$ 個點，要覆蓋 $p$ 比例的空間，所需的邊長比例為 $l = p^{1/d}$ 。當 $d$ 很大時， $l$ 接近 1，意味著需要覆蓋幾乎整個空間才能捕獲足夠的數據。
+假設數據在 $m$ 維單位超立方體中均勻分布，若要以一個子立方體涵蓋 $p$ 比例的數據，則子立方體的邊長比例為 $l = p^{1/m}$ 。當 $m$ 很大時， $l$ 接近 1，意味著需要涵蓋幾乎整個空間的範圍，才能捕獲固定比例的數據，局部鄰域不再「局部」。
+
+例如 $p = 0.1$ 時，在 $m = 2$ 維只需 $l \approx 0.32$ ，但在 $m = 10$ 維需 $l \approx 0.79$ ，在 $m = 100$ 維則需 $l \approx 0.98$ 。
 
 ### 1.3 降維的數學原理
 
@@ -57,11 +59,11 @@ $$
 \mathbf{y} = \mathbf{W}^T \mathbf{x}
 $$
 
-其中 $\mathbf{x} \in \mathbb{R}^D$ 是原始數據， $\mathbf{y} \in \mathbb{R}^d$ 是降維後的數據， $\mathbf{W} \in \mathbb{R}^{D \times d}$ 是投影矩陣。
+其中 $\mathbf{x} \in \mathbb{R}^D$ 是 (已中心化的) 原始數據， $\mathbf{y} \in \mathbb{R}^d$ 是降維後的數據， $\mathbf{W} \in \mathbb{R}^{D \times d}$ 是投影矩陣。
 
 **代表方法**：
 - 主成分分析 (PCA)
-- 線性判別分析 (LDA)
+- 線性判別分析 (LDA，需要類別標籤的監督式方法)
 - 因子分析 (Factor Analysis)
 
 #### 1.3.2 非線性降維
@@ -130,6 +132,8 @@ $$
 
 ## 3. 化工領域應用案例
 
+> 📌 **說明**：以下案例為依典型化工情境整理的教學示意，其中的感測器數量與效益數字 (如誤報率、時間、良率改善幅度) 為說明用的假設數值，並非特定文獻或工廠的實測結果。
+
 ### 3.1 反應器製程監控
 
 **應用背景**：
@@ -138,11 +142,11 @@ $$
 **解決方案**：
 - 使用 PCA 將 50 維數據降至 3 個主成分
 - 建立 Hotelling's T² 控制圖與 SPE (Squared Prediction Error) 控制圖
-- 當主成分超出控制界限時發出警報
+- 當 T² 或 SPE 統計量超出控制界限時發出警報
 
-**效益**：
-- 降低 40% 的誤報率
-- 提前 15 分鐘檢測到異常
+**效益 (示意)**：
+- 降低誤報率 (例如約 40%)
+- 提前檢測到異常 (例如約 15 分鐘)
 - 簡化操作人員的監控負擔
 
 ### 3.2 產品品質預測
@@ -155,24 +159,24 @@ $$
 - 以主成分作為輸入，建立迴歸模型預測產品品質
 - 使用 Loading 分析找出關鍵影響因子
 
-**效益**：
-- 模型訓練時間減少 70%
-- 預測 $R^2$ 從 0.72 提升至 0.88
+**效益 (示意)**：
+- 模型訓練時間大幅減少 (例如約 70%)
+- 預測 $R^2$ 由 0.72 提升至 0.88 (示意數值)
 - 識別出 5 個關鍵控制參數
 
 ### 3.3 批次製程軌跡分析
 
 **應用背景**：
-批次製程 (Batch Process) 的操作軌跡為高維時間序列數據，需要比較不同批次的操作模式。
+批次製程 (Batch Process) 的操作軌跡為高維時間序列數據 (批次 × 變數 × 時間)，需要比較不同批次的操作模式。
 
 **解決方案**：
-- 使用動態 PCA (Dynamic PCA) 分析批次軌跡
+- 將批次數據展開後，使用多向 PCA (Multiway PCA, MPCA) 分析批次軌跡；連續製程則常用動態 PCA (Dynamic PCA，加入時間延遲變數)
 - 使用 t-SNE 視覺化批次差異
 - 識別成功批次與失敗批次的特徵
 
-**效益**：
+**效益 (示意)**：
 - 發現 3 種典型操作模式
-- 提升良品率 12%
+- 提升良品率 (例如約 12%)
 - 縮短新產品開發週期
 
 ### 3.4 觸媒性能評估
@@ -181,14 +185,15 @@ $$
 研究團隊測試 100 種觸媒配方，每種觸媒有 20 個物理化學性質與 5 個性能指標。
 
 **解決方案**：
+- 以 20 個物理化學性質作為降維輸入 (性能指標作為著色或後續分析用，不納入降維輸入)
 - 使用 UMAP 將觸媒特性降至 2D
-- 在 2D 空間中視覺化性能表現
-- 使用 Kernel PCA 捕捉非線性關係
+- 在 2D 空間中以性能指標著色，視覺化性能表現
+- 使用 Kernel PCA 捕捉非線性關係 (100 筆樣本屬小樣本，需留意參數選擇與過擬合)
 
-**效益**：
+**效益 (示意)**：
 - 快速識別高性能觸媒區域
 - 發現性質-性能的非線性關聯
-- 縮短篩選時間 50%
+- 縮短篩選時間 (例如約 50%)
 
 ### 3.5 製程安全監控
 
@@ -200,9 +205,9 @@ $$
 - 建立多層次監控系統：正常操作、警告、危險
 - 使用 UMAP 視覺化歷史事故資料
 
-**效益**：
+**效益 (示意)**：
 - 提前預警潛在危險狀態
-- 降低緊急停機次數 30%
+- 降低緊急停機次數 (例如約 30%)
 - 強化安全管理系統
 
 ---
@@ -218,7 +223,7 @@ PCA 是最經典的線性降維方法，透過尋找數據變異數最大的方�
 
 **數學表達**：
 
-給定數據矩陣 $\mathbf{X} \in \mathbb{R}^{n \times D}$ ，PCA 尋找投影向量 $\mathbf{w}_1, \mathbf{w}_2, \ldots, \mathbf{w}_d$ 使得投影後的變異數最大：
+給定已中心化 (各欄位均值為 0) 的數據矩陣 $\mathbf{X} \in \mathbb{R}^{n \times D}$ ，PCA 尋找投影向量 $\mathbf{w}_1, \mathbf{w}_2, \ldots, \mathbf{w}_d$ 使得投影後的變異數最大：
 
 $$
 \mathbf{w}_1 = \arg\max_{\|\mathbf{w}\|=1} \text{Var}(\mathbf{X}\mathbf{w})
@@ -230,7 +235,7 @@ $$
 \mathbf{C} = \frac{1}{n}\mathbf{X}^T\mathbf{X}, \quad \mathbf{C}\mathbf{w}_i = \lambda_i \mathbf{w}_i
 $$
 
-其中 $\lambda_1 \geq \lambda_2 \geq \ldots \geq \lambda_D$ 為特徵值， $\mathbf{w}_i$ 為對應的特徵向量 (主成分)。
+其中 $\lambda_1 \geq \lambda_2 \geq \ldots \geq \lambda_D$ 為特徵值， $\mathbf{w}_i$ 為對應的特徵向量 (主成分方向)，特徵值 $\lambda_i$ 即為第 $i$ 個主成分的變異數。 (註：sklearn 使用無偏估計 $1/(n-1)$ ，僅影響特徵值的縮放，不影響主成分方向。)
 
 #### 主要特點
 - **線性投影**：假設數據的主要變異為線性結構
@@ -275,15 +280,17 @@ $$
 K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)
 $$
 
-在特徵空間中進行 PCA，求解：
+在特徵空間中進行 PCA (核矩陣需先經過中心化)，求解：
 
 $$
 \mathbf{K}\boldsymbol{\alpha}_i = \lambda_i \boldsymbol{\alpha}_i
 $$
 
+其中 $\boldsymbol{\alpha}_i$ 為核矩陣的特徵向量，樣本在第 $i$ 個核主成分上的投影值正比於 $\sqrt{\lambda_i}\,\boldsymbol{\alpha}_i$ 。
+
 #### 常見核函數
 1. **線性核**： $k(\mathbf{x}_i, \mathbf{x}_j) = \mathbf{x}_i^T \mathbf{x}_j$ (退化為標準 PCA)
-2. **多項式核**： $k(\mathbf{x}_i, \mathbf{x}_j) = (\mathbf{x}_i^T \mathbf{x}_j + c)^d$ 
+2. **多項式核**： $k(\mathbf{x}_i, \mathbf{x}_j) = (\gamma\, \mathbf{x}_i^T \mathbf{x}_j + c)^p$ ，其中 $p$ 為多項式次數 (sklearn 參數 `degree`)
 3. **RBF 核 (徑向基函數)**： $k(\mathbf{x}_i, \mathbf{x}_j) = \exp(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2)$ 
 4. **Sigmoid 核**： $k(\mathbf{x}_i, \mathbf{x}_j) = \tanh(\gamma \mathbf{x}_i^T \mathbf{x}_j + c)$ 
 
@@ -291,7 +298,7 @@ $$
 - **非線性降維**：捕捉數據的非線性結構
 - **核技巧**：無需顯式計算高維映射
 - **靈活性**：可透過選擇不同核函數適應不同數據結構
-- **計算成本較高**：核矩陣計算複雜度為 $O(n^2)$ 
+- **計算成本較高**：核矩陣需 $O(n^2)$ 的記憶體與計算量，特徵分解約 $O(n^3)$ (使用 randomized/arpack 求解器可降低)
 
 #### 化工應用場景
 - **非線性製程特徵提取**：處理複雜反應動力學
@@ -319,7 +326,7 @@ t-SNE 是一種非線性降維方法，主要用於數據視覺化。它透過�
 
 **數學表達**：
 
-在高維空間中，定義點 $i$ 與點 $j$ 的相似度 (條件機率)：
+在高維空間中，定義點 $i$ 與點 $j$ 的相似度 (條件機率，令 $p_{i|i}=0$ )，其中 $\sigma_i$ 由 `perplexity` 決定：
 
 $$
 p_{j|i} = \frac{\exp(-\|\mathbf{x}_i - \mathbf{x}_j\|^2 / 2\sigma_i^2)}{\sum_{k \neq i} \exp(-\|\mathbf{x}_i - \mathbf{x}_k\|^2 / 2\sigma_i^2)}
@@ -327,7 +334,7 @@ $$
 
 對稱化： $p_{ij} = \frac{p_{j|i} + p_{i|j}}{2n}$ 
 
-在低維空間中，使用 t-分布定義相似度：
+在低維空間中，使用自由度為 1 的 t-分布 (Cauchy 分布) 定義相似度：
 
 $$
 q_{ij} = \frac{(1 + \|\mathbf{y}_i - \mathbf{y}_j\|^2)^{-1}}{\sum_{k \neq l}(1 + \|\mathbf{y}_k - \mathbf{y}_l\|^2)^{-1}}
@@ -343,7 +350,7 @@ $$
 - **局部結構保持**：專注於保持鄰近點的相似關係
 - **視覺化優勢**：在 2D/3D 空間中產生清晰的群集結構
 - **非確定性**：每次運行結果可能不同 (需設定隨機種子)
-- **計算成本高**：複雜度為 $O(n^2)$ ，不適合大規模數據
+- **計算成本高**：精確演算法複雜度為 $O(n^2)$ ，sklearn 預設的 Barnes-Hut 近似為 $O(n \log n)$ ，但對大規模數據仍然偏慢
 
 #### 化工應用場景
 - **高維製程數據視覺化**：呈現操作模式的群集結構
@@ -363,48 +370,52 @@ X_tsne = tsne.fit_transform(X)
 ```
 
 **重要參數**：
-- `perplexity`：控制局部與全局結構的平衡 (通常 5-50)
-- `learning_rate`：優化學習率 (通常 10-1000)
-- `n_iter`：優化迭代次數 (至少 1000)
+- `perplexity`：控制局部與全局結構的平衡 (通常 5-50，且必須小於樣本數)
+- `learning_rate`：優化學習率 (預設 `'auto'`，也可手動設定約 10-1000)
+- `max_iter`：優化迭代次數 (預設 1000；sklearn 1.5 起取代舊參數 `n_iter`，1.7 已移除)
 
 ---
 
 ### 4.4 均勻流形近似與投影 (UMAP)
 
 #### 基本原理
-UMAP (Uniform Manifold Approximation and Projection) 是近年發展的降維方法，基於流形學習與拓撲數據分析理論。相較於 t-SNE，UMAP 更快速且更能保持全局結構。
+UMAP (Uniform Manifold Approximation and Projection) 是近年發展的降維方法，基於流形學習與拓撲數據分析理論。相較於 t-SNE，UMAP 通常更快速，且在實務上較能保留全局結構 (此優勢取決於初始化與參數設定，並非絕對)。
 
 **數學表達**：
 
-UMAP 假設數據位於 Riemannian 流形上，透過模糊拓撲結構建立高維與低維空間的對應關係。
+UMAP 假設數據均勻分布於 Riemannian 流形上，透過模糊拓撲結構建立高維與低維空間的對應關係。
 
-在高維空間中，構建模糊單純複形 (Fuzzy Simplicial Complex)，邊的權重為：
-
-$$
-w(\mathbf{x}_i, \mathbf{x}_j) = \exp\left(-\frac{d(\mathbf{x}_i, \mathbf{x}_j) - \rho_i}{\sigma_i}\right)
-$$
-
-其中 $\rho_i$ 是最近鄰距離， $\sigma_i$ 是正規化參數。
-
-在低維空間中，使用交叉熵損失函數優化：
+在高維空間中，構建模糊單純複形 (Fuzzy Simplicial Complex)，由點 $i$ 指向點 $j$ 的邊權重為：
 
 $$
-CE = \sum_{i,j} w_{ij} \log \frac{w_{ij}}{v_{ij}} + (1-w_{ij}) \log \frac{1-w_{ij}}{1-v_{ij}}
+w_{j|i} = \exp\left(-\frac{\max\left(0,\ \mathrm{dist}(\mathbf{x}_i, \mathbf{x}_j) - \rho_i\right)}{\sigma_i}\right)
+$$
+
+其中 $\mathrm{dist}(\cdot,\cdot)$ 為距離函數， $\rho_i$ 是點 $i$ 到其最近鄰的距離， $\sigma_i$ 是由 `n_neighbors` 決定的正規化參數。再以模糊集合聯集對稱化：
+
+$$
+w_{ij} = w_{j|i} + w_{i|j} - w_{j|i}\, w_{i|j}
+$$
+
+在低維空間中，邊權重 $v_{ij}$ 由 $\mathbf{y}_i, \mathbf{y}_j$ 的距離經類 t-分布的函數計算，並以交叉熵損失函數優化：
+
+$$
+CE = \sum_{i \neq j} \left[ w_{ij} \log \frac{w_{ij}}{v_{ij}} + (1-w_{ij}) \log \frac{1-w_{ij}}{1-v_{ij}} \right]
 $$
 
 #### 主要特點
-- **速度快**：複雜度接近 $O(n)$ ，適合大規模數據
-- **全局與局部結構兼顧**：比 t-SNE 更好地保持全局結構
+- **速度快**：複雜度約為 $O(n \log n)$ (近似最近鄰搜尋)，適合大規模數據
+- **全局與局部結構兼顧**：實務上通常比 t-SNE 更能保持全局結構
 - **可用於新數據**：支持 transform 方法 (t-SNE 不支持)
-- **理論基礎紮實**：基於嚴謹的數學理論
+- **理論基礎紮實**：基於拓撲與流形學習理論
 
 #### 化工應用場景
-- **大規模製程數據降維與視覺化**：處理數百萬筆數據
+- **大規模製程數據降維與視覺化**：可處理數十萬至數百萬筆數據
 - **即時製程監控**：快速轉換新數據進行監控
 - **多廠區數據整合**：保持全局結構以比較不同廠區
 - **長期歷史數據分析**：處理數年的製程記錄
 
-#### sklearn 實現 (需安裝 umap-learn)
+#### UMAP 實現 (需另外安裝 umap-learn，介面與 sklearn 相容)
 ```python
 import umap
 
@@ -432,7 +443,7 @@ X_new_umap = reducer.transform(X_new)
 | 比較項目 | 線性降維 (PCA) | 非線性降維 (Kernel PCA, t-SNE, UMAP) |
 |---------|---------------|--------------------------------------|
 | **數據假設** | 線性關係 | 非線性流形結構 |
-| **計算複雜度** | 低 $O(D^2 n + D^3)$ | 高 $O(n^2)$ ~ $O(n \log n)$ |
+| **計算複雜度** | 低 $O(nD^2 + D^3)$ | 高：Kernel PCA 約 $O(n^3)$ ，t-SNE $O(n^2)$ (Barnes-Hut 為 $O(n \log n)$ )，UMAP 約 $O(n \log n)$ |
 | **可解釋性** | 高 (主成分有明確物理意義) | 低 (難以解釋降維後的維度) |
 | **視覺化效果** | 一般 (可能無法分離群集) | 優秀 (群集結構清晰) |
 | **全局結構保持** | 優秀 | 一般 (t-SNE 較差，UMAP 較好) |
@@ -446,9 +457,9 @@ X_new_umap = reducer.transform(X_new)
 | 方法 | 優點 | 缺點 | 適用數據規模 |
 |------|------|------|--------------|
 | **PCA** | • 計算快速<br>• 結果穩定<br>• 可解釋性強<br>• 支持反轉換<br>• 數學基礎紮實 | • 僅捕捉線性關係<br>• 對異常值敏感<br>• 假設主要變異為重要資訊<br>• 可能無法分離非線性群集 | 大規模<br>(> 100 萬樣本) |
-| **Kernel PCA** | • 捕捉非線性結構<br>• 核函數選擇靈活<br>• 支持新數據轉換<br>• 理論完善 | • 計算成本高<br>• 核函數與參數選擇困難<br>• 可解釋性差<br>• 記憶體需求大 | 中小規模<br>(< 10 萬樣本) |
+| **Kernel PCA** | • 捕捉非線性結構<br>• 核函數選擇靈活<br>• 支持新數據轉換<br>• 理論完善 | • 計算成本高<br>• 核函數與參數選擇困難<br>• 可解釋性差<br>• 記憶體需求大 | 中小規模<br>(< 2 萬樣本) |
 | **t-SNE** | • 視覺化效果極佳<br>• 群集分離清晰<br>• 保持局部結構優秀<br>• 適合探索性分析 | • 計算速度慢<br>• 不保持全局結構<br>• 不支持新數據轉換<br>• 參數敏感<br>• 每次結果可能不同 | 小規模<br>(< 1 萬樣本) |
-| **UMAP** | • 速度快<br>• 保持全局與局部結構<br>• 支持新數據轉換<br>• 適合大規模數據<br>• 理論基礎嚴謹 | • 參數調整需要經驗<br>• 可解釋性一般<br>• 結果有隨機性<br>• 需額外安裝套件 | 大規模<br>(> 100 萬樣本) |
+| **UMAP** | • 速度快<br>• 保持全局與局部結構<br>• 支持新數據轉換<br>• 適合大規模數據<br>• 理論基礎嚴謹 | • 參數調整需要經驗<br>• 可解釋性一般<br>• 結果有隨機性<br>• 需額外安裝套件 | 中大規模<br>(> 1 萬至百萬級樣本) |
 
 ### 5.3 化工應用場景對照表
 
@@ -458,7 +469,7 @@ X_new_umap = reducer.transform(X_new)
 | **非線性製程特徵提取** | Kernel PCA | • 捕捉複雜製程的非線性關係<br>• 適用於反應動力學分析<br>• 可用於後續建模 |
 | **高維製程數據視覺化** | t-SNE | • 清晰呈現操作模式群集<br>• 適合探索性分析<br>• 群集邊界清晰<br>• 適合報告與簡報 |
 | **大規模製程數據降維** | UMAP | • 處理速度快<br>• 保持全局結構利於跨廠區比較<br>• 可用於即時監控<br>• 支持新數據轉換 |
-| **批次製程軌跡分析** | PCA / t-SNE | • PCA 用於動態特徵萃取<br>• t-SNE 用於軌跡視覺化比較 |
+| **批次製程軌跡分析** | PCA (MPCA / 動態 PCA) / t-SNE | • 多向 PCA 或動態 PCA 用於特徵萃取與監控<br>• t-SNE 用於軌跡視覺化比較 |
 | **產品品質預測** | PCA | • 提取主成分作為模型輸入<br>• 減少多重共線性<br>• 提升模型泛化能力 |
 | **觸媒篩選與配方優化** | UMAP / Kernel PCA | • 視覺化高維配方空間<br>• 捕捉非線性性質-性能關係 |
 | **製程安全監控** | PCA + Isolation Forest | • PCA 降維後進行異常檢測<br>• 提升檢測靈敏度 |
@@ -502,7 +513,7 @@ X_new_umap = reducer.transform(X_new)
 #### 選擇 Kernel PCA 的情境
 ✓ 數據呈現明顯非線性結構  
 ✓ 用於後續建模 (如迴歸、分類)  
-✓ 數據規模中等 (< 10 萬)  
+✓ 數據規模中等 (< 2 萬，核矩陣為 $n \times n$ )  
 ✓ 需要對新數據進行轉換  
 
 #### 選擇 t-SNE 的情境
@@ -546,8 +557,11 @@ $$
 #### 適用情境
 - 數據近似常態分布
 - 變數間尺度差異大
-- **PCA、Kernel PCA** 的標準前處理
+- **PCA、Kernel PCA** 的標準前處理 (PCA 需中心化，標準化後變數權重一致)
 - 存在異常值但影響不嚴重
+- 亦可用於 t-SNE、UMAP 前處理 (見 6.8 節)
+
+> ⚠️ **避免資料洩漏**：標準化器 (及其他前處理器) 應只用訓練資料 `fit`，再以 `transform` 套用於測試或新數據。
 
 #### sklearn 實現
 ```python
@@ -589,17 +603,20 @@ print("Scaled std:", data_scaled.std(axis=0))
 ### 6.3 正規化 (Normalization)
 
 #### 原理
-將數據縮放到 [0, 1] 或 [-1, 1] 範圍 (Min-Max Scaling)：
+將數據縮放到 [0, 1] 範圍 (Min-Max Scaling)：
 
 $$
 x' = \frac{x - x_{\min}}{x_{\max} - x_{\min}}
 $$
 
+若要縮放到任意範圍 $[a, b]$ (如 [-1, 1])，則為 $x'' = a + (b - a)\,x'$ 。
+
 #### 適用情境
 - 數據分布不是常態分布
 - 需要將數據限制在特定範圍
-- **t-SNE、UMAP** 的前處理
+- 常用於 **t-SNE、UMAP** 的前處理 (亦可使用 StandardScaler)
 - 存在明確的最大/最小值界限
+- ⚠️ 對異常值敏感 (極端值會壓縮其他數據的範圍)
 
 #### sklearn 實現
 ```python
@@ -619,6 +636,7 @@ X_normalized_custom = scaler_custom.fit_transform(X)
 #### 化工應用範例
 ```python
 # 將感測器數據正規化到 [0, 1]
+import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
 # 感測器讀值
@@ -667,7 +685,7 @@ X_robust = scaler.fit_transform(X)
 #### 化工應用範例
 ```python
 # 處理含異常值的製程數據
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 import numpy as np
 
 # 模擬製程數據 (含異常值)
@@ -687,9 +705,13 @@ robust_scaler = RobustScaler()
 X_standard = standard_scaler.fit_transform(process_data)
 X_robust = robust_scaler.fit_transform(process_data)
 
-print("Standard scaling - mean:", X_standard.mean(axis=0))
-print("Robust scaling - median:", np.median(X_robust, axis=0))
+# 比較第 1 個變數的縮放結果：異常值 (500) 使標準化後的正常點被壓縮在 -0.45 附近，
+# 穩健標準化則保留正常點之間的差異，並將異常值明確凸顯出來
+print("Standard scaling (var 1):", np.round(X_standard[:, 0], 2))
+print("Robust scaling (var 1):  ", np.round(X_robust[:, 0], 2))
 ```
+
+**預期結果**：標準化後第 1 個變數為 `[-0.45 -0.44 -0.45 2.24 -0.43 -0.46]` (正常點幾乎無法區分)；穩健標準化後為 `[-0.6 0.2 -0.2 159.4 0.6 -1.]` (正常點仍保有差異，異常值明顯偏離)。
 
 ---
 
@@ -724,6 +746,8 @@ print("Categories:", encoder.categories_)
 將類別轉換為整數：
 
 **範例**：產品類型 ['A', 'B', 'C'] → [0, 1, 2]
+
+> 註：`LabelEncoder` 設計用於目標變數 (y)；若要編碼輸入特徵，應使用 `OrdinalEncoder`。
 
 ```python
 from sklearn.preprocessing import LabelEncoder
@@ -831,10 +855,10 @@ print(f"Explained variance: {pca.explained_variance_ratio_.sum():.2%}")
 | **數據近似常態分布** | StandardScaler | 符合統計假設，效果最佳 |
 | **數據存在大量異常值** | RobustScaler | 對異常值不敏感 |
 | **數據分布未知或非常態** | MinMaxScaler | 不依賴分布假設 |
-| **需要保留零值資訊** | StandardScaler | 不改變零值位置 |
-| **數據有固定範圍** | MinMaxScaler | 保持數據範圍 |
+| **需要保留零值/稀疏性** | MaxAbsScaler | 只縮放不平移，不改變零值位置 (StandardScaler 與 MinMaxScaler 會平移數據) |
+| **數據有固定範圍** | MinMaxScaler | 保持數據範圍 (但對異常值敏感) |
 | **用於 PCA** | StandardScaler | 標準前處理 |
-| **用於 t-SNE / UMAP** | StandardScaler 或 MinMaxScaler | 兩者皆可 |
+| **用於 t-SNE / UMAP** | StandardScaler 或 MinMaxScaler | 兩者皆可，重點是各變數尺度一致 |
 | **含類別變數** | OneHotEncoder | 避免隱含順序關係 |
 | **含缺失值** | SimpleImputer 或 KNNImputer | 根據缺失比例選擇 |
 
@@ -860,6 +884,7 @@ $$
 
 **sklearn 實現**：
 ```python
+import numpy as np
 from sklearn.decomposition import PCA
 
 pca = PCA(n_components=5)
@@ -876,8 +901,8 @@ print("Cumulative explained variance:", cumsum_var)
 
 **解讀**：
 - 第一主成分通常解釋最多變異數 (例如 40%)
-- 前幾個主成分累積解釋 80-95% 變異數即可
-- 若第一主成分解釋 > 90%，可能數據結構過於簡單
+- 前幾個主成分累積解釋 80-95% 變異數即可 (依應用需求決定，與 10.1 節、7.6 節的建議一致)
+- 若第一主成分解釋 > 90%，表示變數高度相關或存在單一主導的變異來源 (也可能是未標準化導致某變數主導)，需檢查數據與前處理
 
 **化工應用**：
 ```python
@@ -954,9 +979,10 @@ plt.show()
 ```
 
 **解讀 (Kaiser Criterion)**：
-- 保留特徵值 > 1 的主成分
+- 保留特徵值 > 1 的主成分 (僅適用於標準化數據，即以相關矩陣做 PCA 時，平均特徵值為 1)
 - 觀察曲線的「拐點」(elbow point)
 - 拐點之後的主成分貢獻較少
+- Kaiser Criterion 為經驗法則，常偏多保留成分，建議與累積解釋變異數合併判斷
 
 ---
 
@@ -967,10 +993,10 @@ plt.show()
 **數學表達**：
 
 $$
-\text{Reconstruction Error} = \|\mathbf{X} - \hat{\mathbf{X}}\|_F^2 = \|\mathbf{X} - \mathbf{X}_{\text{PCA}} \mathbf{W}^T\|_F^2
+\text{Reconstruction Error} = \|\mathbf{X} - \hat{\mathbf{X}}\|_F^2, \quad \hat{\mathbf{X}} = \mathbf{X}\mathbf{W}\mathbf{W}^T
 $$
 
-其中 $\|\cdot\|_F$ 是 Frobenius 範數。
+其中 $\mathbf{X}$ 已中心化， $\mathbf{W} \in \mathbb{R}^{D \times d}$ 為保留的主成分方向， $\|\cdot\|_F$ 是 Frobenius 範數。下方程式碼使用平均每個元素的誤差 (MSE)，等於上式除以 $nD$ 。
 
 **sklearn 實現**：
 ```python
@@ -987,7 +1013,7 @@ X_reconstructed = pca.inverse_transform(X_pca)
 reconstruction_error = mean_squared_error(X_scaled, X_reconstructed)
 print(f"Reconstruction Error (MSE): {reconstruction_error:.4f}")
 
-# 相對重建誤差
+# 相對重建誤差 (標準化數據的總變異數約為 1，故近似為被捨棄的變異數比例)
 relative_error = reconstruction_error / np.var(X_scaled)
 print(f"Relative Reconstruction Error: {relative_error:.4f}")
 ```
@@ -995,7 +1021,23 @@ print(f"Relative Reconstruction Error: {relative_error:.4f}")
 **解讀**：
 - 誤差越小，降維保留的資訊越多
 - 需要在降維程度與重建誤差之間取得平衡
-- 化工應用：監控重建誤差可檢測異常狀態
+- 化工應用：監控重建誤差可檢測異常狀態 (即下方的 SPE 統計量)
+
+---
+
+#### 7.1.5 Hotelling's T² 與 SPE
+
+製程監控中，PCA 模型常搭配兩個統計量 (3.1 節所述控制圖)：
+
+$$
+T^2 = \sum_{i=1}^{d} \frac{t_i^2}{\lambda_i}, \qquad \mathrm{SPE} = \|\mathbf{x} - \hat{\mathbf{x}}\|^2
+$$
+
+其中 $t_i$ 為樣本在第 $i$ 個主成分上的得分 (Score)， $\lambda_i$ 為對應的特徵值。
+
+- $T^2$ ：衡量樣本在主成分空間 (模型內) 偏離中心的程度
+- SPE：衡量樣本無法被主成分模型解釋的殘差 (模型外)，即單一樣本的重建誤差
+- 控制界限通常由 $F$ 分布 (用於 $T^2$ ) 與近似 $\chi^2$ 分布 (用於 SPE) 以 95% 或 99% 信賴水準求得
 
 ---
 
@@ -1008,10 +1050,10 @@ print(f"Relative Reconstruction Error: {relative_error:.4f}")
 **數學表達**：
 
 $$
-T(k) = 1 - \frac{2}{nk(2n-3k-1)} \sum_{i=1}^{n} \sum_{j \in \mathcal{N}_i^k} (r(i,j) - k)
+T(k) = 1 - \frac{2}{nk(2n-3k-1)} \sum_{i=1}^{n} \sum_{j \in \mathcal{U}_i^k} (r(i,j) - k)
 $$
 
-其中 $\mathcal{N}_i^k$ 是低維空間中點 $i$ 的 $k$ 近鄰， $r(i,j)$ 是高維空間中的排名。
+其中 $r(i,j)$ 是在高維空間中，點 $j$ 相對於點 $i$ 的距離排名 (最近鄰排名為 1)， $\mathcal{U}_i^k$ 是「在低維空間中屬於點 $i$ 的 $k$ 近鄰，但在高維空間中不屬於其 $k$ 近鄰」的點集合 (即降維後新「入侵」的假鄰居)，排名越遠懲罰越大。
 
 **sklearn 實現**：
 ```python
@@ -1032,34 +1074,26 @@ print(f"Trustworthiness (k=5): {trust_score:.4f}")
 
 #### 7.2.2 Continuity (連續性)
 
-**定義**：衡量原本是近鄰的點在降維後是否仍然接近。
+**定義**：衡量原本是近鄰的點在降維後是否仍然接近。若原本的近鄰在低維空間被拆散 (排名變遠)，連續性降低。
+
+**數學表達**：
+
+$$
+C(k) = 1 - \frac{2}{nk(2n-3k-1)} \sum_{i=1}^{n} \sum_{j \in \mathcal{V}_i^k} (\hat{r}(i,j) - k)
+$$
+
+其中 $\mathcal{V}_i^k$ 是「在高維空間中屬於點 $i$ 的 $k$ 近鄰，但在低維空間中不屬於其 $k$ 近鄰」的點集合， $\hat{r}(i,j)$ 是在低維空間中的距離排名。Continuity 等同於將高維與低維空間角色互換後的 Trustworthiness。
 
 **sklearn 實現**：
 ```python
-# sklearn 未直接提供，需自行實現
-from sklearn.neighbors import NearestNeighbors
+# sklearn 未直接提供 continuity，但可將高低維角色互換後呼叫 trustworthiness
+from sklearn.manifold import trustworthiness
 
 def continuity(X_high, X_low, n_neighbors=5):
     """
-    計算降維的連續性指標
+    計算降維的連續性指標 (Continuity)
     """
-    nbrs_high = NearestNeighbors(n_neighbors=n_neighbors+1).fit(X_high)
-    nbrs_low = NearestNeighbors(n_neighbors=n_neighbors+1).fit(X_low)
-    
-    _, indices_high = nbrs_high.kneighbors(X_high)
-    _, indices_low = nbrs_low.kneighbors(X_low)
-    
-    # 移除自身 (第一個近鄰)
-    indices_high = indices_high[:, 1:]
-    indices_low = indices_low[:, 1:]
-    
-    # 計算重疊比例
-    continuity_scores = []
-    for i in range(len(X_high)):
-        overlap = len(set(indices_high[i]) & set(indices_low[i]))
-        continuity_scores.append(overlap / n_neighbors)
-    
-    return np.mean(continuity_scores)
+    return trustworthiness(X_low, X_high, n_neighbors=n_neighbors)
 
 cont_score = continuity(X_scaled, X_reduced, n_neighbors=5)
 print(f"Continuity (k=5): {cont_score:.4f}")
@@ -1067,7 +1101,7 @@ print(f"Continuity (k=5): {cont_score:.4f}")
 
 **解讀**：
 - 範圍 [0, 1]，越接近 1 越好
-- 高連續性：局部結構保持良好
+- 高連續性：原本相鄰的點在低維空間中仍保持相鄰
 
 ---
 
@@ -1096,8 +1130,8 @@ print(f"Final KL Divergence: {tsne.kl_divergence_:.4f}")
 
 **解讀**：
 - 越小越好 (接近 0)
-- 典型範圍：1-5
-- > 10：可能需要調整參數
+- 絕對數值受數據與 `perplexity` 影響，不同數據集或不同參數之間不宜直接比較
+- 適合用於同一份數據、同一組參數下比較不同初始化或迭代結果，不適合跨方法 (如 t-SNE 與 UMAP) 比較
 
 ---
 
@@ -1131,7 +1165,7 @@ plt.show()
 ```
 
 ```python
-# 3D 視覺化
+# 3D 視覺化 (需保留至少 3 個主成分，如 PCA(n_components=3))
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], 
@@ -1177,13 +1211,15 @@ from sklearn.neighbors import NearestNeighbors
 # 選擇一個樣本點
 sample_idx = 0
 
-# 高維空間的近鄰
-nbrs_high = NearestNeighbors(n_neighbors=10).fit(X_scaled)
+# 高維空間的近鄰 (取 11 個，第 1 個為樣本自身，故排除後共 10 個)
+nbrs_high = NearestNeighbors(n_neighbors=11).fit(X_scaled)
 distances_high, indices_high = nbrs_high.kneighbors([X_scaled[sample_idx]])
+indices_high = indices_high[:, 1:]
 
 # 低維空間的近鄰
-nbrs_low = NearestNeighbors(n_neighbors=10).fit(X_reduced)
+nbrs_low = NearestNeighbors(n_neighbors=11).fit(X_reduced)
 distances_low, indices_low = nbrs_low.kneighbors([X_reduced[sample_idx]])
+indices_low = indices_low[:, 1:]
 
 # 計算近鄰重疊
 overlap = len(set(indices_high[0]) & set(indices_low[0]))
@@ -1254,7 +1290,7 @@ plt.show()
 ```
 
 **解讀**：
-- 高正負荷：該變數對主成分貢獻大
+- 高負荷 (絕對值大)：該變數對主成分貢獻大
 - PC1 可能代表「整體操作水平」
 - PC2 可能代表「溫度-壓力平衡」
 - 結合製程知識驗證解釋
@@ -1266,8 +1302,8 @@ plt.show()
 驗證主成分是否符合製程物理/化學原理：
 
 ```python
-# 分析 PC1 的主要貢獻變數
-pc1_loadings = loading_df['PC1'].sort_values(ascending=False)
+# 分析 PC1 的主要貢獻變數 (依絕對值由大到小排序)
+pc1_loadings = loading_df['PC1'].sort_values(key=abs, ascending=False)
 print("PC1 Main Contributors:")
 print(pc1_loadings)
 
@@ -1325,6 +1361,10 @@ plt.show()
 建立完整的降維評估流程：
 
 ```python
+import numpy as np
+from sklearn.manifold import trustworthiness
+from sklearn.metrics import silhouette_score
+
 def evaluate_dimensionality_reduction(X_original, X_reduced, method_name, labels=None):
     """
     綜合評估降維效果
@@ -1341,7 +1381,7 @@ def evaluate_dimensionality_reduction(X_original, X_reduced, method_name, labels
     trust = trustworthiness(X_original, X_reduced, n_neighbors=5)
     print(f"Trustworthiness (k=5): {trust:.4f}")
     
-    # 3. Continuity
+    # 3. Continuity (使用 7.2.2 節定義的 continuity 函式)
     cont = continuity(X_original, X_reduced, n_neighbors=5)
     print(f"Continuity (k=5): {cont:.4f}")
     
@@ -1367,12 +1407,12 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 
 | 指標 | 適用方法 | 範圍 | 理想值 | sklearn 函數 |
 |------|---------|------|--------|-------------|
-| **Explained Variance Ratio** | PCA | [0, 1] | 累積 > 0.85 | `pca.explained_variance_ratio_` |
-| **Reconstruction Error** | PCA | ≥ 0 | 越小越好 | `mean_squared_error` |
-| **Trustworthiness** | 所有方法 | [0, 1] | > 0.9 | `sklearn.manifold.trustworthiness` |
-| **Continuity** | 所有方法 | [0, 1] | > 0.9 | 自行實現 |
-| **KL Divergence** | t-SNE | ≥ 0 | < 5 | `tsne.kl_divergence_` |
-| **Silhouette Score** | 所有方法 | [-1, 1] | > 0.5 | `sklearn.metrics.silhouette_score` |
+| **Explained Variance Ratio** | PCA | [0, 1] | 累積 ≥ 0.85 ~ 0.95 (依應用) | `pca.explained_variance_ratio_` |
+| **Reconstruction Error** | PCA (Kernel PCA 需 `fit_inverse_transform=True`) | ≥ 0 | 越小越好 | `mean_squared_error` |
+| **Trustworthiness** | 所有方法 | [0, 1] | > 0.9 (經驗值) | `sklearn.manifold.trustworthiness` |
+| **Continuity** | 所有方法 | [0, 1] | > 0.9 (經驗值) | 互換參數呼叫 `trustworthiness` |
+| **KL Divergence** | t-SNE | ≥ 0 | 越小越好 (僅限同數據、同參數比較) | `tsne.kl_divergence_` |
+| **Silhouette Score** | 所有方法 (需有分群或類別標籤) | [-1, 1] | > 0.5 (經驗值) | `sklearn.metrics.silhouette_score` |
 
 ---
 
@@ -1446,7 +1486,7 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 2. **故障診斷**：結合降維與分群識別異常模式
 3. **品質預測**：降維後建立迴歸模型
 4. **配方優化**：使用 UMAP 視覺化配方空間
-5. **批次分析**：動態 PCA 分析批次製程軌跡
+5. **批次分析**：多向 PCA 分析批次製程軌跡
 
 ---
 
@@ -1462,13 +1502,13 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 | **t-SNE 參數不當** | 視覺化效果差 | 調整 perplexity (5-50) 與 learning_rate |
 | **忽略異常值** | 影響降維結果 | 使用 RobustScaler 或先檢測異常值 |
 | **過度解釋 t-SNE** | 將視覺化當作絕對真相 | t-SNE 主要用於探索，不保證全局結構 |
-| **忽略時間相關性** | 時間序列數據的順序關係 | 使用動態 PCA 或考慮時間延遲 |
+| **忽略時間相關性** | 時間序列數據的順序關係 | 連續製程使用動態 PCA (時間延遲)，批次製程使用多向 PCA |
 
 ### 10.2 化工實務建議
 
 #### 製程監控系統建置
 1. **離線模型訓練**：使用歷史正常操作數據建立 PCA 模型
-2. **控制界限設定**：基於統計分布 (如 95% 信賴區間)
+2. **控制界限設定**：基於統計分布 (如 $T^2$ 採 $F$ 分布、SPE 採近似 $\chi^2$ 分布，信賴水準 95% 或 99%)
 3. **即時監控**：新數據投影到主成分空間並計算統計量
 4. **警報策略**：連續 N 點超出界限才發出警報 (避免誤報)
 5. **模型更新**：定期重新訓練模型以適應製程變化
@@ -1497,18 +1537,19 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 2. **"Pattern Recognition and Machine Learning"** - Christopher Bishop
    - 第 12 章：Continuous Latent Variables (PCA, Kernel PCA)
 
-3. **"Dimensionality Reduction: A Comparative Review"** - L.J.P. van der Maaten et al.
+3. **"Dimensionality Reduction: A Comparative Review"** - L.J.P. van der Maaten, E. Postma, J. van den Herik (2009)
    - 全面比較各種降維方法
 
 ### 11.2 化工應用文獻
 1. **Multivariate Statistical Process Control** - 製程監控領域經典應用
-2. **Batch Process Monitoring** - 批次製程的動態 PCA
+2. **Batch Process Monitoring** - 批次製程的多向 PCA (MPCA) 與動態 PCA
 3. **Fault Detection and Diagnosis** - 故障診斷中的降維應用
 
 ### 11.3 線上資源
 - **scikit-learn 官方文件**: [Dimensionality Reduction](https://scikit-learn.org/stable/modules/decomposition.html)
 - **UMAP 官方文件**: [UMAP Documentation](https://umap-learn.readthedocs.io/)
-- **t-SNE 原始論文**: van der Maaten & Hinton (2008)
+- **t-SNE 原始論文**: van der Maaten & Hinton (2008), "Visualizing Data using t-SNE", *Journal of Machine Learning Research*
+- **UMAP 原始論文**: McInnes, Healy & Melville (2018), "UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction", arXiv:1802.03426
 
 ### 11.4 實用工具
 - **scikit-learn**: PCA, Kernel PCA, t-SNE
@@ -1534,7 +1575,7 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 - **需要解釋性** → PCA
 - **純探索分析** → t-SNE / UMAP
 
-### 12.3 下一步學習
+### 12.3 學習成果與下一步
 完成本單元後，您應該能夠：
 ✓ 理解降維的數學原理與應用場景  
 ✓ 使用 sklearn 實作各種降維方法  
@@ -1560,7 +1601,7 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 | $n$ | 樣本數量 |
 | $\mathbf{W}$ | 投影矩陣 |
 | $\lambda_i$ | 第 $i$ 個特徵值 |
-| $\mathbf{w}_i$ | 第 $i$ 個特徵向量 (主成分) |
+| $\mathbf{w}_i$ | 第 $i$ 個特徵向量 (主成分方向) |
 | $\mathbf{C}$ | 協方差矩陣 |
 | $\mu$ | 均值 |
 | $\sigma$ | 標準差 |
@@ -1568,7 +1609,9 @@ evaluate_dimensionality_reduction(X_scaled, X_umap, "UMAP", labels=y)
 | $\mathbf{K}$ | 核矩陣 |
 | $p_{ij}$ | 高維空間相似度 |
 | $q_{ij}$ | 低維空間相似度 |
-| $\|\cdot\|_F$ | Frobenius 範數 |
+| $T^2$ | Hotelling's T² 統計量 |
+| $\mathrm{SPE}$ | 平方預測誤差 (重建誤差) |
+| $\Vert \cdot \Vert_F$ | Frobenius 範數 |
 
 ---
 
@@ -1627,7 +1670,7 @@ X_new_umap = reducer.transform(X_new_scaled)
 - 課程單元：Unit06 Dimensionality Reduction Overview 降維概述
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-10-26
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
