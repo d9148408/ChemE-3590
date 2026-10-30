@@ -34,9 +34,9 @@
 - **UMAP**：非線性降維，兼具 t-SNE 的視覺化品質與更快的速度、更好的全局結構保持
 
 **UMAP 的優勢**：
-- **速度快**： $O(N \log N)$ 複雜度，比 t-SNE 快 10-100 倍
+- **速度快**： $O(N \log N)$ 複雜度，數萬筆以上的大規模數據通常比 t-SNE 快數倍至數十倍（樣本數較少時差距有限，且首次執行需含 numba 編譯時間）
 - **可擴展性強**：適合處理百萬級數據點
-- **保留全局結構**：在保持局部結構的同時，也能保留更多全局信息
+- **保留全局結構**：在保持局部結構的同時，也能保留更多全局信息（此優勢部分來自光譜初始化，且群集間的相對位置與距離仍不可過度解讀，見 5.4 節）
 - **支援新數據投影**：可以訓練後對新數據進行降維（t-SNE 不支援）
 - **超參數直觀**：超參數與數據的幾何性質直接相關，易於理解與調整
 - **理論基礎堅實**：基於流形學習和拓撲數據分析的嚴謹數學理論
@@ -46,6 +46,7 @@
 - 結果受超參數影響，需要根據數據特性調整
 - 不同初始化可能產生不同結果（但比 t-SNE 穩定）
 - 距離的絕對值仍無嚴格物理意義
+- 群集的大小、群集間的距離與密度不一定反映原始空間，不可過度解讀
 - 對於某些數據，可能過度強調局部結構
 
 ### 1.2 UMAP 的發展歷史與理論基礎
@@ -70,12 +71,12 @@
    - 拓撲結構的保持確保降維後的數據關係一致
 
 3. **範疇論 (Category Theory)**：
-   - 將不同尺度的局部流形統一為全局拓撲結構
-   - 透過 FinSet 範疇的函子構建拓撲表示
+   - 將各點局部的模糊單純集（各自使用不同的距離度量）合併為單一全局拓撲結構
+   - 透過範疇間的函子（有限模糊單純集與擴充偽度量空間之間的對應）構建拓撲表示
 
 **UMAP 與 t-SNE 的理論聯繫**：
-- UMAP 和 t-SNE 都使用交叉熵作為優化目標
-- UMAP 的特殊參數設定可以退化為類似 t-SNE 的行為
+- t-SNE 最小化高低維機率分布的 KL 散度，UMAP 則最小化高低維模糊集合的交叉熵（同時包含吸引項與排斥項）
+- 兩者的低維核函數皆屬重尾分布，UMAP 的 $a = b = 1$ 即為 t-SNE 使用的 Cauchy 核
 - UMAP 的理論基礎更為廣泛，涵蓋更多數學分支
 
 ### 1.3 化工領域應用案例
@@ -142,7 +143,7 @@ UMAP 演算法可以分為以下四個核心步驟：
 對於每個數據點 $\mathbf{x}_i$ ，假設在其局部鄰域內，數據分布在一個局部歐氏流形上。為了適應不同密度區域，使用自適應距離度量：
 
 - 找到每個點的 $k$ 最近鄰（ $k$ 由超參數 `n_neighbors` 決定）
-- 計算到第 $k$ 最近鄰的距離 $\rho_i$ （局部連通半徑）
+- 計算到最近的 1 個鄰居的距離 $\rho_i$ （局部連通半徑，即 $\rho_i = \min_{j \neq i} \|\mathbf{x}_i - \mathbf{x}_j\|$ ）
 - 使用正則化距離：
 
 $$
@@ -162,7 +163,7 @@ $$
 w_{ij} = \exp\left(-\frac{d_i(\mathbf{x}_i, \mathbf{x}_j)}{\sigma_i}\right)
 $$
 
-其中 $\sigma_i$ 是根據 `n_neighbors` 參數自動校準的平滑參數（類似 t-SNE 的困惑度）。
+其中 $\sigma_i$ 是針對每個點自動校準的平滑參數，使得 $\sum_{j=1}^{k} w_{ij} = \log_2 k$ （ $k$ 即 `n_neighbors` ，作用類似 t-SNE 的困惑度）。
 
 **對稱化**：
 
@@ -189,14 +190,14 @@ $$
 
 其中 $a, b$ 是超參數，控制低維空間中距離與隸屬度的關係（類似 t-SNE 中的 t-分布）。
 
-**默認設定**：
-- UMAP 默認使用 $a = 1.929$, $b = 0.7915$ （由 `min_dist` 參數推導）
-- 這個函數形狀類似於 t-分布，但更為平滑
+**參數對應**：
+- $a, b$ 由 `min_dist` 與 `spread` （默認 1.0）透過曲線擬合自動推導，使用者不需直接設定
+- 默認 `min_dist=0.1` 時， $a \approx 1.577$, $b \approx 0.895$ ； `min_dist=0.0` 時 $a \approx 1.933$, $b \approx 0.790$ ； `min_dist=0.5` 時 $a \approx 0.583$, $b \approx 1.334$
+- 當 $a = b = 1$ 時，此函數即為自由度為 1 的 t-分布（Cauchy 分布），與 t-SNE 的低維核函數相同
 
 **直觀理解**：
 - $v_{ij}$ 表示低維空間中邊 $(i, j)$ 的隸屬度
 - 函數形狀允許中等距離的點適度分開（避免擁擠問題）
-- 超參數 $a, b$ 由用戶指定的 `min_dist` 自動推導
 
 #### **步驟 3：優化低維表示**
 
@@ -218,11 +219,17 @@ $$
 
 **優化方法**：
 
-UMAP 使用隨機梯度下降 (Stochastic Gradient Descent, SGD) 優化低維座標 $\mathbf{Y}$ 。梯度計算為：
+UMAP 使用隨機梯度下降 (Stochastic Gradient Descent, SGD) 優化低維座標 $\mathbf{Y}$ 。令 $d_{ij} = \|\mathbf{y}_i - \mathbf{y}_j\|_2$ ，吸引項與排斥項對 $\mathbf{y}_i$ 的梯度分別為：
 
 $$
-\frac{\partial C}{\partial \mathbf{y}_i} = \sum_{j} \left[ \frac{2ab\|\mathbf{y}_i - \mathbf{y}_j\|^{2b-2}}{1 + a\|\mathbf{y}_i - \mathbf{y}_j\|^{2b}} \left( w_{ij} - v_{ij} \right) (\mathbf{y}_i - \mathbf{y}_j) \right]
+\frac{\partial C_{\text{att}}}{\partial \mathbf{y}_i} = \sum_{j} \frac{-2ab\, d_{ij}^{2(b-1)}}{1 + a\, d_{ij}^{2b}} \, w_{ij} \, (\mathbf{y}_i - \mathbf{y}_j)
 $$
+
+$$
+\frac{\partial C_{\text{rep}}}{\partial \mathbf{y}_i} = \sum_{j} \frac{2b}{(\epsilon + d_{ij}^{2})\left(1 + a\, d_{ij}^{2b}\right)} \, (1 - w_{ij}) \, (\mathbf{y}_i - \mathbf{y}_j)
+$$
+
+其中 $\epsilon$ 是避免分母為零的小常數。吸引項沿 $-(\mathbf{y}_i - \mathbf{y}_j)$ 方向（朝向鄰居）移動，排斥項則將點推離非鄰居。
 
 **優化技巧**：
 - 使用負採樣 (Negative Sampling) 加速計算排斥項
@@ -235,13 +242,13 @@ UMAP 支援對新數據進行投影，而無需重新訓練整個模型：
 
 1. 對於新點 $\mathbf{x}_{\text{new}}$ ，找到其在訓練集中的 $k$ 最近鄰
 2. 計算新點到這些鄰居的隸屬度 $w_{\text{new}, i}$
-3. 使用加權平均估計低維座標：
+3. 以加權平均作為低維座標的初始估計：
 
 $$
-\mathbf{y}_{\text{new}} = \frac{\sum_{i} w_{\text{new}, i} \mathbf{y}_i}{\sum_{i} w_{\text{new}, i}}
+\mathbf{y}_{\text{new}}^{(0)} = \frac{\sum_{i} w_{\text{new}, i} \mathbf{y}_i}{\sum_{i} w_{\text{new}, i}}
 $$
 
-4. 可選：使用少量梯度下降步驟微調位置
+4. 固定訓練集的低維座標，僅對新點執行少量 SGD 迭代微調位置（ `transform()` 預設會執行此步驟）
 
 **優勢**：
 - 不需要重新運行整個優化過程
@@ -261,7 +268,7 @@ UMAP 的主要超參數與其影響：
 - **大值（50-100）**：關注全局結構，保留更多大尺度關係
 - **化工應用建議**：
   - 故障診斷、異常檢測：使用小值（10-20），強調局部異常
-  - 製程階段識別：使用中等值（30-50），平衡局部與全局
+  - 製程階段識別與操作模式監控：使用中等至大值（30-100），平衡局部與全局
   - 大規模數據探索：使用大值（50-100），保留整體結構
 
 **數學意義**：決定局部流形的尺度與平滑參數 $\sigma_i$ 的校準。
@@ -365,7 +372,7 @@ import umap
 # scikit-learn 相關
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.datasets import load_digits, make_blobs
+from sklearn.datasets import load_digits
 from sklearn.manifold import TSNE
 
 # 評估指標
@@ -538,8 +545,6 @@ plt.show()
 ### 3.5 比較 UMAP、t-SNE 與 PCA
 
 ```python
-from sklearn.manifold import TSNE
-
 # PCA
 pca = PCA(n_components=2, random_state=42)
 X_pca = pca.fit_transform(X_scaled)
@@ -596,12 +601,14 @@ plt.show()
 
 | 評估類別 | 指標名稱 | 用途 | scikit-learn 函數 |
 |---------|---------|------|------------------|
-| **內部評估** | 信賴度 (Trustworthiness) | 評估局部結構保持 | `trustworthiness()` |
-| **內部評估** | 連續性 (Continuity) | 評估低維空間的連續性 | 需自行實作 |
-| **外部評估** | 輪廓係數 (Silhouette Score) | 評估群集分離度 | `silhouette_score()` |
-| **外部評估** | Davies-Bouldin 指數 | 評估群集緊密度 | `davies_bouldin_score()` |
+| **結構保持** | 信賴度 (Trustworthiness) | 評估局部結構保持 | `sklearn.manifold.trustworthiness()` |
+| **結構保持** | 連續性 (Continuity) | 評估低維空間的連續性 | 需自行實作 |
+| **群集品質** | 輪廓係數 (Silhouette Score) | 評估群集分離度 | `silhouette_score()` |
+| **群集品質** | Davies-Bouldin 指數 | 評估群集緊密度 | `davies_bouldin_score()` |
 | **視覺評估** | 2D/3D 散點圖 | 視覺化群集結構 | matplotlib |
 | **化工評估** | 與領域知識的一致性 | 驗證工程合理性 | 人工評估 |
+
+> 註：輪廓係數與 Davies-Bouldin 指數本質上是群集內部指標，此處借用已知標籤計算；它們在嵌入空間內計算，會受嵌入尺度與群集形狀影響，不能單獨作為降維保真度的依據，建議搭配信賴度並與原始空間基準比較。
 
 ### 4.2 信賴度 (Trustworthiness)
 
@@ -622,7 +629,7 @@ $$
 **使用範例**：
 
 ```python
-from sklearn.metrics import trustworthiness
+from sklearn.manifold import trustworthiness
 
 # 計算信賴度（k=5, 10, 15, 30）
 for k in [5, 10, 15, 30]:
@@ -774,7 +781,7 @@ DB = \frac{1}{k} \sum_{i=1}^{k} \max_{j \neq i} \left( \frac{\sigma_i + \sigma_j
 $$
 
 其中：
-- $\sigma_i$ ：群集 $i$ 內的平均距離
+- $\sigma_i$ ：群集 $i$ 內各點到群集中心 $c_i$ 的平均距離
 - $d(c_i, c_j)$ ：群集中心 $c_i$ 和 $c_j$ 之間的距離
 
 **範圍**： $DB \geq 0$ ，值越小越好（群集越緊密且分離）。
@@ -868,7 +875,7 @@ plt.show()
 
 #### **模擬反應器操作數據**
 
-我們生成了模擬的反應器操作數據，包含 4 種不同的操作模式：
+我們以 Notebook 內的 `generate_reactor_operation_data()` 以程式生成模擬的反應器操作數據（共 5000 筆、30 個製程變數），包含 4 種不同的操作模式，每種模式 1250 筆：
 
 **執行結果**：
 ```
@@ -911,7 +918,7 @@ plt.show()
 ```
 ✓ UMAP 降維完成
   - 降維後形狀: (5000, 2)
-  - 訓練時間: 25.29 秒
+  - 訓練時間: 29.45 秒
 
 訓練進度：
   - 構建模糊單純複形 (Fuzzy Simplicial Set)
@@ -923,18 +930,19 @@ plt.show()
 1. **構建拓撲結構**：使用 RP (Random Projection) forest 加速最近鄰搜索
 2. **NN descent 迭代**：僅需 3 次迭代即收斂（提前停止）
 3. **嵌入優化**：200 個 epochs，每 20 個 epochs 輸出進度
+4. **訓練時間說明**：首次執行包含 numba 即時編譯 (JIT) 時間（約 12 秒，可見最近鄰搜索階段的時間戳記），因此本次耗時 29.45 秒；編譯完成後同量級資料的擬合只需約 11 秒（見 5.4 節）
 
 #### **視覺化結果**
 
 ![UMAP 基本投影結果](outputs/P2_Unit06_UMAP/figs/umap_basic_projection.png)
 
-**圖片已儲存至**: `d:\MyGit\CHE-AI-COURSE\Part_2\Unit06\outputs\P2_Unit06_UMAP\figs\umap_basic_projection.png`
+**圖片儲存位置**： `outputs/P2_Unit06_UMAP/figs/umap_basic_projection.png`
 
 **結果解讀**：
 - **4 個群集清晰分離**：對應 4 種操作模式
 - **群集形狀緊湊**：模式內部的操作條件相似
-- **全局結構保留**：群集間的相對位置反映模式間的相似性
-- **過渡區域**：群集間有少量點，可能代表模式切換的過渡狀態
+- **群集之間沒有任何點**：與合成數據在 30 維空間中分離良好一致；實際製程數據通常會有連續的過渡狀態，不會如此乾淨
+- **群集排列與距離不可解讀**：圖中 4 個群集呈近似等距的四個角，但在 PCA 中 Mode 1 與 Mode 3 最接近（見 5.4 節），可見 UMAP 的群集間相對位置並不反映原始空間的相似性
 
 ---
 
@@ -949,15 +957,20 @@ plt.show()
 **執行結果觀察**：
 ```
 觀察重點:
-  - 小 n_neighbors (5-15): 群集更碎片化，強調局部結構
-  - 大 n_neighbors (50-200): 群集更連續，保留全局結構
+  - 一般趨勢: 小 n_neighbors 強調局部結構（易碎片化），大 n_neighbors 保留更多全局結構（易融合）
+  - 本範例: 4 個操作模式分離良好，所有 n_neighbors 值都維持 4 個清楚的群集，差異主要在群集形狀與緊密度
+  - 注意: 群集在圖中的排列位置與群集間距離會隨設定而變，不具物理意義
 ```
 
 **詳細分析**：
-- **n_neighbors = 5**：群集碎片化嚴重，出現多個小群集，過度強調局部結構
-- **n_neighbors = 15-30**：平衡局部與全局，群集清晰且完整
-- **n_neighbors = 50-100**：群集邊界變模糊，開始融合
-- **n_neighbors = 200**：幾乎失去群集分離，趨向全局平滑
+由於本範例的 4 種操作模式在高維空間中本身分離很清楚，**所有 `n_neighbors` 值（5–200）都能維持 4 個明顯分離的群集**，並未出現群集碎片化或融合。圖中可觀察到的差異主要在於群集的形狀與緊密度：
+- **n_neighbors = 5**：群集內部較鬆散，邊緣較不規則（強調局部結構）
+- **n_neighbors = 15-30**：群集較緊湊、邊界清晰，局部與全局取得良好平衡
+- **n_neighbors = 50-100**：群集更緊實，n_neighbors = 100 是各面板中最緊湊的
+- **n_neighbors = 200**：群集仍清楚分離，但部分群集呈拉長的橢圓形，並未比 n_neighbors = 100 更緊湊
+- **群集排列位置是任意的**：各面板中 4 個群集的相對位置並不穩定（例如 n_neighbors = 15 時 Mode 1 與 Mode 3 左右互換），代表群集的排列與距離不可解讀
+
+> 注：「小 n_neighbors → 群集碎片化、大 n_neighbors → 群集融合」是 UMAP 的一般性質，在群集本身重疊或流形連續的數據上更明顯；本範例因模式分離良好，故主要表現為群集緊密度與形狀的變化。
 
 **化工應用建議**：
 - **製程監控**：使用 50-100（保留全局結構，識別操作模式）
@@ -978,15 +991,15 @@ plt.show()
 ```
 
 **詳細分析**：
-- **min_dist = 0.0**：點極度聚集，群集邊界非常清晰，但內部結構丟失
-- **min_dist = 0.1**：最佳平衡點，群集緊湊且保留內部結構
-- **min_dist = 0.25-0.5**：群集開始擴散，點分布更均勻
-- **min_dist = 0.8-0.99**：幾乎均勻分布，群集分離度下降
+- **min_dist = 0.0**：點極度聚集，群集小而緊實、邊界非常清晰，但群集內部結構難以區辨
+- **min_dist = 0.1**：良好平衡點，群集緊湊且保留一定內部結構
+- **min_dist = 0.25-0.5**：群集範圍擴大，點分布更均勻
+- **min_dist = 0.8-0.99**：群集內點分布越均勻、範圍明顯擴大，但四個群集仍清楚分離（分離度主要由 `n_neighbors` 與數據本身決定， `min_dist` 主要影響群集內的疏密程度）
 
 **化工應用建議**：
 - **操作模式識別**：使用 0.0-0.1（清晰邊界）
-- **配方空間探索**：使用 0.3-0.5（保留連續性）
-- **批次軌跡連續性**：使用 0.5-0.8（強調平滑過渡）
+- **配方/反應條件空間探索**：使用 0.1-0.3（兼顧連續性與群集分離）
+- **批次軌跡連續性**：使用 0.3-0.5（強調平滑過渡）
 
 ---
 
@@ -1004,20 +1017,22 @@ plt.show()
 ```
 計算時間比較:
   PCA:   0.01 秒
-  t-SNE: 23.86 秒
-  UMAP:  10.56 秒
-  UMAP vs t-SNE: 2.3x 快
+  t-SNE: 23.40 秒
+  UMAP:  11.40 秒
+  UMAP vs t-SNE: 2.1x 快
 ```
 
 **效率分析**：
-- **PCA**：極快（線性方法），但群集分離差
+- **PCA**：極快（線性方法），但 Mode 1 與 Mode 3 無法完全分離
 - **t-SNE**：最慢，不適合大規模數據或實時應用
-- **UMAP**：比 t-SNE 快 2.3 倍，適合大規模應用
+- **UMAP**：本例（5000 筆）比 t-SNE 快約 2.1 倍，數據量越大差距越明顯
+- **注意**：5.2 節基本模型的訓練時間（29.45 秒）高於此處的 11.40 秒，原因是首次執行包含 numba 即時編譯 (JIT) 時間
 
 **視覺化品質比較**：
-- **PCA**：線性投影，4 個模式有部分重疊，無法完全分離
-- **t-SNE**：群集分離極佳，但全局結構嚴重失真（群集位置無意義）
-- **UMAP**：群集分離良好，且保留更多全局結構（群集間距離有參考價值）
+- **PCA**：線性投影，Mode 1（橘）與 Mode 3（紫）部分重疊，Mode 0 與 Mode 2 與其他群集相距很遠
+- **t-SNE**：4 個群集完整且彼此分離，每個群集被攤成大圓盤；群集間距離無意義
+- **UMAP**：4 個群集緊密且孤立
+- **全局結構不可過度解讀**：PCA 顯示 Mode 1 與 Mode 3 彼此最接近（原始空間中兩者中心距離也最小），但 t-SNE 與 UMAP 都把 4 個群集排成近似等距的分佈，UMAP 中 Mode 1 與 Mode 3 反而相距很遠。因此兩種非線性方法的群集間相對位置與距離都不能解讀，UMAP「保留更多全局結構」的優勢在本例並未體現（文獻指出這很大程度取決於初始化方式）
 
 ---
 
@@ -1057,32 +1072,37 @@ k      PCA        t-SNE      UMAP
 群集分離度評估:
 
 Method  Silhouette Score (↑)  Davies-Bouldin Index (↓)  Computation Time (s)
-   PCA              0.761592                  0.326995              0.005369
- t-SNE              0.727285                  0.373662             23.863252
-  UMAP              0.936143                  0.090773             10.563400
+   PCA              0.761592                  0.326995              0.005003
+ t-SNE              0.727285                  0.373662             23.401185
+  UMAP              0.936143                  0.090773             11.401203
 
 解讀:
   Silhouette Score: 接近 1 表示群集分離良好
   Davies-Bouldin Index: 越小表示群集越緊密且分離
 
 結論: UMAP 在群集分離度上表現最佳
+
+基準 (原始 30 維空間): Silhouette = 0.3754, Davies-Bouldin = 1.2183
+註: 此類指標在各嵌入空間內計算，UMAP 會刻意壓縮群集，因此對 UMAP 有利；
+    它們反映群集緊密度，不代表鄰域保持較佳，請搭配 Trustworthiness 一併判讀
 ```
 
 **深度分析**：
 
 **Silhouette Score (輪廓係數)**：
-- **UMAP: 0.936** ⭐ —— 接近 1，群集分離極佳
-- **PCA: 0.762** —— 中等，有明顯群集但有重疊
-- **t-SNE: 0.727** —— 意外較低，可能因群集內部過於碎片化
+- **UMAP: 0.936** —— 接近 1，群集緊密且孤立
+- **PCA: 0.762** —— 中等，Mode 1 與 Mode 3 部分重疊，但 Mode 0 與 Mode 2 距離其他群集很遠，拉高了平均值
+- **t-SNE: 0.727** —— 略低於 PCA。圖中 t-SNE 的 4 個群集完整無碎片，偏低的原因是 t-SNE 把每個群集攤成大圓盤（直徑約 30–35 單位），而群集間隙只有約 10–20 單位，使「群集內距離」相對「最近群集距離」偏大
+- **原始 30 維空間基準: 0.375** —— 三種降維方法都高於此值，說明降維後的群集更容易視覺辨識
 
 **Davies-Bouldin Index**：
-- **UMAP: 0.091** ⭐ —— 遠小於 1，群集緊密且分離優秀
-- **PCA: 0.327** —— 可接受
-- **t-SNE: 0.374** —— 相對較高
+- **UMAP: 0.091** —— 遠小於 1，群集緊密且分離
+- **PCA: 0.327**、**t-SNE: 0.374** —— 同樣低於原始空間基準 1.218
 
 **綜合結論**：
-- **UMAP 在本實驗中表現最佳**：群集分離度最高、計算速度適中
-- **t-SNE 在視覺化上看起來很好，但定量指標不是最佳**：可能因過度強調局部導致內部碎片化
+- **UMAP 在群集緊密度類指標上最佳**，但這類指標在各自的嵌入空間內計算，而 UMAP 會刻意壓縮群集，因此天生有利；它們不是降維保真度的指標
+- **鄰域保持以 t-SNE 最佳**：上表 Trustworthiness 顯示 t-SNE（k=5: 0.9687）高於 UMAP（0.9123）與 PCA（0.9026）
+- **本數據為分離明顯的合成數據**，指標差異主要反映群集的視覺緊密度，不宜據此宣稱 UMAP 一般性優於其他方法
 - **PCA 在速度與定量指標間取得平衡**：適合快速探索
 
 ---
@@ -1092,12 +1112,16 @@ Method  Silhouette Score (↑)  Davies-Bouldin Index (↓)  Computation Time (s)
 #### **訓練/測試集分離投影**
 
 **執行結果**：
+
+前處理先分割數據，再僅以訓練集擬合 `StandardScaler`（避免資料洩漏）：
+
 ```
 訓練集樣本數: 4000
 測試集樣本數: 1000
 
-✓ 測試集投影完成，耗時: 0.010 秒
-  （比重新訓練快 1056x）
+✓ 訓練集 fit_transform 耗時: 28.40 秒 (4000 筆)
+✓ 測試集 transform 耗時: 6.97 秒 (1000 筆，暖機後)
+✓ 測試集投影後以 5-NN 還原操作模式的準確率: 1.0000
 ```
 
 ![新數據投影結果](outputs/P2_Unit06_UMAP/figs/umap_new_data_projection.png)
@@ -1105,15 +1129,17 @@ Method  Silhouette Score (↑)  Davies-Bouldin Index (↓)  Computation Time (s)
 **圖片已儲存至**: `umap_new_data_projection.png`
 
 **結果解讀**：
-- **測試集投影位置與訓練集一致**：相同操作模式的點落在相同區域
-- **投影速度極快**：0.010 秒 vs 訓練 10.56 秒，快 1056 倍
-- **支援實時應用**：可用於實時製程監控、異常檢測
+- **群集歸屬正確**：測試集投影後，以訓練集嵌入座標訓練的 5-NN 可 100% 還原操作模式，相同操作模式的點落在對應的群集附近
+- **出現環狀假象**：右圖的測試點沿群集外緣排成空心環，群集內部幾乎是空的，與左圖訓練集填滿的圓盤明顯不同。這是 `transform()` 的已知現象：新點與訓練點距離很近時，優化過程中的排斥項會把新點推向群集外圍。群集歸屬判斷可信，但**不可用測試點的疏密解讀密度**，也不宜直接以投影座標做距離比較
+- **可投影新數據（t-SNE 無法做到）**：這是 UMAP 相較 t-SNE 最關鍵的優勢之一
+- **耗時並非即時**：`transform()` 會對新點執行一輪嵌入優化，本次 1000 筆需 6.97 秒，單筆耗時與 `fit_transform`（28.40 秒 / 4000 筆）相近。真正的優勢在於「能投影新數據」本身，以及資料量遠大於新批次時，省去對整個訓練集重新擬合的成本。耗時會受 numba 編譯與機器負載影響而波動（5.4 節同參數 5000 筆的完整擬合僅需 11.40 秒）
+- **模型可重複使用**：Notebook 7.1 節以 `joblib` 儲存 `Scaler` 與 `UMAP` 模型，載入後的投影結果與原模型完全一致（最大差異 0.00）
 
 **UMAP 的優勢**：
 - ✅ **支援 `transform()` 方法**（t-SNE 不支援）
-- ✅ **投影速度極快**，適合實時應用
-- ✅ **新數據位置有意義**，可與訓練數據對比
-- ✅ **支援增量學習與在線監控**
+- ✅ **可對新數據投影到既有嵌入空間**，與訓練數據直接對比
+- ✅ **適合增量監控**：固定嵌入後持續投影新批次數據
+- ✅ **可儲存模型重複使用**，確保不同時間點的投影一致
 
 **化工應用場景**：
 1. **實時製程監控**：新採集的數據立即投影到 UMAP 空間，監控是否偏離正常操作區域
@@ -1127,10 +1153,10 @@ Method  Silhouette Score (↑)  Davies-Bouldin Index (↓)  Computation Time (s)
 
 #### **核心發現**
 
-1. **UMAP 在本實驗中表現卓越**：
-   - 群集分離度最高（Silhouette: 0.936, DB: 0.091）
-   - 計算速度適中（比 t-SNE 快 2.3 倍）
-   - 支援新數據投影（極快，0.010 秒）
+1. **UMAP 在本實驗中的表現**：
+   - 群集緊密度類指標最佳（Silhouette: 0.936, DB: 0.091），但這類指標在嵌入空間內計算，有利於會壓縮群集的 UMAP；鄰域保持（Trustworthiness）仍以 t-SNE 最高
+   - 計算速度約為 t-SNE 的 2 倍（11.40 秒 vs 23.40 秒，5000 筆）
+   - 支援新數據投影（t-SNE 無法做到），測試集投影後以 5-NN 還原操作模式的準確率為 1.0000
 
 2. **超參數選擇建議**：
    - **製程監控**：`n_neighbors=50-100`, `min_dist=0.1`
@@ -1138,10 +1164,10 @@ Method  Silhouette Score (↑)  Davies-Bouldin Index (↓)  Computation Time (s)
    - **批次軌跡**：`n_neighbors=30-50`, `min_dist=0.3-0.5`
 
 3. **方法選擇指南**：
-   - **快速探索**：使用 PCA（0.01 秒）
-   - **最佳視覺化**：使用 UMAP（10.56 秒，群集分離最佳）
+   - **快速探索**：使用 PCA（約 0.01 秒）
+   - **最佳視覺化**：使用 UMAP（約 11 秒，群集緊密且孤立）
    - **純視覺化任務**：t-SNE 也可（但慢，且無法投影新數據）
-   - **實時應用**：必須使用 UMAP（支援 transform）
+    - **需投影新數據的實時應用**：優先選 UMAP（t-SNE 不支援 `transform()`；若線性結構已足夠，PCA 亦可）
 
 #### **化工領域應用建議**
 
@@ -1228,6 +1254,7 @@ for label, count in zip(unique_labels, counts):
 - 不同顏色的群集代表不同的操作模式
 - 噪音點（-1）可能代表異常操作或過渡狀態
 - 可以進一步分析每個模式的特徵變數分布
+- 注意： `eps` 與 `min_samples` 依賴 UMAP 座標尺度，需依實際嵌入結果調整（或改用 HDBSCAN）；群集大小與密度在 UMAP 空間中不完全可靠，分群結果需回到原始變數驗證
 
 **實務價值**：
 - 快速視覺化大規模數據，發現未知操作模式
@@ -1340,7 +1367,7 @@ X_scaled = scaler.fit_transform(X_conditions)
 reducer = umap.UMAP(
     n_neighbors=15,
     n_components=2,
-    min_dist=0.0,        # 小值，強調群集分離
+    min_dist=0.1,        # 兼顧群集分離與連續性
     metric='euclidean',
     random_state=42
 )
@@ -1398,7 +1425,7 @@ for i, col_name in enumerate(condition_names):
 - 發現多個最優區域（多峰優化）
 - 支援自動化實驗平台的決策
 
-### 5.4 案例四：產品配方空間的相似性分析
+### 6.4 案例四：產品配方空間的相似性分析
 
 **背景**：
 某化妝品公司有數千個配方（每個配方包含數十種成分），希望視覺化配方空間，發現相似配方群集，並探索新配方方向。
@@ -1415,10 +1442,9 @@ for i, col_name in enumerate(condition_names):
 # X_formulations: shape (n_formulations, n_ingredients) - 成分含量 (%)
 # product_types: 產品類型標籤
 
-# 2. 標準化（稀疏數據可考慮使用 L2 正規化）
-from sklearn.preprocessing import Normalizer
-normalizer = Normalizer(norm='l2')
-X_normalized = normalizer.fit_transform(X_formulations)
+# 2. 前處理：cosine 距離與向量長度無關，因此不需要額外的 L2 正規化
+# （若改用 euclidean 距離，才需考慮 Normalizer 或 StandardScaler）
+X_normalized = X_formulations
 
 # 3. UMAP 降維（使用餘弦距離適合成分數據）
 reducer = umap.UMAP(
@@ -1444,7 +1470,7 @@ plt.show()
 
 # 5. 新配方投影
 # X_new_formulation: shape (1, n_ingredients)
-X_new_normalized = normalizer.transform(X_new_formulation)
+X_new_normalized = X_new_formulation  # cosine 距離不需額外正規化
 X_new_umap = reducer.transform(X_new_normalized)
 
 # 視覺化新配方位置
@@ -1474,18 +1500,18 @@ plt.show()
 
 ---
 
-## 6. UMAP 的優缺點與適用場景
+## 7. UMAP 的優缺點與適用場景
 
-### 6.1 UMAP 的優點
+### 7.1 UMAP 的優點
 
 1. **速度快，可擴展性強**：
-   - $O(N \log N)$ 複雜度，比 t-SNE 快 10-100 倍
+   - $O(N \log N)$ 複雜度，大規模數據通常比 t-SNE 快數倍至數十倍
    - 適合處理百萬級數據點
-   - 支援多核心並行計算
+   - 未指定 `random_state` 時支援多核心並行計算（指定 `random_state` 會強制單執行緒以確保可重現，速度較慢）
 
 2. **平衡局部與全局結構**：
    - 在保持局部群集分離的同時，也能保留更多全局信息
-   - 群集間的相對位置更有意義
+   - 群集內的鄰域結構可信；群集間的相對位置與距離仍不可過度解讀
 
 3. **支援新數據投影**：
    - 訓練後可以對新數據進行快速投影
@@ -1507,8 +1533,9 @@ plt.show()
 
 7. **適應不同密度的數據**：
    - 自適應距離度量能夠處理不均勻密度的數據分布
+   - 但也因此低維空間中的群集大小與密度不再反映原始密度
 
-### 6.2 UMAP 的缺點
+### 7.2 UMAP 的缺點
 
 1. **結果受超參數影響**：
    - 不同的 `n_neighbors` 和 `min_dist` 可能產生不同的視覺化結果
@@ -1530,7 +1557,7 @@ plt.show()
    - 小 `n_neighbors` 可能產生假群集
    - 需要結合領域知識驗證結果的合理性
 
-### 6.3 UMAP 與其他降維方法的選擇建議
+### 7.3 UMAP 與其他降維方法的選擇建議
 
 | 場景 | 推薦方法 | 理由 |
 |------|---------|------|
@@ -1543,11 +1570,11 @@ plt.show()
 | **學術報告視覺化** | UMAP 或 t-SNE | 視覺化品質高 |
 | **需要保留全局結構** | UMAP 或 PCA | UMAP 平衡局部與全局，PCA 保留線性結構 |
 
-### 6.4 化工領域最佳實踐
+### 7.4 化工領域最佳實踐
 
 **數據前處理**：
-- 必須進行標準化（StandardScaler），確保不同量綱的變數具有可比性
-- 對於稀疏數據（如成分配方），考慮使用 L2 正規化
+- 連續型製程變數建議進行標準化（StandardScaler），確保不同量綱的變數具有可比性
+- 使用 `metric='cosine'` 時不需另做 L2 正規化（餘弦距離與向量長度無關）；使用 euclidean 距離處理成分數據時，才需考慮 L2 正規化
 - 移除常數特徵與高度相關特徵
 
 **超參數調整策略**：
@@ -1570,9 +1597,9 @@ plt.show()
 
 ---
 
-## 7. 總結
+## 8. 總結
 
-### 7.1 核心要點回顧
+### 8.1 核心要點回顧
 
 1. **UMAP 是什麼**：
    - 基於流形學習與拓撲數據分析的非線性降維技術
@@ -1594,7 +1621,8 @@ plt.show()
 4. **評估指標**：
    - 信賴度 (Trustworthiness)：評估局部結構保持
    - 連續性 (Continuity)：評估低維空間的連續性
-   - 輪廓係數 (Silhouette Score)：評估群集分離度
+   - 輪廓係數 (Silhouette Score)：評估群集分離度（在嵌入空間內計算，需搭配信賴度判讀）
+   - Davies-Bouldin 指數 (Davies-Bouldin Index)：評估群集緊密度
    - 視覺化評估與領域知識驗證
 
 5. **化工應用場景**：
@@ -1622,6 +1650,7 @@ plt.show()
 **UMAP + 監督式學習**：
 - 將 UMAP 降維後的特徵作為輸入，訓練分類或回歸模型
 - 注意：UMAP 特徵不一定總能提升監督式模型性能，需實驗驗證
+- 注意：必須僅以訓練集 `fit` UMAP，再以 `transform` 投影測試集，避免資料洩漏 (Data Leakage)
 
 **UMAP + 異常檢測**：
 - 用 UMAP 視覺化數據，識別偏離主要群集的異常點
@@ -1637,8 +1666,7 @@ plt.show()
 - 豐富的教程與範例
 
 **推薦閱讀**：
-- Van der Maaten, L., & Hinton, G. (2008). *Visualizing Data using t-SNE*. Journal of Machine Learning Research, 9(Nov), 2579-2605. （t-SNE 原始論文）
-- Belkin, M., & Niyogi, P. (2003). *Laplacian Eigenmaps for Dimensionality Reduction and Data Representation*. Neural Computation, 15(6), 1373-1396. （流形學習基礎）
+- t-SNE 與 Laplacian Eigenmaps 原始論文：請參見本講義末尾「參考文獻」第 3、4 項
 
 **實務工具**：
 - `umap-learn`：Python 官方實作
@@ -1672,13 +1700,13 @@ plt.show()
 
 2. McInnes, L., Healy, J., & Astels, S. (2017). hdbscan: Hierarchical density based clustering. *Journal of Open Source Software*, 2(11), 205.
 
-3. Van der Maaten, L., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(11).
+3. Van der Maaten, L., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of Machine Learning Research*, 9(11).
 
-4. Belkin, M., & Niyogi, P. (2003). Laplacian eigenmaps for dimensionality reduction and data representation. *Neural computation*, 15(6), 1373-1396.
+4. Belkin, M., & Niyogi, P. (2003). Laplacian eigenmaps for dimensionality reduction and data representation. *Neural Computation*, 15(6), 1373-1396.
 
-5. Tenenbaum, J. B., De Silva, V., & Langford, J. C. (2000). A global geometric framework for nonlinear dimensionality reduction. *science*, 290(5500), 2319-2323.
+5. Tenenbaum, J. B., De Silva, V., & Langford, J. C. (2000). A global geometric framework for nonlinear dimensionality reduction. *Science*, 290(5500), 2319-2323.
 
-6. Coenen, A., & Pearce, A. (2019). Understanding UMAP. *Google AI Blog*.
+6. Coenen, A., & Pearce, A. (2019). Understanding UMAP. *Google PAIR Explorables*.
 
 7. Becht, E., et al. (2019). Dimensionality reduction for visualizing single-cell data using UMAP. *Nature biotechnology*, 37(1), 38-44.
 
@@ -1700,11 +1728,11 @@ plt.show()
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Unit06 UMAP 大規模製程數據的非線性降維與視覺化
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-10-29
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
