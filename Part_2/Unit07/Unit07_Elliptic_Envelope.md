@@ -13,15 +13,16 @@
 - 應用橢圓包絡於化工領域的品質控制與製程監控
 
 > **💡 執行結果說明**：
-> 
-> 本講義整合了 `Unit07_Elliptic_Envelope.ipynb` 的完整執行結果，包含：
-> - **Section 5.6**：實際數據生成、模型訓練、超參數優化、混淆矩陣、ROC 曲線、馬氏距離分析
-> - **Section 6.4**：穩健性評估實驗結果
-> - **Section 6.5**：橢圓包絡 vs 其他方法的算法對比
-> - **7 張高品質圖表** (300 DPI)：數據可視化、超參數調整、混淆矩陣、ROC 曲線、馬氏距離分析、穩健性評估、算法對比
-> - **詳細性能分析**：Precision、Recall、F1-Score、AUC 等指標
-> 
-> 所有執行結果均已標註在相應理論章節後，便於理論與實踐對照學習。
+>
+> 本講義整合了 `Unit07_Elliptic_Envelope.ipynb` 的實際執行結果，集中於 **第 6 節**，內容包含：
+> - 批次反應器數據生成、模型訓練、穩健估計結果與決策閾值
+> - 效能評估（Precision、Recall、F1、AUC、混淆矩陣）與訓練/測試切分驗證
+> - MCD 與經驗共變異數的比較、`contamination` 超參數掃描、ROC 曲線
+> - 與 Isolation Forest、One-Class SVM、LOF 的方法比較
+> - 製程監控儀表板與模型儲存
+> - **7 張圖表** (300 DPI)，存放於 `outputs/P2_Unit07_Elliptic_Envelope/figs/`
+>
+> 理論章節（第 2 至 5 節）與實作結果（第 6 節）可對照閱讀。
 
 ---
 
@@ -156,7 +157,7 @@ $$
 $$
 
 其中：
-- $h = \lfloor n \times \text{support\_fraction} \rfloor$ ：子集大小
+- $h \approx n \times \text{support\_fraction}$ ：子集大小（預設為 $\lceil (n + d + 1) / 2 \rceil$ ，見 2.4 節）
 - $\mathbf{\Sigma}_{\mathcal{H}}$ ：子集 $\mathcal{H}$ 的共變異數矩陣
 - $\det(\cdot)$ ：行列式
 
@@ -170,7 +171,7 @@ $$
 - 自動識別並排除離群值
 - 基於"最緊密"的數據子集估計分布
 - 提高對污染數據的抵抗能力
-- 適合半監督異常檢測場景
+- 適合含少量污染數據的異常檢測場景（訓練時不需要標籤）
 
 ### 2.4 演算法流程
 
@@ -181,38 +182,42 @@ $$
 
 **訓練階段**：
 
-1. **子集選擇**：
-   - 計算 $h = \lfloor n \times (1 - \text{contamination}) \rfloor$
-   - 如果 `support_fraction` 未指定，使用 $h = \lfloor n \times 0.5 \times (n + d + 1) / n \rfloor$
+1. **決定子集大小**：
+   - `support_fraction=None` 時，使用 $h = \lceil (n + d + 1) / 2 \rceil$ 個點（例如 $n = 330$ 、 $d = 2$ 時為 167），對應 MCD 最大的崩潰點，可容忍約 50% 的污染
+   - 指定 `support_fraction` 時，則 $h \approx n \times \text{support\_fraction}$
+   - `contamination` **不參與**這個步驟，也不影響 MCD 的估計結果
 
 2. **MCD 估計**：
-   - 使用 FastMCD 演算法尋找最小共變異數行列式子集
-   - 計算穩健均值 $\hat{\boldsymbol{\mu}}$ 和穩健共變異數 $\hat{\mathbf{\Sigma}}$
+   - 使用 FastMCD 演算法尋找行列式最小的 $h$ 點子集（原始支援集 `raw_support_`）
+   - 計算穩健均值與共變異數
 
-3. **校正因子**：
-   - 應用校正因子確保一致性估計
-   - 調整共變異數矩陣使其在大樣本下無偏
+3. **校正與重加權**：
+   - 套用校正因子，使共變異數在高斯分布下為一致估計
+   - 以原始估計計算所有訓練點的 $D^2$ ，保留 $D^2$ 不超過 $\chi^2_{d, 0.975}$ 的點（最終支援集 `support_`），重新計算均值 $\hat{\boldsymbol{\mu}}$ 與共變異數 $\hat{\mathbf{\Sigma}}$
 
-4. **決策邊界**：
-   - 計算所有訓練點的馬氏距離
-   - 基於卡方分布確定異常閾值
+4. **決定閾值（經驗百分位數）**：
+   - 以最終估計計算所有訓練點的馬氏距離平方 $D^2$
+   - 閾值 $c^2 = -\mathrm{offset\_}$ 取訓練數據 $D^2$ 的第 $100 \times (1 - \text{contamination})$ 個百分位數
+   - 因此 `contamination` 只決定閾值，不改變均值、共變異數與各點的 $D^2$ 排序
 
 **預測階段**：
 
-1. **計算馬氏距離**：
-   
+1. **計算馬氏距離平方**：
+
 $$
-D_M(\mathbf{x}) = \sqrt{(\mathbf{x} - \hat{\boldsymbol{\mu}})^T \hat{\mathbf{\Sigma}}^{-1} (\mathbf{x} - \hat{\boldsymbol{\mu}})}
+D^2(\mathbf{x}) = (\mathbf{x} - \hat{\boldsymbol{\mu}})^T \hat{\mathbf{\Sigma}}^{-1} (\mathbf{x} - \hat{\boldsymbol{\mu}})
 $$
 
 2. **異常判定**：
-   
+
 $$
 \text{label}(\mathbf{x}) = \begin{cases}
-+1 & \text{if } D_M(\mathbf{x}) \leq \text{threshold (正常)} \\
--1 & \text{if } D_M(\mathbf{x}) > \text{threshold (異常)}
++1 & \text{if } D^2(\mathbf{x}) \leq c^2 \text{ (正常)} \\
+-1 & \text{if } D^2(\mathbf{x}) > c^2 \text{ (異常)}
 \end{cases}
 $$
+
+scikit-learn 的 `decision_function(x)` 等於 $c^2 - D^2(\mathbf{x})$ ，大於或等於 0 為正常，小於 0 為異常。
 
 ---
 
@@ -253,13 +258,15 @@ $$
 
 **異常閾值設定**：
 
-基於卡方分布，可以設定閾值使得正常數據的覆蓋率達到 $(1-\text{contamination})$ ：
+若數據純為高斯分布且參數已知，可以用卡方分位數得到理論閾值，使正常數據的覆蓋率為 $(1-\alpha)$ ：
 
 $$
-\text{threshold} = \sqrt{\chi^2_{d, 1-\alpha}}
+c^2_{\mathrm{theory}} = \chi^2_{d, 1-\alpha}
 $$
 
-其中 $\alpha = \text{contamination}$ 是預期的異常比例。
+其中 $\alpha$ 是預期的異常比例。例如 $d = 2$ 、 $\alpha = 0.1$ 時， $c^2_{\mathrm{theory}} = 4.605$ 。
+
+**scikit-learn 的實際做法**：`EllipticEnvelope` 並不使用卡方閾值，而是取訓練數據 $D^2$ 的第 $100 \times (1 - \text{contamination})$ 個百分位數（即 $c^2 = -\mathrm{offset\_}$ ）。因為訓練數據含有異常點，且均值與共變異數來自 MCD 估計，這個經驗閾值通常比卡方理論值大；本單元的範例中為 6.667，卡方理論值為 4.605（見第 6.2 節）。
 
 ### 3.3 橢圓的幾何特性
 
@@ -303,7 +310,7 @@ $$
 3. **穩健性**：
    - MCD 方法對少量離群值有抵抗力
    - 能在含污染數據中準確估計分布
-   - 適合半監督異常檢測
+   - 訓練時不需要標籤，適合含少量污染數據的異常檢測
 
 4. **計算效率高**：
    - FastMCD 演算法計算複雜度低
@@ -383,9 +390,12 @@ X_test = np.array([[5, 3], [10, 10]])  # [正常點, 異常點]
 predictions = model.predict(X_test)
 # 輸出：[1, -1]，1 代表正常，-1 代表異常
 
-# 計算馬氏距離（負值表示決策函數值）
-distances = model.decision_function(X_test)
-# 距離越負，越可能是異常
+# 決策函數值：decision_function = c^2 - D^2，小於 0 判為異常
+scores = model.decision_function(X_test)
+# 值越負，離橢圓中心越遠，越可能是異常
+
+# 馬氏距離平方 D^2（注意：mahalanobis() 回傳的是平方值）
+d2 = model.mahalanobis(X_test)
 ```
 
 ### 5.2 關鍵參數說明
@@ -394,30 +404,31 @@ distances = model.decision_function(X_test)
 
 **定義**：預期訓練數據中異常點的比例。
 
-**範圍**：$(0, 0.5)$ ，預設值為 $0.1$
+**範圍**： $(0, 0.5]$ ，預設值為 $0.1$
 
 **影響**：
-- 決定橢圓邊界的大小
-- 值越大，橢圓邊界越寬鬆，更多點被視為正常
-- 值越小，橢圓邊界越緊，更多點被視為異常
+- 決定判定閾值 $c^2$ （訓練數據 $D^2$ 的第 $100 \times (1 - \text{contamination})$ 個百分位數），**不影響** MCD 估計的均值與共變異數
+- 值越大，橢圓邊界越小（越緊），更多點被判為異常（Recall 上升、Precision 下降）
+- 值越小，橢圓邊界越大（越寬鬆），較少點被判為異常
+- AUC 等只依賴排序的指標不受影響
 
 **設定建議**：
 ```python
-# 品質控制場景（嚴格標準）
-model = EllipticEnvelope(contamination=0.05)  # 5% 異常容忍
+# 預期異常很少、誤報成本高
+model = EllipticEnvelope(contamination=0.05)  # 約 5% 的訓練點被標記
 
-# 製程監控場景（一般標準）
-model = EllipticEnvelope(contamination=0.1)   # 10% 異常容忍
+# 一般製程監控
+model = EllipticEnvelope(contamination=0.1)   # 約 10% 的訓練點被標記
 
-# 探索性分析（寬鬆標準）
-model = EllipticEnvelope(contamination=0.2)   # 20% 異常容忍
+# 漏報成本高，可接受較多誤報
+model = EllipticEnvelope(contamination=0.2)   # 約 20% 的訓練點被標記
 ```
 
 #### 5.2.2 `support_fraction`（支援子集比例）
 
 **定義**：MCD 演算法使用的子集比例。
 
-**範圍**：$(0, 1)$ ，預設值為 `None`（自動計算）
+**範圍**： $(0, 1)$ ，預設值為 `None`（自動計算）
 
 **自動計算公式**：
 
@@ -428,19 +439,16 @@ $$
 其中 $n$ 是樣本數， $d$ 是維度。
 
 **影響**：
-- 決定 MCD 估計的穩健性
-- 值越小，對離群值的抵抗力越強，但可能犧牲效率
-- 值越大，使用更多數據，但對離群值更敏感
+- 預設值對應 MCD 最大的崩潰點，可容忍約 50% 的污染數據，通常不需要調整
+- 調高（如 0.9）：使用更多數據，估計較有效率，但可容忍的污染比例下降，只適合很乾淨的數據
+- 不建議低於預設值：不會提高穩健性，反而因使用的點較少而使估計不穩定
 
 **設定建議**：
 ```python
-# 高污染場景（使用較小子集）
-model = EllipticEnvelope(support_fraction=0.6)
-
-# 低污染場景（使用預設值）
+# 一般情況（使用預設值）
 model = EllipticEnvelope(support_fraction=None)
 
-# 清潔數據（可使用較大子集）
+# 非常乾淨的數據（可使用較大子集）
 model = EllipticEnvelope(support_fraction=0.9)
 ```
 
@@ -469,14 +477,21 @@ print(f"共變異數矩陣:\n{Sigma}")
 precision = model.precision_
 print(f"精度矩陣:\n{precision}")
 
-# 支援向量（用於 MCD 估計的數據點索引）
-support = model.support_
-print(f"支援點數量: {len(support)}")
+# 重加權後的最終支援集（布林遮罩，長度等於訓練樣本數）
+print(f"支援點數量: {model.support_.sum()} / {len(model.support_)}")
 
-# 馬氏距離閾值
-threshold = model.threshold_
-print(f"異常閾值: {threshold}")
+# 原始 MCD 支援集（布林遮罩）
+print(f"原始支援點數量: {model.raw_support_.sum()}")
+
+# 馬氏距離平方的決策閾值 c^2（EllipticEnvelope 沒有 threshold_ 屬性）
+c2 = -model.offset_
+print(f"D^2 閾值: {c2:.4f}")
 ```
+
+**屬性說明**：
+- `support_` 與 `raw_support_` 是**布林遮罩**，不是索引清單，數量要用 `.sum()` 計算，`len()` 只會得到樣本數
+- `offset_` 是決策函數的偏移量；`decision_function(X) = -D^2 - offset_` ，因此邊界位於 $D^2 = -\mathrm{offset\_}$
+- `mahalanobis(X)` 回傳**馬氏距離平方** $D^2$ ，不是 $D_M$
 
 ### 5.4 完整工作流程
 
@@ -530,7 +545,7 @@ print(confusion_matrix(y_true, y_pred))
 # ========================================
 # 4. 可視化
 # ========================================
-# 計算馬氏距離
+# 計算馬氏距離平方 D^2
 mahal_dist = model.mahalanobis(X)
 
 # 建立網格用於繪製決策邊界
@@ -562,8 +577,8 @@ scatter2 = ax2.scatter(X[:, 0], X[:, 1], c=mahal_dist,
                        cmap='coolwarm', edgecolors='k', s=50)
 ax2.set_xlabel('Feature 1')
 ax2.set_ylabel('Feature 2')
-ax2.set_title('Mahalanobis Distance')
-plt.colorbar(scatter2, ax=ax2, label='Mahalanobis Distance')
+ax2.set_title('Squared Mahalanobis Distance')
+plt.colorbar(scatter2, ax=ax2, label='Squared Mahalanobis Distance')
 
 plt.tight_layout()
 plt.show()
@@ -618,7 +633,7 @@ model.fit(X)
 
 # 預測
 df['Prediction'] = model.predict(X)
-df['Mahalanobis_Distance'] = model.mahalanobis(X)
+df['Mahalanobis_D2'] = model.mahalanobis(X)  # 馬氏距離平方
 df['Is_Outlier'] = df['Prediction'] == -1
 
 # ========================================
@@ -626,7 +641,7 @@ df['Is_Outlier'] = df['Prediction'] == -1
 # ========================================
 print("檢測到的異常批次:")
 outlier_batches = df[df['Is_Outlier']]
-print(outlier_batches[['Batch_ID', 'Temperature', 'Pressure', 'Mahalanobis_Distance']])
+print(outlier_batches[['Batch_ID', 'Temperature', 'Pressure', 'Mahalanobis_D2']])
 
 print(f"\n總批次數: {len(df)}")
 print(f"異常批次數: {outlier_batches.shape[0]}")
@@ -685,9 +700,442 @@ y_pred_multimode = predict_multimode(X)
 
 ---
 
-## 6. 實務應用指南
+## 6. 範例演練：批次反應器品質監控（Notebook 執行結果）
 
-### 6.1 何時選擇橢圓包絡？
+本節整理 `Unit07_Elliptic_Envelope.ipynb` 的實際執行結果（scikit-learn 1.7.2，隨機種子 `SEED = 42`），並逐項解讀。所有圖檔存放於 `outputs/P2_Unit07_Elliptic_Envelope/figs/`。
+
+**案例設定**：監控批次反應器的溫度 $T$ (°C) 與壓力 $P$ (bar)，共 330 個批次，其中 300 個正常、30 個異常。橢圓包絡為**無監督**方法，訓練時不使用標籤；真實標籤僅用於事後評估。
+
+### 6.1 數據生成與探索
+
+**正常批次**：溫度 $T \sim N(180, 5^2)$ ，壓力 $P \sim N(2.5, 0.4^2)$ ，兩者相關係數 $\rho = 0.6$ ，因此共變異數為：
+
+$$
+\sigma_{TP} = \rho \sigma_T \sigma_P = 0.6 \times 5 \times 0.4 = 1.2
+$$
+
+**異常批次**（共 30 筆）：高溫異常、低壓異常、隨機異常各 10 筆；部分異常刻意落在正常分布邊緣，增加偵測難度。
+
+> **⚠️ 共變異數矩陣必須是合法的（正定）**：共變異數需滿足 $|\rho| \le 1$ 。例如若誤把 $\sigma_{TP}$ 設為 4 ，則 $\rho = 4 / (5 \times 0.4) = 2.0$ ，矩陣不是半正定，數據不是合法的多變量高斯分布，後續所有分析都失去意義。Notebook 以 `np.linalg.eigvalsh` 檢查特徵值皆為正，作為建立數據前的保護。
+
+```python
+cov_normal = [[std_T**2, rho * std_T * std_P],
+              [rho * std_T * std_P, std_P**2]]
+assert np.all(np.linalg.eigvalsh(cov_normal) > 0), "共變異數矩陣必須為正定"
+X_normal = np.random.multivariate_normal(mean_normal, cov_normal, n_normal)
+```
+
+**執行結果**：
+
+```text
+✓ 數據生成完成
+  - 總批次數: 330
+  - 正常批次: 300
+  - 異常批次: 30
+  - 異常比例: 9.09%
+  - 正常批次溫度-壓力相關係數: 0.598 (設定值 0.6)
+
+各類型批次統計:
+             Temperature       Pressure      
+                    mean   std     mean   std
+Batch_Type                                   
+High Temp         200.70  3.67     2.66  0.21
+Low Pressure      180.05  4.17     1.50  0.24
+Normal            180.05  4.90     2.50  0.39
+Random            177.07  9.97     2.28  0.47
+```
+
+**結果分析**：
+
+- 正常批次的樣本相關係數 0.598 與設定值 0.6 吻合，表示數據生成正確
+- 高溫異常的平均溫度為 200.70 °C（約高出正常平均 4σ），但壓力 2.66 bar 與正常批次相近，屬於「單一變數偏離」
+- 低壓異常的平均壓力為 1.50 bar（約低於正常平均 2.5σ），溫度 180.05 °C 與正常批次相同
+- 隨機異常的標準差最大（溫度 9.97），散佈在整個區域，其中部分會落入正常分布內部，是最難偵測的一類
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/01_data_visualization.png" alt="Batch reactor data with true labels" width="100%">
+
+**圖 6-1 分析**：
+
+- **左圖（散佈圖）**：綠點為正常批次，呈明顯的右上傾斜橢圓雲（溫度越高壓力越高）；紅色三角形為異常批次，包含右側高溫群（約 195 至 206 °C）、下方低壓群（壓力 1.0 至 1.8 bar），以及零星散佈的隨機異常
+- **中圖（溫度分布）**：高溫異常在 195 至 206 °C 形成獨立的第二個群，與正常分布分離；但其他異常的溫度與正常批次大幅重疊
+- **右圖（壓力分布）**：低壓異常集中在 1.0 至 1.8 bar，但仍有部分異常的壓力落在正常範圍內
+- **重點**：多數異常在單一變數的邊際分布上並不極端，需要同時考慮溫度與壓力的**聯合分布**（相關結構）才容易被識別，這正是馬氏距離的優勢
+
+### 6.2 模型建立與訓練
+
+```python
+CONTAMINATION = 0.1
+
+model = EllipticEnvelope(
+    contamination=CONTAMINATION,
+    support_fraction=None,  # None: 使用 (n + d + 1) / 2 個點作為 MCD 原始支援集
+    random_state=SEED
+)
+model.fit(X)
+
+# sklearn 的 decision_function = -D^2 - offset_ ，邊界在 D^2 = -offset_
+d2_threshold = -model.offset_
+```
+
+`contamination = 0.1` 接近本案例的實際異常比例 9.09%。
+
+**執行結果**：
+
+```text
+✓ 橢圓包絡模型訓練完成
+
+模型參數:
+  - Contamination: 0.1
+  - Support Fraction: None
+
+穩健估計結果:
+  - 穩健均值 (Location): [180.13156893   2.48403934]
+  - 穩健共變異數矩陣 (Covariance):
+[[20.05708153  0.97209021]
+ [ 0.97209021  0.1452739 ]]
+  - 溫度-壓力相關係數 (MCD): 0.569 (設定值 0.6)
+
+支援集與閾值:
+  - 原始 MCD 支援點數 (raw_support_): 167/330
+  - 重加權後支援點數 (support_): 301/330
+  - 決策閾值 D^2 = -offset_: 6.6669
+  - 卡方理論閾值 chi2(0.90, df=2): 4.6052 (僅在數據純為高斯且無污染時適用)
+```
+
+**結果分析**：
+
+1. **穩健均值**：[180.13, 2.484] 非常接近正常批次的設定值 [180, 2.5]，雖然訓練數據混有 9.09% 的異常，估計中心幾乎沒有被拉偏
+2. **穩健共變異數**：溫度變異數 20.06、壓力變異數 0.145、相關係數 0.569，大致反映正常批次的結構（設定值 25、0.16、0.6）；MCD 以「最緊密的子集」為基礎，估計值略小於真值是常見現象，單一隨機樣本不宜過度解讀
+3. **兩層支援集**：
+   - `raw_support_` 為 167 個點，約為 $(330 + 2 + 1) / 2$ ，即 FastMCD 最小行列式子集的大小
+   - `support_` 為 301 個點，是 MCD 重加權 (reweighting) 後的最終支援集（保留馬氏距離未超過截斷值的點）。它是長度為 330 的**布林遮罩**，不是索引清單
+4. **決策閾值**： $c^2 = -\mathrm{offset\_} = 6.667$ ，是訓練數據馬氏距離平方的第 90 個百分位數；比卡方理論值 $\chi^2_{2, 0.90} = 4.605$ 大，原因是訓練數據含有遠離中心的異常批次，使距離分布的上尾變長；sklearn 使用的是**經驗百分位數**，並不是卡方閾值
+
+### 6.3 模型預測與效能評估
+
+以「異常」為正類 (positive class)。`confusion_matrix(y_true, y_pred, labels=[-1, 1])` 的排列為：
+
+| | 預測異常 (-1) | 預測正常 (1) |
+|---|---|---|
+| **實際異常 (-1)** | TP | FN (漏報) |
+| **實際正常 (1)** | FP (誤報) | TN |
+
+```python
+y_pred = model.predict(X)
+mahal_d2 = model.mahalanobis(X)  # 回傳馬氏距離「平方」 D^2
+
+# AUC: 以 -decision_function 作為異常分數（越大越異常）
+decision_scores = -model.decision_function(X)
+auc = roc_auc_score(y_binary, decision_scores)
+cm = confusion_matrix(y_true, y_pred, labels=[-1, 1])
+```
+
+**執行結果**：
+
+```text
+性能指標 (針對異常檢測):
+  - Precision: 0.667
+  - Recall: 0.733
+  - F1-Score: 0.698
+  - AUC-ROC: 0.919
+
+分類報告:
+              precision    recall  f1-score   support
+
+     Outlier       0.67      0.73      0.70        30
+      Normal       0.97      0.96      0.97       300
+
+    accuracy                           0.94       330
+   macro avg       0.82      0.85      0.83       330
+weighted avg       0.95      0.94      0.94       330
+
+混淆矩陣 (列: 實際 [異常, 正常]；欄: 預測 [異常, 正常]):
+[[ 22   8]
+ [ 11 289]]
+  - TP: 22 (異常批次被正確識別)
+  - FN: 8 (漏報：異常批次被誤判為正常)
+  - FP: 11 (誤報：正常批次被誤判為異常)
+  - TN: 289 (正常批次被正確識別)
+  - 誤報率 (FP / 實際正常)：3.7%（11/300）
+  - 漏報率 (FN / 實際異常)：26.7%（8/30）
+```
+
+**結果分析**：
+
+- 模型共標記 33 個批次為異常（22 個真異常 + 11 個誤報）
+- **Precision 0.667**：發出警報時，有 66.7% 是真正的異常
+- **Recall 0.733**：找到 30 個真異常中的 22 個，漏掉 8 個
+- **整體準確率 0.94 容易誤導**：若全部預測為正常，準確率就有 $300 / 330 = 90.9\%$ ，因此異常檢測應看異常類別的 Precision、Recall 與 F1
+- **AUC 0.919**：與閾值無關的排序能力，表示隨機抽一個異常與一個正常批次，異常批次的馬氏距離較大的機率約為 91.9%
+- **各類異常的偵測情形**：高溫異常 10 個全部偵測到；低壓異常偵測 7 個、漏報 3 個；隨機異常偵測 5 個、漏報 5 個
+- **漏報的 8 個異常**：3 個低壓異常的 $D^2$ 為 4.63 至 5.91，接近但低於閾值 6.67；5 個隨機異常中有 4 個 $D^2 \le 2.5$ （最低僅 0.19），位於正常分布中心附近，從聯合分布來看與正常批次沒有差異，任何基於分布的方法都難以辨識
+- **誤報的 11 個正常批次**：全部位於正常分布的外緣， $D^2$ 介於 6.71 至 16.45 ；正常批次的馬氏距離本身就有上尾，只要閾值不是無限大，就一定有少數正常批次被判為異常（本例為 3.7%）
+
+### 6.4 訓練/測試切分驗證
+
+上面的評估是「訓練即評估」(in-sample)。以下以分層抽樣切出 30% 測試集：訓練集（含未標記的異常）訓練模型，再於未見過的測試批次上評估。
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_true, test_size=0.3, stratify=y_true, random_state=SEED
+)
+model_cv = EllipticEnvelope(contamination=CONTAMINATION, random_state=SEED).fit(X_train)
+```
+
+**執行結果**：
+
+```text
+          Dataset   N  Outliers  Precision  Recall  F1-Score   AUC
+Train (in-sample) 231        21      0.739   0.810     0.773 0.958
+  Test (hold-out)  99         9      0.800   0.444     0.571 0.826
+
+20 次不同切分的測試集表現 (mean ± std):
+  - Precision: 0.670 ± 0.123  (min 0.467, max 0.875)
+  - Recall: 0.722 ± 0.122  (min 0.444, max 1.000)
+  - F1-Score: 0.686 ± 0.093  (min 0.526, max 0.842)
+  - AUC: 0.910 ± 0.058  (min 0.784, max 0.991)
+```
+
+**結果分析**：
+
+- 單次切分的測試集只有 9 個異常，Recall 0.444 代表只找到 4 個，表面上比 in-sample 差很多
+- 重複 20 次不同切分後，測試集平均 Recall 為 0.722 ± 0.122、F1 為 0.686 ± 0.093、AUC 為 0.910 ± 0.058，與 in-sample 的 0.733、0.698、0.919 相近，表示模型沒有明顯過擬合
+- Recall 的範圍從 0.444 到 1.000，說明**異常樣本很少時，單次切分的指標隨機性很大**，不應僅憑一次切分下結論
+- 橢圓包絡只估計均值與共變異數（共 5 個參數），模型很簡單，因此訓練與測試表現接近
+
+### 6.5 橢圓決策邊界與馬氏距離
+
+決策邊界為 $D_M^2(\mathbf{x}) = c^2$ 的橢圓，其中 $c^2 = -\mathrm{offset\_}$ 。橢圓的主軸方向為共變異數矩陣 $\hat{\mathbf{\Sigma}}$ 的特徵向量，半軸長度為 $c\sqrt{\lambda_i}$ 。
+
+```python
+def cov_ellipse(location, cov, c2, **kwargs):
+    """回傳滿足 (x - mu)^T cov^-1 (x - mu) = c2 的橢圓 patch"""
+    vals, vecs = np.linalg.eigh(cov)
+    angle = np.degrees(np.arctan2(vecs[1, 0], vecs[0, 0]))
+    width, height = 2 * np.sqrt(c2 * vals)
+    return Ellipse(location, width, height, angle=angle, fill=False, **kwargs)
+```
+
+**執行結果**：
+
+```text
+✓ 決策邊界與馬氏距離可視化完成
+  - 橢圓半軸長度 c*sqrt(lambda): [ 0.80801267 11.57731426]
+  - 被判定為異常的批次數: 33
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/02_decision_boundary_and_mahalanobis.png" alt="Decision boundary and squared Mahalanobis distance" width="100%">
+
+**圖 6-2 分析**：
+
+- **左圖**：藍色實線是由 $\hat{\mathbf{\Sigma}}$ 、 $\hat{\boldsymbol{\mu}}$ 與 $c^2 = 6.667$ 手動畫出的橢圓，黑色虛線是 `decision_function = 0` 的等高線，兩者完全重合，驗證了決策邊界就是 $D^2 = -\mathrm{offset\_}$ 的橢圓
+- 橢圓長軸往右上方傾斜（半軸長 11.58 與 0.81，分別對應溫度為主的方向與較小的變異方向），反映溫度與壓力的正相關
+- 色階（Decision Function）離橢圓中心越遠越負，右下角（高溫低壓）已降至約 -150，表示與正常批次的聯合模式差異極大
+- 橢圓**內部**仍有少數紅色三角形（漏報），橢圓**外緣**也有少數綠色圓點被劃為異常（誤報）；這就是第 6.3 節混淆矩陣中的 FN 與 FP
+- **右圖**：以馬氏距離平方 $D^2$ 著色。正常批次幾乎都是藍色（ $D^2$ 小）；右側高溫異常批次的顏色由淺藍到紅，最大 $D^2$ 約 45.7；下方的低壓異常多呈較淺的藍色，距離值介於正常批次與高溫異常之間
+- 圖中金色星號為穩健中心 [180.13, 2.484]，位於正常批次密度最高處
+
+### 6.6 MCD 穩健估計 vs. 經驗共變異數
+
+為了驗證穩健性，在同一份含 9.09% 異常的數據上比較 `EmpiricalCovariance`（一般共變異數）與 `MinCovDet`（MCD），並以建立數據時的理論參數作為基準。
+
+```python
+emp = EmpiricalCovariance().fit(X)
+mcd = MinCovDet(random_state=SEED).fit(X)
+```
+
+**執行結果**：
+
+```text
+✓ 共變異數估計比較
+            Estimator  Mean_T  Mean_P  Var_T  Var_P  Corr
+True (normal batches) 180.000   2.500 25.000  0.160 0.600
+            Empirical 180.589   2.466 38.173  0.175 0.448
+         MCD (robust) 180.132   2.484 20.057  0.145 0.569
+
+橢圓面積 (true / empirical / MCD): 30.12 / 43.46 / 26.41
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/03_mcd_vs_empirical.png" alt="Empirical vs MCD covariance ellipses" width="80%">
+
+**圖 6-3 分析**（95% 等密度橢圓， $c^2 = \chi^2_{2, 0.95} = 5.991$ ）：
+
+| 估計方法 | 溫度變異數 | 相關係數 | 橢圓面積 | 與理論值的偏差 |
+|---|---|---|---|---|
+| 理論值 | 25.00 | 0.600 | 30.12 | 基準 |
+| 經驗共變異數 | 38.17 | 0.448 | 43.46 | 面積偏大 44% |
+| MCD | 20.06 | 0.569 | 26.41 | 面積偏小 12% |
+
+- **經驗共變異數被污染**：30 個異常批次（尤其是高溫群）把溫度變異數從 25 拉高到 38.17，並因異常偏離相關結構，使相關係數由 0.6 降到 0.448。橙色橢圓明顯向高溫異常方向膨脹，傾斜程度也較不明顯
+- **MCD 與理論橢圓接近**：藍色橢圓與黑色虛線橢圓的方向與形狀相近，面積略小；MCD 只用最緊密的子集估計，不被異常拉動
+- 橢圓若被污染撐大，離群的點會被納入「正常範圍」，造成漏報。這是橢圓包絡使用 MCD 而不是一般共變異數的原因
+- 本例的異常比例僅 9.09%，若異常比例更高或更極端，經驗估計的失真會更嚴重
+
+### 6.7 超參數調整：`contamination` 的影響
+
+`contamination` 只改變判定閾值（訓練數據 $D^2$ 的百分位數），**不改變** MCD 估計的均值與共變異數，因此馬氏距離排序與 AUC 不會隨之改變；提高 `contamination` 會讓橢圓邊界收縮，更多批次被判為異常。
+
+```python
+for cont in [0.01, 0.05, 0.1, 0.15, 0.2, 0.25]:
+    m = EllipticEnvelope(contamination=cont, random_state=SEED).fit(X)
+    yp = m.predict(X)
+    d2_threshold = -m.offset_
+```
+
+**執行結果**：
+
+```text
+ Contamination  Precision  Recall  F1-Score   AUC  Detected_Outliers  False_Alarms  D2_Threshold
+          0.01      1.000   0.133     0.235 0.919                  4             0        33.756
+          0.05      0.882   0.500     0.638 0.919                 17             2        13.736
+          0.10      0.667   0.733     0.698 0.919                 33            11         6.667
+          0.15      0.500   0.833     0.625 0.919                 50            25         5.272
+          0.20      0.394   0.867     0.542 0.919                 66            40         4.428
+          0.25      0.313   0.867     0.460 0.919                 83            57         3.598
+
+F1-Score 最高的 Contamination: 0.1 (F1 = 0.698)
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/04_contamination_tuning.png" alt="Performance metrics versus contamination" width="100%">
+
+**圖 6-4 分析**：
+
+- **閾值 $D^2$ 隨 `contamination` 單調下降**：由 33.756 降到 3.598，橢圓逐步收縮
+- **Recall 上升、Precision 下降**：`contamination` 從 0.01 增加到 0.25，Recall 由 0.133 升至 0.867，Precision 由 1.000 降至 0.313
+- **AUC 恆為 0.919**：排序能力與閾值無關，`contamination` 只是選擇工作點
+- **F1 在 `contamination = 0.1` 最高**（0.698），與實際異常比例 9.09% 相近
+- **右圖**：偵測到的異常數與誤報數都隨之上升，但 `contamination` 超過 0.1 後，誤報（11 → 25 → 40 → 57）的增加速度遠快於真正找到的異常，再提高只會增加無謂的警報；從 0.20 到 0.25，Recall 同為 0.867，Precision 卻從 0.394 降到 0.313
+- **實務提醒**：以上利用真實標籤選擇 F1 最高的設定僅供教學。實務上通常沒有標籤，應依歷史異常率，以及誤報與漏報的成本來設定
+
+### 6.8 ROC 曲線與混淆矩陣
+
+```python
+fpr, tpr, _ = roc_curve(y_binary, -model.decision_function(X))
+```
+
+**執行結果**：
+
+```text
+✓ ROC 曲線與混淆矩陣可視化完成
+  - AUC = 0.919
+  - 工作點: FPR = 0.037, TPR = 0.733
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/05_roc_and_confusion_matrix.png" alt="ROC curve and confusion matrix" width="100%">
+
+**圖 6-5 分析**：
+
+- **ROC 曲線**：曲線快速往左上角攀升，TPR 達 0.5 時 FPR 僅約 0.003、TPR 達 0.8 時 FPR 約 0.053，表示最明顯的異常（高溫群與極端低壓）的距離遠大於正常批次
+- 紅點為 `contamination = 0.1` 的工作點（FPR = 0.037、TPR = 0.733），位於曲線的「轉折點」附近，是合理的選擇
+- 曲線後段變得平緩：TPR 從 0.87 提高到 0.9 需要 FPR 約 0.33，要抓到最後 1 個異常（TPR = 1.0）則需 FPR 約 0.94，因為這些異常位於正常分布內部，要抓到它們就會把大量正常批次也判為異常
+- **混淆矩陣**：左上 22（TP）、右上 8（FN）、左下 11（FP）、右下 289（TN），與第 6.3 節的數字一致
+
+### 6.9 與其他方法的比較
+
+橢圓包絡對特徵的線性轉換（平移、縮放、旋轉）具有不變性；One-Class SVM 與 LOF 基於距離或核函數，必須先標準化，否則溫度（約 180）會主導壓力（約 2.5）。Isolation Forest 對單一特徵的縮放不敏感，直接使用原始數據。
+
+```python
+X_scaled = StandardScaler().fit_transform(X)
+
+methods = {
+    'Elliptic Envelope': (EllipticEnvelope(contamination=0.1, random_state=SEED), X),
+    'Isolation Forest': (IsolationForest(contamination=0.1, random_state=SEED), X),
+    'One-Class SVM': (OneClassSVM(nu=0.1, kernel='rbf', gamma='scale'), X_scaled),
+    'LOF': (LocalOutlierFactor(n_neighbors=20, contamination=0.1), X_scaled),
+}
+```
+
+**執行結果**：
+
+```text
+           Method  Precision  Recall  F1-Score   AUC  Detected
+Elliptic Envelope      0.667   0.733     0.698 0.919        33
+ Isolation Forest      0.576   0.633     0.603 0.902        33
+    One-Class SVM      0.417   0.500     0.455 0.653        36
+              LOF      0.636   0.700     0.667 0.895        33
+
+F1-Score 最高的方法: Elliptic Envelope (F1 = 0.698)
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/06_methods_comparison.png" alt="Anomaly detection methods comparison" width="100%">
+
+**圖 6-6 分析**：
+
+- **橢圓包絡最佳**：F1 = 0.698、AUC = 0.919 皆為最高；LOF（F1 = 0.667、AUC = 0.895）與 Isolation Forest（F1 = 0.603、AUC = 0.902）次之
+- **One-Class SVM 最差**（F1 = 0.455、AUC = 0.653），使用預設的 `gamma='scale'` 而未調校，排序能力明顯較差
+- **為何橢圓包絡領先**：本案例的正常批次完全由多變量高斯分布生成，符合橢圓包絡的模型假設，所以它佔有優勢。若真實數據偏態、多峰或維度很高，結論可能相反
+- 這是單一數據集、單一隨機種子的比較，且四個方法都固定 `contamination = 0.1`，沒有逐一調參；結果不宜推廣為「橢圓包絡永遠最好」
+
+### 6.10 製程監控儀表板
+
+模擬最近 20 個新批次，其中人工植入 2 個異常批次（第 6 批：195 °C、3.20 bar；第 16 批：170 °C、1.50 bar），使用已訓練的模型即時判定。
+
+```python
+y_pred_recent = model.predict(X_recent)
+d2_recent = model.mahalanobis(X_recent)
+```
+
+**執行結果**：
+
+```text
+監控摘要:
+  - 最近批次數: 20
+  - 異常批次數: 2
+  - 異常批次編號: [ 6 16]
+  - 異常比例: 10.0%
+  - 植入異常批次 (6, 16) 的 D^2: 11.02, 7.59 (閾值 6.67)
+```
+
+<img src="outputs/P2_Unit07_Elliptic_Envelope/figs/07_monitoring_dashboard.png" alt="Batch reactor quality monitoring dashboard" width="100%">
+
+**圖 6-7 分析**：
+
+- **左上（目前狀態）**：18 個綠色批次都在橢圓內；第 6 批（高溫）位於橢圓右上方外側，第 16 批（低壓）位於橢圓左下角外緣
+- **中上（ $D^2$ 管制圖）**：第 6 批 $D^2 = 11.02$ 、第 16 批 $D^2 = 7.59$ ，皆超過閾值 6.67。第 11 批 $D^2 = 6.13$ ，接近但未超過，可視為需要留意的「預警」批次
+- 第 16 批的溫度（170 °C）與壓力（1.50 bar）相對於各自的平均值約為 -2σ 與 -2.5σ ，單變數 $\pm 3\sigma$ 管制圖不會報警；但「溫度偏低且壓力更低」與溫度-壓力的正相關結構不符，馬氏距離才能抓出，這是多變量監控的優勢
+- **右上（統計）**：18 個正常、2 個異常，異常比例 10.0%
+- **左下（歷史對照）**：灰點為歷史數據，新批次中的正常點都落在歷史分布的核心區，異常點則在外緣
+- **右下（異常清單）**：列出被判定為異常的批次、溫度、壓力與 $D^2$ ，可直接作為根因分析的待辦清單
+- 異常批次應立即進行根因分析，確認是否為設備或製程問題；若為新的正常操作模式，則需重新訓練模型
+
+### 6.11 模型儲存與重新載入
+
+```python
+joblib.dump(model, MODEL_DIR / 'elliptic_envelope_model.pkl')
+loaded = joblib.load(MODEL_DIR / 'elliptic_envelope_model.pkl')
+assert np.array_equal(loaded.predict(X), model.predict(X))
+```
+
+```text
+✓ 模型已儲存並驗證可重新載入: ...\outputs\P2_Unit07_Elliptic_Envelope\models\elliptic_envelope_model.pkl
+```
+
+重新載入後的預測與原模型完全一致，可直接用於線上監控。
+
+### 6.12 本節結果總結
+
+| 項目 | 結果 |
+|---|---|
+| 數據 | 330 批次（300 正常 / 30 異常，異常比例 9.09%） |
+| 穩健估計 | 均值 [180.13, 2.484]，相關係數 0.569 |
+| 決策閾值 | $D^2 = 6.667$ （卡方理論值 4.605） |
+| in-sample 效能 | Precision 0.667 / Recall 0.733 / F1 0.698 / AUC 0.919 |
+| 20 次切分測試集 | F1 0.686 ± 0.093、AUC 0.910 ± 0.058 |
+| MCD vs 經驗共變異數 | 溫度變異數 20.06 vs 38.17（理論 25），MCD 較穩健 |
+| 最佳 contamination | 0.10（F1 最高；AUC 不變） |
+| 方法比較（F1） | 橢圓包絡 0.698 > LOF 0.667 > Isolation Forest 0.603 > One-Class SVM 0.455 |
+
+**限制**：
+
+- 數據為模擬，正常批次服從高斯分布，對橢圓包絡有利
+- 使用標籤計算指標與挑選 `contamination` 僅供教學，實務上通常沒有異常標籤
+- 異常批次數量很少（30 個），指標的不確定性大
+
+---
+
+## 7. 實務應用指南
+
+### 7.1 何時選擇橢圓包絡？
 
 **適合場景**：
 
@@ -709,9 +1157,9 @@ y_pred_multimode = predict_multimode(X)
 ❌ 樣本數不足（ $n < 5d$ ）  
 ❌ 需要處理任意形狀異常區域
 
-### 6.2 參數調整策略
+### 7.2 參數調整策略
 
-#### 6.2.1 `contamination` 調整
+#### 7.2.1 `contamination` 調整
 
 **策略 1：基於歷史數據**
 ```python
@@ -725,7 +1173,8 @@ model = EllipticEnvelope(contamination=historical_outlier_rate)
 from sklearn.model_selection import GridSearchCV
 
 param_grid = {'contamination': [0.05, 0.1, 0.15, 0.2]}
-# 注意：需要自定義評分函數，因為 EllipticEnvelope 不支持標準 GridSearchCV
+# 注意：GridSearchCV 需要標籤 y 才能評分；實務上通常沒有標籤，
+# 可改用第 6.7 節的 contamination 掃描，並搭配領域知識判斷
 ```
 
 **策略 3：視覺化調整**
@@ -741,30 +1190,31 @@ for cont in [0.05, 0.1, 0.15, 0.2]:
     plt.show()
 ```
 
-#### 6.2.2 `support_fraction` 調整
+#### 7.2.2 `support_fraction` 調整
 
-**一般建議**：使用預設值（ `None` ），除非：
+**一般建議**：使用預設值（ `None` ），其對應 MCD 最大的崩潰點，可容忍約 50% 的污染。
 
-- 已知污染比例很高（ $>20\%$ ）：降低 `support_fraction`
-- 數據非常乾淨：可適度提高 `support_fraction`
+- 污染比例很高（ $>20\%$ ）時，應調整 `contamination` ，而不是降低 `support_fraction`
+- 數據非常乾淨：可適度提高 `support_fraction` （如 0.9）以提高估計效率，但可容忍的污染比例會下降
+- 不建議低於預設值
 
 ```python
-# 高污染場景
+# 高污染場景：提高 contamination，support_fraction 保留預設值
 model = EllipticEnvelope(
     contamination=0.3,
-    support_fraction=0.5,  # 使用 50% 數據估計
+    support_fraction=None,
     random_state=42
 )
 
-# 低污染場景
+# 非常乾淨的數據
 model = EllipticEnvelope(
     contamination=0.05,
-    support_fraction=None,  # 自動計算
+    support_fraction=0.9,
     random_state=42
 )
 ```
 
-### 6.3 常見問題與解決方案
+### 7.3 常見問題與解決方案
 
 #### 問題 1：數據不符合高斯分布
 
@@ -856,7 +1306,7 @@ from sklearn.neighbors import LocalOutlierFactor
 model = LocalOutlierFactor(n_neighbors=20, contamination=0.1)
 ```
 
-### 6.4 效能評估
+### 7.4 效能評估
 
 對於有部分標籤的數據：
 
@@ -895,12 +1345,12 @@ plt.grid(True, alpha=0.3)
 plt.show()
 
 # 混淆矩陣
-cm = confusion_matrix(y_true, y_pred)
-print("混淆矩陣:")
+cm = confusion_matrix(y_true, y_pred, labels=[-1, 1])  # 順序：[異常, 正常]
+print("混淆矩陣 (列: 實際, 欄: 預測；順序 [異常, 正常]):")
 print(cm)
 ```
 
-### 6.5 化工製程實務建議
+### 7.5 化工製程實務建議
 
 #### 建議 1：製程穩定後再建模
 
@@ -1005,6 +1455,15 @@ def classify_alert_level(X_test):
 alerts = classify_alert_level(X_test)
 ```
 
+> **注意**：兩個模型使用相同的訓練數據與 `random_state` ，因此 MCD 估計的均值與共變異數相同， `contamination` 只改變 $D^2$ 閾值，兩個模型的異常區域是互相巢狀的（HIGH 一定也是 MEDIUM）。這等同於「一個模型搭配兩個 $D^2$ 閾值」：
+>
+> ```python
+> d2 = model_fast.mahalanobis(X_test)
+> c2_medium = -model_fast.offset_    # contamination = 0.15 的閾值
+> c2_high = -model_strict.offset_    # contamination = 0.05 的閾值
+> alert = np.where(d2 > c2_high, 'HIGH', np.where(d2 > c2_medium, 'MEDIUM', 'NORMAL'))
+> ```
+
 #### 建議 5：可視化監控儀表板
 
 ```python
@@ -1018,8 +1477,9 @@ def plot_monitoring_dashboard(model, X_current, X_historical):
     
     # 1. 實時監控圖
     ax1 = axes[0, 0]
-    mahal_dist = model.mahalanobis(X_current)
-    colors = ['red' if d > model.threshold_ else 'green' for d in mahal_dist]
+    c2 = -model.offset_  # 馬氏距離平方的閾值
+    mahal_dist = model.mahalanobis(X_current)  # 馬氏距離平方 D^2
+    colors = ['red' if d > c2 else 'green' for d in mahal_dist]
     ax1.scatter(X_current[:, 0], X_current[:, 1], c=colors, s=50, alpha=0.6)
     ax1.set_xlabel('Temperature (°C)')
     ax1.set_ylabel('Pressure (bar)')
@@ -1028,7 +1488,7 @@ def plot_monitoring_dashboard(model, X_current, X_historical):
     # 繪製橢圓邊界
     eigenvalues, eigenvectors = np.linalg.eigh(model.covariance_)
     angle = np.degrees(np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0]))
-    width, height = 2 * np.sqrt(model.threshold_) * np.sqrt(eigenvalues)
+    width, height = 2 * np.sqrt(c2 * eigenvalues)
     ellipse = Ellipse(model.location_, width, height, angle=angle,
                      fill=False, edgecolor='blue', linewidth=2)
     ax1.add_patch(ellipse)
@@ -1037,16 +1497,16 @@ def plot_monitoring_dashboard(model, X_current, X_historical):
     ax2 = axes[0, 1]
     time_steps = np.arange(len(mahal_dist))
     ax2.plot(time_steps, mahal_dist, marker='o', linestyle='-', color='blue')
-    ax2.axhline(y=model.threshold_, color='red', linestyle='--', label='Threshold')
+    ax2.axhline(y=c2, color='red', linestyle='--', label='Threshold')
     ax2.set_xlabel('Time Step')
-    ax2.set_ylabel('Mahalanobis Distance')
-    ax2.set_title('Mahalanobis Distance Over Time')
+    ax2.set_ylabel('Squared Mahalanobis Distance')
+    ax2.set_title('Squared Mahalanobis Distance Over Time')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
     # 3. 異常統計
     ax3 = axes[1, 0]
-    n_outliers = np.sum(mahal_dist > model.threshold_)
+    n_outliers = np.sum(mahal_dist > c2)
     n_normal = len(mahal_dist) - n_outliers
     ax3.bar(['Normal', 'Outlier'], [n_normal, n_outliers], color=['green', 'red'])
     ax3.set_ylabel('Count')
@@ -1072,17 +1532,18 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 
 ---
 
-## 7. 總結
+## 8. 總結
 
-### 7.1 核心要點
+### 8.1 核心要點
 
 1. **橢圓包絡基於高斯分布假設**，透過馬氏距離識別異常點
 2. **MCD 方法提供穩健估計**，能抵抗少量污染數據
 3. **考慮變數相關性**，適合多變量聯合監控
 4. **可解釋性強**，橢圓邊界易於可視化與理解
 5. **適合中等維度、接近高斯分布的數據**
+6. **`contamination` 只移動閾值**，不改變 MCD 估計與排序（AUC），應依誤報與漏報的成本設定
 
-### 7.2 使用決策樹
+### 8.2 使用決策樹
 
 ```
 開始
@@ -1107,7 +1568,7 @@ plot_monitoring_dashboard(model, X_current, X_historical)
    └─ 設定 contamination 與 support_fraction
 ```
 
-### 7.3 與其他方法的選擇
+### 8.3 與其他方法的選擇
 
 | 場景 | 推薦方法 | 原因 |
 |------|----------|------|
@@ -1115,11 +1576,11 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 | **非高斯分布數據** | Isolation Forest | 無分布假設 |
 | **多模態數據** | LOF | 基於局部密度 |
 | **高維數據** | Isolation Forest | 對維度不敏感 |
-| **小樣本數據** | One-Class SVM | 核方法適合小樣本 |
+| **小樣本且邊界複雜** | One-Class SVM（需標準化與調參） | 核方法可建立彈性邊界，但對 $\gamma$ 、 $\nu$ 敏感 |
 | **需要高度可解釋性** | 橢圓包絡 | 橢圓邊界直觀 |
 | **複雜非線性邊界** | One-Class SVM + RBF Kernel | 靈活性高 |
 
-### 7.4 延伸學習
+### 8.4 延伸學習
 
 1. **穩健統計學**：深入學習 MCD、MVE 等穩健估計方法
 2. **多變量統計**：Hotelling's T² 控制圖、MEWMA 控制圖
@@ -1127,11 +1588,11 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 4. **深度學習方法**：Autoencoder 用於異常檢測
 5. **時間序列異常檢測**：動態製程的異常檢測方法
 
-### 7.5 實務檢查清單
+### 8.5 實務檢查清單
 
 在實際應用橢圓包絡時，請確認：
 
-- [ ] 數據已標準化或正規化
+- [ ] 已檢查各變數的單位與異常值（橢圓包絡對線性縮放具不變性，不必標準化；One-Class SVM、LOF 則需要）
 - [ ] 驗證數據接近高斯分布（或已轉換）
 - [ ] 樣本數充足（ $n > 10d$ ）
 - [ ] 合理設定 `contamination` 參數
@@ -1140,13 +1601,14 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 - [ ] 建立可視化監控機制
 - [ ] 評估誤報與漏報的成本
 - [ ] 記錄並分析誤判案例
+- [ ] 以重複切分或 AUC 評估，避免單次切分的隨機性
 - [ ] 與製程工程師保持溝通
 
 ---
 
-## 8. 參考資源
+## 9. 參考資源
 
-### 8.1 理論參考
+### 9.1 理論參考
 
 1. **Rousseeuw, P. J., & Driessen, K. V. (1999)**. "A fast algorithm for the minimum covariance determinant estimator." *Technometrics*, 41(3), 212-223.
    - MCD 演算法的原始論文
@@ -1157,13 +1619,13 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 3. **Hubert, M., Debruyne, M., & Rousseeuw, P. J. (2018)**. "Minimum covariance determinant and extensions." *Wiley Interdisciplinary Reviews: Computational Statistics*, 10(3), e1421.
    - MCD 方法的綜述文章
 
-### 8.2 scikit-learn 文檔
+### 9.2 scikit-learn 文檔
 
 - [EllipticEnvelope API 文檔](https://scikit-learn.org/stable/modules/generated/sklearn.covariance.EllipticEnvelope.html)
 - [Novelty and Outlier Detection 用戶指南](https://scikit-learn.org/stable/modules/outlier_detection.html)
 - [Covariance Estimation 模組](https://scikit-learn.org/stable/modules/covariance.html)
 
-### 8.3 化工應用案例
+### 9.3 化工應用案例
 
 1. **Kourti, T., & MacGregor, J. F. (1995)**. "Process analysis, monitoring and diagnosis, using multivariate projection methods." *Chemometrics and Intelligent Laboratory Systems*, 28(1), 3-21.
    - 多變量統計製程監控經典文獻
@@ -1174,7 +1636,7 @@ plot_monitoring_dashboard(model, X_current, X_historical)
 3. **Qin, S. J. (2012)**. "Survey on data-driven industrial process monitoring and diagnosis." *Annual Reviews in Control*, 36(2), 220-234.
    - 數據驅動製程監控綜述
 
-### 8.4 線上資源
+### 9.4 線上資源
 
 - [scikit-learn 異常檢測教學](https://scikit-learn.org/stable/auto_examples/applications/plot_outlier_detection_wine.html)
 - [Robust Covariance Estimation Tutorial](https://scikit-learn.org/stable/auto_examples/covariance/plot_robust_vs_empirical_covariance.html)
@@ -1228,6 +1690,8 @@ $$
 - 95%： $D_M = \sqrt{5.991} \approx 2.448$
 - 99%： $D_M = \sqrt{9.210} \approx 3.035$
 
+> 以上為理論上的卡方閾值；scikit-learn 的 `EllipticEnvelope` 以 `contamination` 對應的經驗百分位數決定閾值（見第 3.2 節）。
+
 ---
 
 ## 附錄 B：完整程式碼範例
@@ -1236,11 +1700,14 @@ $$
 **`Unit07_Elliptic_Envelope.ipynb`**
 
 範例內容包含：
-- 批次反應器數據生成
-- 橢圓包絡模型訓練與超參數調整
-- 多種可視化分析
-- 與其他異常檢測方法的比較
-- 實時監控儀表板實作
+- 批次反應器數據生成（含共變異數合法性檢查）
+- 橢圓包絡模型訓練、效能評估與訓練/測試切分驗證
+- MCD 與經驗共變異數的比較
+- `contamination` 超參數掃描與 ROC 曲線
+- 與 Isolation Forest、One-Class SVM、LOF 的方法比較
+- 製程監控儀表板與模型儲存
+
+上述結果的完整討論見本講義第 6 節。
 
 ---
 
@@ -1264,11 +1731,11 @@ $$
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Unit07 Elliptic Envelope 橢圓包絡異常檢測
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-04
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

@@ -50,12 +50,12 @@ TEP 是一個**連續式化學製程**，用於生產兩種液態產品 (Product
 **主要反應**：
 
 $$
-\begin{align*}
+\begin{aligned}
 \text{A(g)} + \text{C(g)} + \text{D(g)} &\rightarrow \text{G(liq)} \\
 \text{A(g)} + \text{C(g)} + \text{E(g)} &\rightarrow \text{H(liq)} \\
 \text{A(g)} + \text{E(g)} &\rightarrow \text{F(liq)} \\
 3\text{D(g)} &\rightarrow 2\text{F(liq)}
-\end{align*}
+\end{aligned}
 $$
 
 其中 F 是副產物 (By-product)，B 是惰性氣體 (Inert)。
@@ -65,7 +65,7 @@ $$
 **測量變數**：
 - **連續測量變數**：22 個 (XMEAS 1-22)，如溫度、壓力、流量、液位等
 - **取樣分析變數**：19 個 (XMEAS 23-41)，如組成分析 (定期取樣)
-- **操作變數**：12 個 (XMV 1-12)，如進料流量、閥門開度、攪拌速度等
+- **操作變數**：11 個 (XMV 1-11)，如進料流量、閥門開度等 (本數據集未納入 XMV 12 攪拌器速度)
 
 **故障場景**：
 - TEP 提供 21 種預定義的故障場景 (IDV 1-21)
@@ -73,7 +73,7 @@ $$
 - 正常操作條件 (IDV = 0) 作為基準
 
 **數據規模**：
-- 訓練數據：480 個時間點 (每 3 分鐘採樣一次，共 24 小時)
+- 訓練數據：500 個時間點 (每 3 分鐘採樣一次，約 25 小時)
 - 測試數據：960 個時間點 (每 3 分鐘採樣一次，共 48 小時)
 - 總維度：52 個變數 (41 個測量變數 + 11 個操作變數)
 
@@ -432,7 +432,7 @@ $$
 - XMV(11): 冷凝器冷卻水流量
 
 **其他操作變數**：
-- XMV(12): 攪拌器速度
+- XMV(12): 攪拌器速度 (本數據集未納入，故實際使用 11 個操作變數 XMV 1-11)
 
 **化工意義**：操作變數是製程控制的執行機構，是實現製程優化的直接手段。
 
@@ -923,11 +923,11 @@ def plot_roc_curves(roc_data_dict, fig_dir):
 ```
 ✓ 偵測到 Local 環境
 
-✓ Notebook工作目錄: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09
-✓ 數據來源目錄: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\data\TEP_data
-✓ 結果輸出目錄: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study
-✓ 模型輸出目錄: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study\models
-✓ 圖檔輸出目錄: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study\figs
+✓ Notebook工作目錄: d:\MyGit\ChemE-3590\Part_2\Unit09
+✓ 數據來源目錄: d:\MyGit\ChemE-3590\Part_2\Unit09\data\TEP_data
+✓ 結果輸出目錄: d:\MyGit\ChemE-3590\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study
+✓ 模型輸出目錄: d:\MyGit\ChemE-3590\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study\models
+✓ 圖檔輸出目錄: d:\MyGit\ChemE-3590\Part_2\Unit09\outputs\P2_Unit09_Integrated_Case_Study\figs
 ```
 
 環境設定成功，所有必要的路徑都已創建。系統自動偵測到本地環境並配置相應的路徑結構。
@@ -935,13 +935,13 @@ def plot_roc_curves(roc_data_dict, fig_dir):
 #### 6.1.2 數據載入結果
 
 ```
-正在載入: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\data\TEP_data\d00.dat
+正在載入: d:\MyGit\ChemE-3590\Part_2\Unit09\data\TEP_data\d00.dat
 原始數據形狀: (52, 500)
   → 檢測到轉置格式，正在轉置...
 最終數據形狀: (500, 52) (samples × features)
 時間範圍: 0 - 1497 minutes
 
-正在載入: d:\MyGit\CHE-AI-COURSE\Part_2\Unit09\data\TEP_data\d00_te.dat
+正在載入: d:\MyGit\ChemE-3590\Part_2\Unit09\data\TEP_data\d00_te.dat
 原始數據形狀: (960, 52)
   → 檢測到標準格式
 最終數據形狀: (960, 52) (samples × features)

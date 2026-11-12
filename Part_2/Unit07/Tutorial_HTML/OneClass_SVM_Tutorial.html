@@ -1,0 +1,2407 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：一類支持向量機 (One-Class SVM) 原理與化工異常偵測 | ChemE 3590</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+        .font-mono-code {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            margin-top: -6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca;
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
+        }
+        .step-tab-active {
+            background: linear-gradient(135deg, #3730a3 0%, #0284c7 100%);
+            color: #ffffff;
+            box-shadow: 0 6px 16px -3px rgba(55, 48, 163, 0.4);
+            border-color: transparent;
+        }
+        .canvas-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        }
+    </style>
+</head>
+<body class="min-h-screen py-6 px-3 md:px-8">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- ==================== 頂部課程標題橫幅 ==================== -->
+        <header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-sky-900 text-white rounded-2xl shadow-xl p-6 md:p-8 mb-6 relative overflow-hidden">
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div>
+                    <div class="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                        <span>ChemE 3590 · AI 在化工上之應用</span>
+                        <span>｜</span>
+                        <span>Unit 07 互動式原理實驗室</span>
+                    </div>
+                    <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight mb-2">
+                        🛡️ 一類支持向量機 (One-Class SVM) 逐步互動教學
+                    </h1>
+                    <p class="text-slate-200 text-sm md:text-base max-w-3xl leading-relaxed">
+                        當化工廠只有「正常穩態操作數據」、沒有異常故障樣本時，如何畫出最精確的安全操作邊界？透過以下 <strong>4 個循序漸進的互動實驗</strong>，親手操作超球面與超平面包絡、核技巧高斯疊加、$\nu \times \gamma$ 雙參數調校，以及特徵標準化與連續告警策略！
+                    </p>
+                </div>
+
+                <!-- 傳統二類 SVM vs 一類 SVM 對照小卡 -->
+                <div class="bg-slate-800/80 border border-slate-600/70 rounded-xl p-4 lg:w-96 shrink-0 backdrop-blur-sm">
+                    <div class="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2">💡 核心觀念突破：只有一類數據怎麼分？</div>
+                    <div class="grid grid-cols-2 gap-2.5 text-xs">
+                        <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-700">
+                            <div class="font-bold text-slate-300 mb-1">傳統二分類 SVC</div>
+                            <p class="text-slate-400 leading-snug">必須同時有「正常 (+1)」與「異常 (-1)」兩類標籤，在兩群之間找最寬街道。</p>
+                        </div>
+                        <div class="bg-indigo-950/80 p-2.5 rounded-lg border border-indigo-400/50">
+                            <div class="font-bold text-indigo-300 mb-1">One-Class SVM</div>
+                            <p class="text-indigo-100/90 leading-snug">只需<strong>正常數據</strong>！用<strong>最小超球面</strong>包住正常點，或在特徵空間把<strong>原點 $\mathbf{0}$ 當作虛擬異常類</strong>推開！</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ==================== 4 階段互動導覽列 ==================== -->
+        <nav class="bg-white rounded-xl shadow-sm border border-slate-200 p-3 mb-6 sticky top-2 z-30">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                    <button onclick="switchStage(1)" id="tabBtn1" class="step-tab-active flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span class="w-6 h-6 rounded-full bg-white/20 text-xs font-extrabold flex items-center justify-center shrink-0">1</span>
+                        <div>
+                            <div class="text-xs opacity-80 font-medium">Step 1 · 幾何與支持向量</div>
+                            <div class="text-sm font-bold leading-tight">超球面 vs. 超平面包絡</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(2)" id="tabBtn2" class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">2</span>
+                        <div>
+                            <div class="text-xs opacity-75 font-medium">Step 2 · 核技巧魔法</div>
+                            <div class="text-sm font-bold leading-tight">非線性邊界與高斯核疊加</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(3)" id="tabBtn3" class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">3</span>
+                        <div>
+                            <div class="text-xs opacity-75 font-medium">Step 3 · 超參數實驗室</div>
+                            <div class="text-sm font-bold leading-tight">$\nu$ 定理驗證 $\times$ $\gamma$ 過擬合</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(4)" id="tabBtn4" class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">4</span>
+                        <div>
+                            <div class="text-xs opacity-75 font-medium">Step 4 · 化工實務部署</div>
+                            <div class="text-sm font-bold leading-tight">特徵標準化與連續告警</div>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 border-t md:border-t-0 md:border-l border-slate-200 pt-2 md:pt-0 md:pl-3 shrink-0">
+                    <button onclick="toggleViewAll()" id="btnViewAll" class="text-xs font-semibold px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                        📖 展開全部單元
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- =====================================================================
+             STAGE 1: 幾何直覺 — 超球面 (SVDD) vs. 高維超平面 (Schölkopf) 逐步包絡
+        ===================================================================== -->
+        <section id="stageSection1" class="mb-8">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div class="bg-gradient-to-r from-indigo-50 via-sky-50 to-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span class="inline-block bg-indigo-700 text-white text-xs font-bold px-2.5 py-0.5 rounded mr-2">STEP 1</span>
+                        <h2 class="inline text-xl md:text-2xl font-extrabold text-slate-800">核心幾何原理：如何只用正常數據建立「最緊密的安全邊界」？</h2>
+                    </div>
+                    <div class="text-xs text-slate-600 font-medium">
+                        👉 操作方式：<strong>切換兩種幾何視角</strong> $\rightarrow$ <strong>點擊 4 個逐步推導階段或拖曳邊界滑桿</strong>觀察支持向量！
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- 頂部控制列：視角切換 + 4 步教學導引 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-5">
+                        <!-- 左：兩種經典數學流派視角切換 -->
+                        <div class="lg:col-span-5 bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                ① 選擇幾何理解視角（在 RBF 核下兩者數學完全等價！）
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setStage1Mode('sphere')" id="s1ModeSphere" class="p-2.5 rounded-lg border-2 border-indigo-600 bg-indigo-50 text-indigo-900 text-left transition">
+                                    <div class="text-xs font-extrabold">🟢 視角 A：最小超球面法</div>
+                                    <div class="text-[11px] text-indigo-700 mt-0.5">尋找中心 $\mathbf{a}$ 與最小半徑 $R$ 包住正常數據 (SVDD)</div>
+                                </button>
+                                <button onclick="setStage1Mode('plane')" id="s1ModePlane" class="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition">
+                                    <div class="text-xs font-extrabold">📐 視角 B：超平面遠離原點</div>
+                                    <div class="text-[11px] text-slate-500 mt-0.5">把原點 $\mathbf{0}$ 當異常參考點，將超平面推到最遠 ($\rho$ 最大)</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 右：4 步分解推導按鈕 -->
+                        <div class="lg:col-span-7 bg-indigo-50/60 rounded-xl p-3.5 border border-indigo-200 flex flex-col justify-between">
+                            <div class="text-xs font-bold text-indigo-950 uppercase tracking-wider mb-2">
+                                ② 逐步體驗 One-Class SVM 建立決策邊界的 4 個階段
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button onclick="setStage1WalkStep(1)" id="s1StepBtn1" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-indigo-50 transition text-left">
+                                    <span class="text-indigo-600 font-mono-code">Step 1</span><br>散佈正常數據
+                                </button>
+                                <button onclick="setStage1WalkStep(2)" id="s1StepBtn2" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-indigo-50 transition text-left">
+                                    <span class="text-indigo-600 font-mono-code">Step 2</span><br>過寬硬邊界 ($\xi_i=0$)
+                                </button>
+                                <button onclick="setStage1WalkStep(3)" id="s1StepBtn3" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-indigo-50 transition text-left">
+                                    <span class="text-indigo-600 font-mono-code">Step 3</span><br>收縮邊界與鬆弛 $\xi_i$
+                                </button>
+                                <button onclick="setStage1WalkStep(4)" id="s1StepBtn4" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-sm transition text-left">
+                                    <span class="text-amber-300 font-mono-code">Step 4 ★</span><br>鎖定支持向量 SV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 即時狀態解說橫幅 -->
+                    <div class="mb-5 p-3.5 rounded-xl bg-slate-900 text-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-l-4 border-indigo-400">
+                        <div class="flex items-start md:items-center gap-3">
+                            <span id="s1BannerBadge" class="px-2.5 py-1 rounded bg-indigo-500/30 border border-indigo-400/50 text-indigo-200 font-mono-code text-xs font-bold shrink-0">
+                                Step 4 · 最佳化決策邊界
+                            </span>
+                            <p id="s1BannerDesc" class="text-sm text-slate-200 leading-relaxed">
+                                透過權衡「最小化邊界體積 ($R^2$)」與「邊界外違規懲罰 ($\sum \xi_i$)」，演算法由少數位於邊界上的<strong>支持向量 (綠圈)</strong> 撐起精確的安全操作邊界！
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <button onclick="toggleHideInterior()" id="btnHideInterior" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow transition">
+                                🧹 點擊驗證：隱藏內部非支持向量點
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 雙欄同步視覺化：左 = 2D 幾何空間畫布，右 = 控制滑桿 + 三類樣本角色解剖與數學公式 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- 左側：2D 幾何互動畫布 -->
+                        <div class="lg:col-span-7 canvas-card p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 id="s1CanvasTitle" class="font-bold text-slate-800 text-base">📍 反應器操作空間：最小超球面決策邊界 $\|\mathbf{x} - \mathbf{a}\|^2 = R^2$</h3>
+                                    <p class="text-xs text-slate-500">💡 <strong>互動提示：</strong>直接<strong>點擊畫布任意位置</strong>可放置「測試樣本點 $\mathbf{x}_{\text{test}}$」，即時計算決策函數值 $f(\mathbf{x})$！</p>
+                                </div>
+                                <span id="s1TestPointBadge" class="text-xs font-mono-code bg-slate-100 text-slate-700 font-bold px-2.5 py-1 rounded border border-slate-300">
+                                    f(x_test) = +0.42 (正常)
+                                </span>
+                            </div>
+
+                            <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                <canvas id="s1GeoCanvas" class="w-full h-full cursor-crosshair"></canvas>
+                            </div>
+
+                            <!-- 邊界緊縮度手動滑桿 -->
+                            <div class="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div class="flex-1">
+                                    <label for="s1RadiusSlider" class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                                        <span id="s1SliderLabel">🔧 手動調整超球面半徑 $R$（體會「體積最小化」與「違規懲罰 $\sum\xi_i$」的拉鋸）：</span>
+                                        <span id="s1SliderVal" class="font-mono-code text-indigo-700">R = 23.5 (最佳解 ★)</span>
+                                    </label>
+                                    <input type="range" id="s1RadiusSlider" min="13" max="36" step="0.5" value="23.5" oninput="onS1SliderInput(this.value)">
+                                </div>
+                                <button onclick="setStage1WalkStep(4)" class="px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 transition">
+                                    ★ 回到最佳解
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 右側：三類樣本角色統計、拉格朗日乘子 α_i 意義與優化目標函數 -->
+                        <div class="lg:col-span-5 space-y-4">
+                            <!-- 即時三格統計卡片 -->
+                            <div class="grid grid-cols-3 gap-2.5">
+                                <div class="bg-sky-50 border border-sky-200 rounded-xl p-3 text-center">
+                                    <div class="text-[11px] font-bold text-sky-800">🔵 內部正常點</div>
+                                    <div id="s1CountInterior" class="text-2xl font-extrabold text-sky-700 font-mono-code my-0.5">26</div>
+                                    <div class="text-[10px] text-sky-600 font-mono-code">$\alpha_i = 0, \xi_i = 0$</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">對邊界毫無影響</div>
+                                </div>
+                                <div class="bg-emerald-50 border-2 border-emerald-500 rounded-xl p-3 text-center shadow-sm">
+                                    <div class="text-[11px] font-bold text-emerald-900">🟢 邊界支持向量</div>
+                                    <div id="s1CountBoundarySV" class="text-2xl font-extrabold text-emerald-700 font-mono-code my-0.5">5</div>
+                                    <div class="text-[10px] text-emerald-700 font-mono-code">$0 < \alpha_i < \frac{1}{\nu n}$</div>
+                                    <div class="text-[10px] text-emerald-800 font-semibold mt-0.5">決定決策邊界位置！</div>
+                                </div>
+                                <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-center">
+                                    <div class="text-[11px] font-bold text-rose-800">🔺 邊界外違規點</div>
+                                    <div id="s1CountOutlierSV" class="text-2xl font-extrabold text-rose-600 font-mono-code my-0.5">3</div>
+                                    <div class="text-[10px] text-rose-600 font-mono-code">$\alpha_i = \frac{1}{\nu n}, \xi_i > 0$</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">有界支持向量/異常</div>
+                                </div>
+                            </div>
+
+                            <!-- 優化目標函數即時損益儀表圖 -->
+                            <div class="canvas-card p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="font-bold text-slate-800 text-sm">⚖️ 凸優化目標函數損益拆解 (Volume vs. Slack Penalty)</h4>
+                                    <span id="s1TotalLossBadge" class="text-xs font-mono-code bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">
+                                        Total Loss: 14.2
+                                    </span>
+                                </div>
+                                <div class="relative w-full h-36 bg-slate-900 rounded-xl overflow-hidden border border-slate-800">
+                                    <canvas id="s1LossCanvas" class="w-full h-full"></canvas>
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                                    🔍 試著把左方滑桿往左拉（邊界過小 $\rightarrow$ 鬆弛變數懲罰 $\sum \xi_i$ 暴增），或往右拉（邊界過大 $\rightarrow$ 包絡體積項 $R^2$ 暴增），只有<strong>最佳解 ★</strong> 能使總目標函數最小！
+                                </p>
+                            </div>
+
+                            <!-- 兩種流派之數學公式對照卡 -->
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs space-y-2">
+                                <div class="font-bold text-slate-800 border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                                    <span id="s1FormulaCardTitle">📘 數學目標與決策函數對照</span>
+                                    <span class="text-[11px] text-indigo-600 font-mono-code">f(x) ≥ 0 正常 ｜ f(x) < 0 異常</span>
+                                </div>
+                                <div id="s1FormulaBox" class="text-slate-700 space-y-1.5 leading-relaxed">
+                                    <div><strong>1. 超球面法 (SVDD)：</strong> $\min \left( R^2 + C \sum_{i=1}^n \xi_i \right)$，約束 $\|\mathbf{x}_i - \mathbf{a}\|^2 \le R^2 + \xi_i$</div>
+                                    <div><strong>2. 超平面法 (`sklearn` 實作)：</strong> $\min \left( \frac{1}{2}\|\mathbf{w}\|^2 - \rho + \frac{1}{\nu n}\sum_{i=1}^n \xi_i \right)$</div>
+                                    <div><strong>3. 僅依賴支持向量的決策函數：</strong> $f(\mathbf{x}) = \sum_{i \in SV} \alpha_i K(\mathbf{x}_i, \mathbf{x}) - \rho$</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部引導進入 Step 2 -->
+                    <div class="mt-5 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="text-xs text-slate-600">
+                            💡 <strong>下一步思考：</strong>真實化工反應器的正常操作區間往往是<strong>彎曲的弧形或雙模態</strong>，單純的圓球或直線包得住嗎？
+                        </div>
+                        <button onclick="switchStage(2)" class="bg-slate-900 hover:bg-indigo-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition shrink-0">
+                            前往 Step 2：體驗「核技巧 (Kernel Trick)」如何捏出任意非線性邊界 →
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             STAGE 2: 核技巧魔法 (Kernel Trick) — 非線性邊界與支持向量高斯核疊加
+        ===================================================================== -->
+        <section id="stageSection2" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div class="bg-gradient-to-r from-sky-50 via-indigo-50 to-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span class="inline-block bg-sky-700 text-white text-xs font-bold px-2.5 py-0.5 rounded mr-2">STEP 2</span>
+                        <h2 class="inline text-xl md:text-2xl font-extrabold text-slate-800">核技巧魔法 (Kernel Trick)：為什麼 RBF 核能完美貼合非線性化工操作窗？</h2>
+                    </div>
+                    <div class="text-xs text-slate-600 font-medium">
+                        👉 操作方式：<strong>步驟 ① 切換不同形狀的製程數據</strong> $\rightarrow$ <strong>步驟 ② 比較不同核函數 (`rbf`, `linear`, `poly`) 的包絡能力</strong>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- 頂部控制列：資料集形狀 + 核函數選擇 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-5">
+                        <!-- 左：選擇化工非線性操作分佈形狀 -->
+                        <div class="lg:col-span-6 bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                ① 選擇化工製程正常操作空間幾何形狀 ($N = 56$ 點)
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setStage2Dataset('banana')" id="s2DataBanana" class="p-2.5 rounded-lg border-2 border-sky-600 bg-sky-50 text-sky-900 text-left transition">
+                                    <div class="text-xs font-bold">🌙 弧形放熱操作窗</div>
+                                    <div class="text-[10px] text-sky-700 mt-0.5">溫度-轉化率非線性軌跡</div>
+                                </button>
+                                <button onclick="setStage2Dataset('bimodal')" id="s2DataBimodal" class="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition">
+                                    <div class="text-xs font-bold">♊ 雙模態品級區</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">Grade A / B 兩套穩態</div>
+                                </button>
+                                <button onclick="setStage2Dataset('ring')" id="s2DataRing" class="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition">
+                                    <div class="text-xs font-bold">🍩 環狀循環操作帶</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">中心與外圍皆為異常</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 右：選擇核函數類型 -->
+                        <div class="lg:col-span-6 bg-sky-50/60 rounded-xl p-3.5 border border-sky-200">
+                            <div class="text-xs font-bold text-sky-950 uppercase tracking-wider mb-2">
+                                ② 切換核函數 $K(\mathbf{x}_i, \mathbf{x}_j) = \phi(\mathbf{x}_i)^T \phi(\mathbf{x}_j)$ (`kernel` 參數)
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setStage2Kernel('rbf')" id="s2KerRbf" class="p-2.5 rounded-lg border-2 border-indigo-600 bg-indigo-600 text-white shadow-sm text-left transition">
+                                    <div class="text-xs font-extrabold">🌟 RBF 徑向基核</div>
+                                    <div class="text-[10px] text-indigo-100 mt-0.5">$\exp(-\gamma\|\mathbf{x}_i-\mathbf{x}_j\|^2)$ 首選</div>
+                                </button>
+                                <button onclick="setStage2Kernel('poly')" id="s2KerPoly" class="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition">
+                                    <div class="text-xs font-bold">📐 Polynomial 核</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">$(\gamma \mathbf{x}_i^T \mathbf{x}_j + 1)^2$ 橢圓曲面</div>
+                                </button>
+                                <button onclick="setStage2Kernel('linear')" id="s2KerLinear" class="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition">
+                                    <div class="text-xs font-bold">📏 Linear 線性核</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">$\mathbf{x}_i^T \mathbf{x}_j$ 僅能切直線超平面</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 雙圖視覺化：左 = 2D 核函數決策邊界，右 = RBF 高斯核基底函數疊加切面圖 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- 左側：2D 決策邊界與支持向量 -->
+                        <div class="lg:col-span-6 canvas-card p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 id="s2LeftTitle" class="font-bold text-slate-800 text-base">🗺️ 2D 決策邊界 $f(\mathbf{x}) = \sum_{i \in SV} \alpha_i K(\mathbf{x}_i, \mathbf{x}) - \rho = 0$</h3>
+                                    <p class="text-xs text-slate-500">黃色實線為 $f(\mathbf{x})=0$ 決策邊界；綠圈為支持向量；白虛線為右側 1D 剖面觀測線。</p>
+                                </div>
+                                <span id="s2F1Badge" class="text-xs font-mono-code font-bold bg-teal-100 text-teal-800 px-2.5 py-1 rounded">
+                                    F1 = 100%
+                                </span>
+                            </div>
+                            <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                <canvas id="s2BoundaryCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div id="s2KernelDiagnostic" class="mt-2.5 text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 leading-relaxed">
+                                ✨ <strong>RBF 核優勢：</strong>能夠順著彎曲的弧形操作窗建立貼身包絡線，將凹口處與外圍的 6 個異常點（紅星）100% 排除在外！
+                            </div>
+                        </div>
+
+                        <!-- 右側：支持向量核函數疊加剖面圖 (直觀揭秘 f(x) 如何誕生！) -->
+                        <div class="lg:col-span-6 canvas-card p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-base">⛰️ 剖面透視：決策函數 $f(\mathbf{x})$ 是如何由核函數疊加而成的？</h3>
+                                    <p class="text-xs text-slate-500">沿左圖白色虛線切開：每個支持向量貢獻一座小山丘 $\alpha_i K(\mathbf{x}_i, \mathbf{x})$，總和超過閾值 $\rho$ 即為正常區！</p>
+                                </div>
+                                <span class="text-xs bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded">山峰 ≥ ρ 為正常 (+1)</span>
+                            </div>
+                            <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                <canvas id="s2BasisCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="mt-2.5 text-xs text-slate-700 bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 leading-relaxed">
+                                💡 <strong>恍然大悟時刻：</strong>為什麼 RBF 核能造出任意形狀的邊界？因為它在每個支持向量 $\mathbf{x}_i$ 上放一座高斯鐘形波 $\alpha_i \exp(-\gamma\|\mathbf{x}-\mathbf{x}_i\|^2)$，疊加起來就像用黏土捏出座山，再用水平面 $\rho$（紅虛線）一刀切出山腰輪廓！
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部引導進入 Step 3 -->
+                    <div class="mt-5 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="text-xs text-slate-600">
+                            💡 <strong>關鍵疑問：</strong>在剛剛的山形剖面圖中，<strong>閾值高度 $\rho$（由 $\nu$ 控制）</strong>與<strong>每座高斯鐘形波的寬窄（由 $\gamma$ 控制）</strong>如何決定模型的成敗？
+                        </div>
+                        <button onclick="switchStage(3)" class="bg-slate-900 hover:bg-indigo-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition shrink-0">
+                            前往 Step 3：親手調校 $\nu \times \gamma$ 超參數與驗證 $\nu$-定理 →
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             STAGE 3: 超參數聯合調校實驗室 — ν (雙重界限定理) × γ (影響半徑與過擬合)
+        ===================================================================== -->
+        <section id="stageSection3" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div class="bg-gradient-to-r from-amber-50 via-indigo-50 to-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span class="inline-block bg-amber-600 text-white text-xs font-bold px-2.5 py-0.5 rounded mr-2">STEP 3</span>
+                        <h2 class="inline text-xl md:text-2xl font-extrabold text-slate-800">超參數實驗室：$\nu$ (支持向量與誤差雙重界限) $\times$ $\gamma$ (核寬度與過擬合孤島)</h2>
+                    </div>
+                    <div class="text-xs text-slate-600 font-medium">
+                        👉 操作方式：<strong>拖曳 $\nu$ 與 $\gamma$ 滑桿（或點選 4 種典型組合）</strong>，即時觀察決策邊界形狀與 Schölkopf $\nu$-定理！
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- 頂部：4 種經典超參數組合快速按鈕 (對應講義 4.2.3 節) -->
+                    <div class="mb-5">
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            ⚡ 快速載入講義 4.2.3 節之四種典型 $(\nu, \gamma)$ 交互影響組合（訓練集含 $N=50$ 個正常樣本 + $6$ 個測試異常樣本）：
+                        </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <button onclick="setStage3Preset(0.05, 0.08)" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-left transition">
+                                <div class="text-xs font-extrabold text-emerald-700">🟢 組合 1：小 $\nu$ + 小 $\gamma$</div>
+                                <div class="text-[11px] font-mono-code text-slate-500">ν = 0.05, γ = 0.08</div>
+                                <div class="text-[11px] text-slate-600 mt-1">極寬鬆且平滑大包絡（誤報極低、易漏報邊緣異常）</div>
+                            </button>
+                            <button onclick="setStage3Preset(0.10, 0.35)" class="p-3 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-left shadow-sm transition">
+                                <div class="text-xs font-extrabold text-indigo-900">🔵 組合 2：適中 $\nu$ + 適中 $\gamma$ ★</div>
+                                <div class="text-[11px] font-mono-code text-indigo-700">ν = 0.10, γ = 0.35 ('scale')</div>
+                                <div class="text-[11px] text-indigo-800 mt-1">黃金平衡！緊密貼合正常群集且邊界平滑無孤島</div>
+                            </button>
+                            <button onclick="setStage3Preset(0.28, 0.10)" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-left transition">
+                                <div class="text-xs font-extrabold text-amber-700">🟠 組合 3：大 $\nu$ + 小 $\gamma$</div>
+                                <div class="text-[11px] font-mono-code text-slate-500">ν = 0.28, γ = 0.10</div>
+                                <div class="text-[11px] text-slate-600 mt-1">嚴格但平滑（強迫排除 28% 正常點，產生大量誤報 FP）</div>
+                            </button>
+                            <button onclick="setStage3Preset(0.22, 2.20)" class="p-3 rounded-xl border border-rose-300 bg-rose-50/50 hover:bg-rose-50 text-left transition">
+                                <div class="text-xs font-extrabold text-rose-700">🔴 組合 4：大 $\nu$ + 大 $\gamma$ (過擬合)</div>
+                                <div class="text-[11px] font-mono-code text-rose-600">ν = 0.22, γ = 2.20</div>
+                                <div class="text-[11px] text-rose-800 mt-1">高斯半徑過小！邊界碎裂成多座小孤島，嚴重過擬合</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <!-- 左側：2D 決策邊界與 RBF 影響半徑視覺化 -->
+                        <div class="lg:col-span-7 canvas-card p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-base">🎛️ $\nu \times \gamma$ 即時決策邊界與支持向量分佈圖</h3>
+                                    <p class="text-xs text-slate-500">綠圈 = 支持向量 SV ($N_{\text{SV}}$) ｜ 淡綠虛線圓 = 單個樣本之 RBF 影響範圍 ($\propto 1/\sqrt{\gamma}$)</p>
+                                </div>
+                                <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer bg-slate-100 px-2.5 py-1 rounded">
+                                    <input type="checkbox" id="s3ShowRadiusChk" checked onchange="updateStage3Model()">
+                                    <span>顯示 $\gamma$ 影響半徑圓</span>
+                                </label>
+                            </div>
+                            <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                <canvas id="s3ContourCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="mt-2.5 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+                                <div class="flex flex-wrap gap-3">
+                                    <span>🔵 <strong>正常訓練點 (邊界內)</strong></span>
+                                    <span>🟢 <strong>支持向量 (SV 綠框)</strong></span>
+                                    <span>🟠 <strong>被排除之正常訓練點 (誤報 FP)</strong></span>
+                                    <span>🔴 <strong>測試異常點 (紅星)</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右側：雙滑桿 + ν 定理即時驗證器 + 混淆矩陣指標 -->
+                        <div class="lg:col-span-5 space-y-4">
+                            <!-- ν 與 γ 滑桿控制卡 -->
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                                <div>
+                                    <label for="s3NuSlider" class="flex justify-between items-center text-xs font-bold text-slate-800 mb-1">
+                                        <span>1. 參數 $\nu$ (`nu`：控制邊界嚴格度與異常比例)：</span>
+                                        <span id="s3NuValBadge" class="bg-indigo-600 text-white font-mono-code px-2 py-0.5 rounded text-xs">ν = 0.10 (10%)</span>
+                                    </label>
+                                    <input type="range" id="s3NuSlider" min="0.03" max="0.40" step="0.01" value="0.10" oninput="onStage3SlidersChange()">
+                                    <div class="flex justify-between text-[10px] text-slate-400 font-mono-code mt-0.5">
+                                        <span>0.03 (極寬鬆)</span>
+                                        <span>0.10 (推薦)</span>
+                                        <span>0.40 (極嚴格/高誤報)</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="s3GammaSlider" class="flex justify-between items-center text-xs font-bold text-slate-800 mb-1">
+                                        <span>2. 核參數 $\gamma$ (`gamma`：控制單點高斯影響範圍)：</span>
+                                        <span id="s3GammaValBadge" class="bg-teal-700 text-white font-mono-code px-2 py-0.5 rounded text-xs">γ = 0.35 (影響半徑 R_γ=1.69)</span>
+                                    </label>
+                                    <input type="range" id="s3GammaSlider" min="0.04" max="2.50" step="0.02" value="0.35" oninput="onStage3SlidersChange()">
+                                    <div class="flex justify-between text-[10px] text-slate-400 font-mono-code mt-0.5">
+                                        <span>0.04 (大範圍平滑圓)</span>
+                                        <span>0.35 (適中貼合)</span>
+                                        <span>2.50 (窄範圍碎裂孤島)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Schölkopf ν-Property 雙重界限定理即時驗算卡 -->
+                            <div class="bg-indigo-950 text-white p-4 rounded-xl border border-indigo-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-extrabold text-amber-300">📐 Schölkopf $\nu$-雙重界限定理即時驗證 ($N_{\text{train}}=50$)</span>
+                                    <span class="text-[10px] bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 px-2 py-0.5 rounded font-mono-code">定理恆成立 ✓</span>
+                                </div>
+                                <p class="text-[11px] text-indigo-200 mb-3 leading-relaxed">
+                                    理論保證：<strong>訓練集邊界外比例 (Outlier%) $\le \nu \le$ 支持向量比例 (SV%)</strong>
+                                </p>
+                                <div class="grid grid-cols-3 gap-2 text-center items-center bg-slate-900/90 p-2.5 rounded-lg border border-indigo-800 font-mono-code">
+                                    <div>
+                                        <div class="text-[10px] text-rose-300">訓練誤差下界</div>
+                                        <div id="s3OutlierFrac" class="text-base font-extrabold text-rose-400">8.0%</div>
+                                        <div id="s3OutlierCount" class="text-[10px] text-slate-400">(4 / 50 點在界外)</div>
+                                    </div>
+                                    <div class="border-x border-slate-700 px-1">
+                                        <div class="text-[10px] text-amber-300">設定參數 $\nu$</div>
+                                        <div id="s3NuCenter" class="text-lg font-extrabold text-amber-300">≤ 10.0% ≤</div>
+                                        <div class="text-[10px] text-slate-400">夾在兩者之間</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[10px] text-emerald-300">支持向量上界</div>
+                                        <div id="s3SvFrac" class="text-base font-extrabold text-emerald-400">16.0%</div>
+                                        <div id="s3SvCount" class="text-[10px] text-slate-400">(8 / 50 點為 SV)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 檢測效能指標卡片 -->
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
+                                <div class="font-bold text-slate-800 flex justify-between">
+                                    <span>📊 異常檢測效能評估 (50 正常 + 6 異常)</span>
+                                    <span id="s3VerdictText" class="text-indigo-700 font-bold">狀態：理想平衡</span>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-semibold text-slate-700 mb-0.5">
+                                        <span>精確率 Precision (避免正常點被誤報為異常)</span>
+                                        <span id="s3PrecVal" class="font-mono-code text-teal-700 font-bold">85.7%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                        <div id="s3PrecBar" class="h-full bg-teal-600 transition-all duration-200" style="width: 85.7%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-semibold text-slate-700 mb-0.5">
+                                        <span>召回率 Recall (成功抓出 6 個測試異常點比例)</span>
+                                        <span id="s3RecVal" class="font-mono-code text-sky-700 font-bold">100.0%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                        <div id="s3RecBar" class="h-full bg-sky-600 transition-all duration-200" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between font-semibold text-slate-700 mb-0.5">
+                                        <span>綜合指標 F1-Score</span>
+                                        <span id="s3F1Val" class="font-mono-code text-indigo-700 font-bold">92.3%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                        <div id="s3F1Bar" class="h-full bg-indigo-600 transition-all duration-200" style="width: 92.3%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部引導進入 Step 4 -->
+                    <div class="mt-5 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="text-xs text-slate-600">
+                            💡 <strong>化工實戰大考驗：</strong>為什麼孤立森林不用做特徵標準化，但 One-Class SVM 忘記加 `StandardScaler` 就會全盤失效？
+                        </div>
+                        <button onclick="switchStage(4)" class="bg-slate-900 hover:bg-indigo-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition shrink-0">
+                            前往 Step 4：特徵尺度敏感度實驗、連續 N 點告警抑制與隨堂測驗 →
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             STAGE 4: 化工實務關鍵陷阱 — 特徵標準化 (StandardScaler) + 連續告警抑制 + 隨堂測驗
+        ===================================================================== -->
+        <section id="stageSection4" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div class="bg-gradient-to-r from-rose-50 via-indigo-50 to-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span class="inline-block bg-rose-700 text-white text-xs font-bold px-2.5 py-0.5 rounded mr-2">STEP 4</span>
+                        <h2 class="inline text-xl md:text-2xl font-extrabold text-slate-800">化工實務部署關鍵：特徵標準化 (`StandardScaler`) 與連續 $N$ 點告警抑制策略</h2>
+                    </div>
+                    <div class="text-xs text-slate-600 font-medium">
+                        👉 親手驗證講義 3.2 節與 5.4.2 節的兩大工程實務鐵律！
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8">
+                    <!-- Part A: 特徵尺度敏感度對照實驗 (Unscaled vs StandardScaler) -->
+                    <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 border-b border-slate-200 pb-3">
+                            <div>
+                                <h3 class="text-lg font-extrabold text-slate-800">⚖️ Part A · 為什麼 One-Class SVM 絕對需要 `StandardScaler` 特徵標準化？</h3>
+                                <p class="text-xs text-slate-600">
+                                    RBF 核依賴歐氏距離 $\|\mathbf{x}_i - \mathbf{x}_j\|^2 = (\Delta T)^2 + (\Delta P)^2$。當溫度 $T \in [350, 450]^\circ\text{C}$ ($\Delta T \approx 40$) 與催化劑活性 $a \in [0.70, 0.90]$ ($\Delta a \approx 0.08$) 量綱相差 500 倍時會發生什麼事？
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-xs font-bold text-slate-700">調整量綱差距倍數：</span>
+                                <button onclick="setStage4ScaleRatio(1)" id="s4ScaleBtn1" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-600 text-white shadow-sm transition">
+                                    ✅ 已標準化 (Z-score 1:1)
+                                </button>
+                                <button onclick="setStage4ScaleRatio(20)" id="s4ScaleBtn20" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white shadow-sm transition">
+                                    ❌ 未標準化原始尺度 (差距 20 倍)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            <!-- 左圖：未標準化原始數據 -->
+                            <div class="lg:col-span-6 canvas-card p-4 border-t-4 border-t-rose-500">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm">❌ 未經標準化直接訓練 (`OneClassSVM().fit(X_raw)`)</h4>
+                                        <p class="text-xs text-slate-500">橫軸 $\Delta T$ 數值遠大於縱軸 $\Delta a$，RBF 距離完全被溫度主導！</p>
+                                    </div>
+                                    <span class="text-xs font-mono-code font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded">
+                                        漏報 Y 軸異常: 2 點
+                                    </span>
+                                </div>
+                                <div class="relative w-full aspect-[16/10] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                    <canvas id="s4UnscaledCanvas" class="w-full h-full"></canvas>
+                                </div>
+                                <p class="text-xs text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200 mt-2.5">
+                                    ⚠️ <strong>尺度災難：</strong>因為 $(\Delta a)^2 \approx 0.006$ 相較於 $(\Delta T)^2 \approx 400$ 幾乎為 0，決策邊界在垂直方向被拉長成柱狀，<strong>正上方與正下方的催化劑失活異常點（紫圈 FN）完全被當成正常點漏報！</strong>
+                                </p>
+                            </div>
+
+                            <!-- 右圖：StandardScaler 標準化後 -->
+                            <div class="lg:col-span-6 canvas-card p-4 border-t-4 border-t-emerald-500">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm">✅ 先經 `StandardScaler` 標準化 (`Z = (X - μ) / σ`)</h4>
+                                        <p class="text-xs text-slate-500">各特徵均轉為均值 0、標準差 1，RBF 核在所有特徵方向等向敏感！</p>
+                                    </div>
+                                    <span class="text-xs font-mono-code font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                                        異常召回率: 100% (4/4)
+                                    </span>
+                                </div>
+                                <div class="relative w-full aspect-[16/10] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                    <canvas id="s4ScaledCanvas" class="w-full h-full"></canvas>
+                                </div>
+                                <p class="text-xs text-emerald-900 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 mt-2.5">
+                                    ✨ <strong>工程鐵律：</strong>使用 One-Class SVM 前<strong>務必以正常訓練集擬合 `StandardScaler`</strong>，再轉換訓練集與測試集，才能同時捕捉溫度偏移與催化劑失活異常！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Part B: 化工線上監控 — 連續 N 點異常告警抑制模擬器 (講義 5.4.2 節) -->
+                    <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 border-b border-slate-200 pb-3">
+                            <div>
+                                <h3 class="text-lg font-extrabold text-slate-800">🚨 Part B · 化工線上監控：決策分數 $f(\mathbf{x}_t)$ 時序追蹤與「連續 $N$ 點告警抑制」</h3>
+                                <p class="text-xs text-slate-600">
+                                    現場感測器常有單點瞬間突波雜訊（使得單點 $f(\mathbf{x}_t) < 0$）。講義 5.4.2 節建議採用<strong>「連續 $N$ 個取樣點皆判定為異常才觸發工廠警報」</strong>以消除誤報疲勞！
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                                <span class="text-xs font-bold text-slate-700">設定觸發警報所需連續異常點數 $N$：</span>
+                                <button onclick="setStage4ConsecN(1)" id="s4ConsecBtn1" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700">N=1 (無抑制)</button>
+                                <button onclick="setStage4ConsecN(2)" id="s4ConsecBtn2" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700">N=2</button>
+                                <button onclick="setStage4ConsecN(3)" id="s4ConsecBtn3" class="px-2.5 py-1 rounded text-xs font-bold bg-indigo-600 text-white shadow">N=3 (推薦 ★)</button>
+                                <button onclick="setStage4ConsecN(5)" id="s4ConsecBtn5" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700">N=5 (過慢)</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                            <div class="lg:col-span-8 canvas-card p-4">
+                                <div class="relative w-full aspect-[21/9] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                                    <canvas id="s4TimeSeriesCanvas" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-4 space-y-3">
+                                <div class="grid grid-cols-2 gap-2.5">
+                                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-center">
+                                        <div class="text-[11px] font-bold text-amber-800">雜訊誤報警報次數</div>
+                                        <div id="s4FalseAlarmCount" class="text-2xl font-extrabold text-amber-700 font-mono-code mt-0.5">0 次</div>
+                                        <div class="text-[10px] text-slate-500">單點或雙點瞬間突波</div>
+                                    </div>
+                                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-center">
+                                        <div class="text-[11px] font-bold text-emerald-800">真實故障警報延遲</div>
+                                        <div id="s4DetectionDelay" class="text-2xl font-extrabold text-emerald-700 font-mono-code mt-0.5">+2 分鐘</div>
+                                        <div class="text-[10px] text-slate-500">自 t=42 劣化起算</div>
+                                    </div>
+                                </div>
+                                <div id="s4ConsecExplain" class="text-xs text-slate-700 bg-white p-3.5 rounded-xl border border-slate-200 leading-relaxed">
+                                    ✅ <strong>當 $N=3$ 時：</strong>時間步 $t=14$ 與 $t=27, 28$ 的感測器瞬間突波雜訊被成功過濾（0 次誤報），且當 $t=42$ 發生真實冷卻水異常劣化時，於第 3 個取樣點 ($t=44$) 準時觸發警報！
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Part C: 3 題互動式觀念自我檢測 (Interactive Quiz) -->
+                    <div class="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4 border-b border-slate-700 pb-3">
+                            <div>
+                                <h3 class="text-lg font-extrabold text-indigo-300">🎓 隨堂觀念自我檢測 (點擊選項立即批改解析)</h3>
+                                <p class="text-xs text-slate-300">完成 4 個互動實驗後，測試看看是否已掌握 One-Class SVM 的核心數學與工程實務！</p>
+                            </div>
+                            <span id="quizScoreBadge" class="bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-xs font-mono-code font-bold px-3 py-1 rounded-full">
+                                答對題數：0 / 3
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Q1 -->
+                            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+                                <div>
+                                    <div class="text-xs font-bold text-amber-400 mb-1">問題 1 · 參數 $\nu$ (nu) 的雙重物理意義</div>
+                                    <p class="text-sm font-semibold text-slate-100 mb-3 leading-snug">
+                                        若我們在 `OneClassSVM(nu=0.05)` 中設定 $\nu = 0.05$，並使用 1,000 筆正常製程數據進行訓練，根據 Schölkopf 定理，下列敘述何者正確？
+                                    </p>
+                                    <div class="space-y-2 text-xs">
+                                        <button onclick="checkQuiz(1, 'A')" id="q1_A" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (A) 被落在決策邊界外的訓練樣本比例上限約為 5%，且支持向量比例下限約為 5%
+                                        </button>
+                                        <button onclick="checkQuiz(1, 'B')" id="q1_B" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (B) 森林中總共會建立 50 棵決策樹
+                                        </button>
+                                        <button onclick="checkQuiz(1, 'C')" id="q1_C" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (C) $\nu$ 設得越大，決策邊界越寬鬆，越不會誤報
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="q1_feedback" class="hidden mt-3 text-xs p-2.5 rounded-lg"></div>
+                            </div>
+
+                            <!-- Q2 -->
+                            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+                                <div>
+                                    <div class="text-xs font-bold text-amber-400 mb-1">問題 2 · RBF 核參數 $\gamma$ 與過擬合</div>
+                                    <p class="text-sm font-semibold text-slate-100 mb-3 leading-snug">
+                                        在 RBF 核 $K(\mathbf{x}_i, \mathbf{x}_j) = \exp(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2)$ 中，若將 $\gamma$ 設得非常大（例如 $\gamma = 10$），決策邊界會發生什麼現象？
+                                    </p>
+                                    <div class="space-y-2 text-xs">
+                                        <button onclick="checkQuiz(2, 'A')" id="q2_A" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (A) 每個樣本的高斯影響範圍變得極大，邊界變成一個巨大的平滑圓形
+                                        </button>
+                                        <button onclick="checkQuiz(2, 'B')" id="q2_B" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (B) 每個樣本的高斯影響半徑變得極窄，決策邊界碎裂成緊包個別樣本的「孤島」，導致嚴重過擬合與高誤報率
+                                        </button>
+                                        <button onclick="checkQuiz(2, 'C')" id="q2_C" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (C) 決策邊界會退化成一條直線
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="q2_feedback" class="hidden mt-3 text-xs p-2.5 rounded-lg"></div>
+                            </div>
+
+                            <!-- Q3 -->
+                            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 flex flex-col justify-between">
+                                <div>
+                                    <div class="text-xs font-bold text-amber-400 mb-1">問題 3 · One-Class SVM vs. 孤立森林選型</div>
+                                    <p class="text-sm font-semibold text-slate-100 mb-3 leading-snug">
+                                        某精細化工新產品試產階段，僅有 180 批正常合格批次與 6 個關鍵品質特徵，且需要極精確的非線性合格邊界，應優先選擇哪種方法與前處理？
+                                    </p>
+                                    <div class="space-y-2 text-xs">
+                                        <button onclick="checkQuiz(3, 'A')" id="q3_A" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (A) 選擇 One-Class SVM (RBF 核)，且訓練前必須先做 `StandardScaler` 特徵標準化
+                                        </button>
+                                        <button onclick="checkQuiz(3, 'B')" id="q3_B" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (B) 選擇 One-Class SVM，但絕對不可做特徵標準化
+                                        </button>
+                                        <button onclick="checkQuiz(3, 'C')" id="q3_C" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                                            (C) One-Class SVM 只適用於百萬筆以上、上千維度的大數據集
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="q3_feedback" class="hidden mt-3 text-xs p-2.5 rounded-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 課程版權頁尾 ==================== -->
+        <footer class="bg-white rounded-xl border border-slate-200 p-5 text-xs text-slate-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            <div class="space-y-1">
+                <div class="font-bold text-slate-700 text-sm">課程資訊 · AI 在化工上之應用 (ChemE 3590)</div>
+                <div>課程單元：Unit 07 一類支持向量機 (One-Class SVM) 互動式原理實驗室 ｜ 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室</div>
+                <div>授課教師：莊曜禎 助理教授 ｜ 更新日期：2026-11-12</div>
+            </div>
+            <div class="text-left md:text-right shrink-0">
+                <span class="inline-block bg-slate-100 text-slate-700 font-semibold px-2.5 py-1 rounded border border-slate-200">
+                    課程授權：CC BY-NC-SA 4.0
+                </span>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- ==================== 互動式模擬引擎 (JavaScript) ==================== -->
+    <script>
+        // =========================================================================
+        // 0. 基礎數學工具與真實 One-Class SVM 二次規劃求解器 (SMO Dual Solver)
+        // =========================================================================
+        function mulberry32(a) {
+            return function() {
+                let t = a += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+
+        function randGaussian(rng) {
+            const u1 = Math.max(1e-6, rng());
+            const u2 = rng();
+            return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        }
+
+        function setupHiDPICanvas(canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const w = Math.max(rect.width, 280);
+            const h = Math.max(rect.height, 140);
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { ctx, w, h };
+        }
+
+        // 核函數計算 K(x_i, x_j)
+        function evalKernel(p1, p2, kernelType, gamma) {
+            if (kernelType === 'rbf') {
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                return Math.exp(-gamma * (dx * dx + dy * dy));
+            } else if (kernelType === 'linear') {
+                // 中心化至 (1.2, 1.2) 後作內積以呈現從原點推開的超平面
+                return (p1.x * p2.x + p1.y * p2.y) * 0.25;
+            } else if (kernelType === 'poly') {
+                const dot = p1.x * p2.x + p1.y * p2.y;
+                return Math.pow(gamma * 0.35 * dot + 1.0, 2);
+            }
+            return 0;
+        }
+
+        /**
+         * 真實 Schölkopf One-Class SVM 對偶問題 SMO 求解器：
+         * min_{α} 0.5 * α^T K α
+         * s.t. 0 <= α_i <= 1/(ν*n),  Σ α_i = 1
+         */
+        function solveOneClassSVM(trainPts, kernelType, nu, gamma) {
+            const n = trainPts.length;
+            const C = 1.0 / (nu * n);
+            const alphas = new Float64Array(n);
+
+            // 初始化滿足 Σ α_i = 1 且 0 <= α_i <= C
+            const numFull = Math.min(n, Math.floor(1.0 / C));
+            for (let i = 0; i < numFull; i++) alphas[i] = C;
+            if (numFull < n) {
+                alphas[numFull] = Math.max(0, 1.0 - numFull * C);
+            } else {
+                const eq = 1.0 / n;
+                for (let i = 0; i < n; i++) alphas[i] = eq;
+            }
+
+            // 預先計算核矩陣 K (n x n)
+            const K = new Array(n);
+            for (let i = 0; i < n; i++) {
+                K[i] = new Float64Array(n);
+                for (let j = 0; j < n; j++) {
+                    K[i][j] = evalKernel(trainPts[i], trainPts[j], kernelType, gamma);
+                }
+            }
+
+            // 計算初始梯度 g_i = (K α)_i
+            const g = new Float64Array(n);
+            for (let i = 0; i < n; i++) {
+                let sum = 0;
+                for (let j = 0; j < n; j++) sum += K[i][j] * alphas[j];
+                g[i] = sum;
+            }
+
+            // 執行 SMO 成對座標下降最佳化
+            const eps = 1e-6;
+            for (let iter = 0; iter < 360; iter++) {
+                // 尋找違反 KKT 最嚴重的 (i_up, i_low)
+                let iUp = -1, minG = Infinity;
+                let iLow = -1, maxG = -Infinity;
+                for (let i = 0; i < n; i++) {
+                    if (alphas[i] < C - eps && g[i] < minG) {
+                        minG = g[i];
+                        iUp = i;
+                    }
+                    if (alphas[i] > eps && g[i] > maxG) {
+                        maxG = g[i];
+                        iLow = i;
+                    }
+                }
+                if (iUp === -1 || iLow === -1 || iUp === iLow || (maxG - minG) < 1e-4) break;
+
+                const i = iUp, j = iLow;
+                const sumAlpha = alphas[i] + alphas[j];
+                const L = Math.max(0, sumAlpha - C);
+                const H = Math.min(C, sumAlpha);
+                if (H - L < 1e-9) continue;
+
+                const denom = Math.max(1e-8, K[i][i] + K[j][j] - 2.0 * K[i][j]);
+                let newAlphaI = alphas[i] + (g[j] - g[i]) / denom;
+                if (newAlphaI < L) newAlphaI = L;
+                if (newAlphaI > H) newAlphaI = H;
+
+                const deltaI = newAlphaI - alphas[i];
+                const deltaJ = -deltaI;
+                if (Math.abs(deltaI) < 1e-8) continue;
+
+                alphas[i] = newAlphaI;
+                alphas[j] = sumAlpha - newAlphaI;
+
+                // O(n) 更新梯度 g
+                for (let k = 0; k < n; k++) {
+                    g[k] += K[k][i] * deltaI + K[k][j] * deltaJ;
+                }
+            }
+
+            // 辨識邊界支持向量 (0 < α_i < C) 與有界支持向量 (α_i ≈ C)
+            const tol = C * 0.03;
+            const marginSVIndices = [];
+            const boundedSVIndices = [];
+            const svIndices = [];
+
+            for (let i = 0; i < n; i++) {
+                if (alphas[i] > tol) {
+                    svIndices.push(i);
+                    if (alphas[i] < C - tol) {
+                        marginSVIndices.push(i);
+                    } else {
+                        boundedSVIndices.push(i);
+                    }
+                }
+            }
+
+            // 計算偏移量閾值 ρ：由邊界支持向量 (0 < α_i < C) 之 g_i 平均決定
+            let rho = 0;
+            if (marginSVIndices.length > 0) {
+                for (const idx of marginSVIndices) rho += g[idx];
+                rho /= marginSVIndices.length;
+            } else {
+                // 若無嚴格內部邊界 SV，以分位數決定 ρ
+                const sortedG = Array.from(g).sort((a, b) => a - b);
+                const kIdx = Math.min(n - 1, Math.max(0, Math.floor(nu * n)));
+                rho = sortedG[kIdx];
+            }
+
+            // 決策函數評估器 f(x) = Σ α_i K(x_i, x) - ρ
+            const decisionFunction = (pt) => {
+                let val = 0;
+                for (const idx of svIndices) {
+                    val += alphas[idx] * evalKernel(trainPts[idx], pt, kernelType, gamma);
+                }
+                return val - rho;
+            };
+
+            return {
+                trainPts,
+                alphas,
+                C,
+                rho,
+                svIndices,
+                marginSVIndices,
+                boundedSVIndices,
+                kernelType,
+                nu,
+                gamma,
+                decisionFunction
+            };
+        }
+
+        // =========================================================================
+        // 1. 階段導覽與視窗自適應切換
+        // =========================================================================
+        let currentStage = 1;
+        let viewAllMode = false;
+
+        function switchStage(stageNum) {
+            currentStage = stageNum;
+            if (!viewAllMode) {
+                for (let i = 1; i <= 4; i++) {
+                    const sec = document.getElementById(`stageSection${i}`);
+                    if (sec) sec.classList.toggle('hidden', i !== stageNum);
+                }
+            }
+            for (let i = 1; i <= 4; i++) {
+                const btn = document.getElementById(`tabBtn${i}`);
+                if (!btn) continue;
+                const badge = btn.querySelector('span');
+                if (i === stageNum) {
+                    btn.className = 'step-tab-active flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all';
+                    badge.className = 'w-6 h-6 rounded-full bg-white/20 text-xs font-extrabold flex items-center justify-center shrink-0';
+                } else {
+                    btn.className = 'bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all';
+                    badge.className = 'w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0';
+                }
+            }
+            if (viewAllMode) {
+                const targetEl = document.getElementById(`stageSection${stageNum}`);
+                if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            setTimeout(redrawAllVisibleCanvases, 30);
+        }
+
+        function toggleViewAll() {
+            viewAllMode = !viewAllMode;
+            const btn = document.getElementById('btnViewAll');
+            for (let i = 1; i <= 4; i++) {
+                const sec = document.getElementById(`stageSection${i}`);
+                if (sec) sec.classList.toggle('hidden', !viewAllMode && i !== currentStage);
+            }
+            btn.textContent = viewAllMode ? '📑 切換為分步聚焦模式' : '📖 展開全部單元';
+            setTimeout(redrawAllVisibleCanvases, 40);
+        }
+
+        // =========================================================================
+        // 2. STAGE 1: 最小超球面 (SVDD) vs. 高維超平面 (Schölkopf) 逐步包絡實驗
+        // =========================================================================
+        let s1Mode = 'sphere'; // 'sphere' | 'plane'
+        let s1WalkStep = 4;    // 1..4
+        let s1Radius = 23.5;   // 最佳半徑 R = 23.5
+        let s1HideInterior = false;
+        let s1TestPt = { x: 46, y: 62 };
+        const s1Center = { x: 54, y: 54 };
+        const s1Points = [];
+
+        function initStage1Data() {
+            s1Points.length = 0;
+            const rng = mulberry32(359011);
+            // 26 個內部正常點 (距離中心 R < 22)
+            for (let i = 0; i < 26; i++) {
+                const angle = (i / 26) * Math.PI * 2 + rng() * 0.25;
+                const r = 4 + rng() * 16.5;
+                s1Points.push({
+                    x: s1Center.x + Math.cos(angle) * r,
+                    y: s1Center.y + Math.sin(angle) * r,
+                    role: 'interior'
+                });
+            }
+            // 5 個正好落在 R = 23.5 邊界上的支持向量 (Margin Support Vectors)
+            const svAngles = [0.35, 1.55, 2.75, 4.05, 5.35];
+            for (const ang of svAngles) {
+                s1Points.push({
+                    x: s1Center.x + Math.cos(ang) * 23.5,
+                    y: s1Center.y + Math.sin(ang) * 23.5,
+                    role: 'marginSV'
+                });
+            }
+            // 3 個落在邊界外的少數違規/邊緣雜訊點 (R = 28.5, 31.0, 33.5)
+            const outCoords = [
+                { ang: 0.95, r: 29.0 },
+                { ang: 2.25, r: 31.5 },
+                { ang: 4.75, r: 33.0 }
+            ];
+            for (const oc of outCoords) {
+                s1Points.push({
+                    x: s1Center.x + Math.cos(oc.ang) * oc.r,
+                    y: s1Center.y + Math.sin(oc.ang) * oc.r,
+                    role: 'outlierSV'
+                });
+            }
+        }
+
+        function setStage1Mode(mode) {
+            s1Mode = mode;
+            const btnSphere = document.getElementById('s1ModeSphere');
+            const btnPlane = document.getElementById('s1ModePlane');
+            const titleEl = document.getElementById('s1CanvasTitle');
+            const sliderLabel = document.getElementById('s1SliderLabel');
+
+            if (mode === 'sphere') {
+                btnSphere.className = 'p-2.5 rounded-lg border-2 border-indigo-600 bg-indigo-50 text-indigo-900 text-left transition';
+                btnPlane.className = 'p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition';
+                titleEl.innerHTML = '📍 反應器操作空間：最小超球面決策邊界 $\\|\\mathbf{x} - \\mathbf{a}\\|^2 = R^2$';
+                sliderLabel.innerHTML = '🔧 手動調整超球面半徑 $R$（體會「體積最小化 $R^2$」與「違規懲罰 $\\sum\\xi_i$」的拉鋸）：';
+            } else {
+                btnPlane.className = 'p-2.5 rounded-lg border-2 border-indigo-600 bg-indigo-50 text-indigo-900 text-left transition';
+                btnSphere.className = 'p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition';
+                titleEl.innerHTML = '📍 高維特徵空間 $\\phi(\\mathbf{x})$：超平面 $\\mathbf{w}^T\\phi(\\mathbf{x}) - \\rho = 0$ 將正常數據與原點 $\\mathbf{0}$ 隔開';
+                sliderLabel.innerHTML = '🔧 手動調整超平面與原點距離 $\\rho$（把超平面往右上推離原點 $\\mathbf{0}$）：';
+            }
+            if (window.renderMathInElement) {
+                renderMathInElement(titleEl, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false });
+                renderMathInElement(sliderLabel, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false });
+            }
+            updateStage1UI();
+        }
+
+        function setStage1WalkStep(step) {
+            s1WalkStep = step;
+            s1HideInterior = false;
+            document.getElementById('btnHideInterior').textContent = '🧹 點擊驗證：隱藏內部非支持向量點';
+
+            if (step === 1) s1Radius = 36.0;
+            else if (step === 2) s1Radius = 33.2; // 硬邊界包住全部
+            else if (step === 3) s1Radius = 18.0; // 收縮過頭示範大量 ξ_i
+            else if (step === 4) s1Radius = 23.5; // 最佳解 ★
+
+            document.getElementById('s1RadiusSlider').value = s1Radius;
+
+            for (let i = 1; i <= 4; i++) {
+                const b = document.getElementById(`s1StepBtn${i}`);
+                if (i === step) {
+                    b.className = 'py-2 px-2.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-sm transition text-left';
+                } else {
+                    b.className = 'py-2 px-2.5 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-indigo-50 transition text-left';
+                }
+            }
+            updateStage1UI();
+        }
+
+        function onS1SliderInput(val) {
+            s1Radius = parseFloat(val);
+            if (Math.abs(s1Radius - 23.5) < 0.6) s1WalkStep = 4;
+            else if (s1Radius >= 32.5) s1WalkStep = 2;
+            else s1WalkStep = 3;
+            updateStage1UI();
+        }
+
+        function toggleHideInterior() {
+            s1HideInterior = !s1HideInterior;
+            const btn = document.getElementById('btnHideInterior');
+            btn.textContent = s1HideInterior
+                ? '👁️ 恢復顯示內部正常點 (邊界位置完全不變！)'
+                : '🧹 點擊驗證：隱藏內部非支持向量點';
+            btn.className = s1HideInterior
+                ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-500 text-slate-950 shadow transition'
+                : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow transition';
+            drawStage1GeoCanvas();
+        }
+
+        function updateStage1UI() {
+            const badge = document.getElementById('s1BannerBadge');
+            const desc = document.getElementById('s1BannerDesc');
+            const sliderVal = document.getElementById('s1SliderVal');
+
+            const isOpt = Math.abs(s1Radius - 23.5) < 0.6;
+            if (s1Mode === 'sphere') {
+                sliderVal.textContent = `R = ${s1Radius.toFixed(1)} ${isOpt ? '(最佳解 ★)' : ''}`;
+            } else {
+                const rhoDisp = (48.0 - s1Radius).toFixed(1);
+                sliderVal.textContent = `ρ = ${rhoDisp} ${isOpt ? '(最佳解 ★)' : ''}`;
+            }
+
+            if (s1WalkStep === 1) {
+                badge.textContent = 'Step 1 · 觀察正常訓練數據';
+                desc.innerHTML = '化工反應器在穩態運行下收集了 34 筆數據：絕大多數聚集在核心區，但外圍有少數 3 個邊緣波動點。我們該如何畫出安全操作邊界？';
+            } else if (s1WalkStep === 2) {
+                badge.textContent = 'Step 2 · 硬邊界包絡 (ξ_i = 0)';
+                desc.innerHTML = '若強制要求<strong>「100% 訓練點都必須包在裡面 ($\\xi_i = 0$)」</strong>，邊界會被最外圍的 3 個離群點撐得過大（過度寬鬆，導致未來異常漏報）！';
+            } else if (s1WalkStep === 3) {
+                badge.textContent = 'Step 3 · 引入鬆弛變數 ξ_i > 0';
+                desc.innerHTML = '引入<strong>鬆弛變數 $\\xi_i > 0$（橘紅色虛線）</strong>允許少數邊緣點落在界外；但若把邊界縮得太小（如目前），違規懲罰 $\\sum \\xi_i$ 將急遽上升！';
+            } else {
+                badge.textContent = 'Step 4 ★ · 最佳化決策邊界與支持向量';
+                desc.innerHTML = '在最佳解處，<strong>5 個邊界支持向量 (綠圈)</strong> 剛好撐起決策邊界 $f(\\mathbf{x})=0$；內部 26 個藍點的 $\\alpha_i=0$，即使全部移除也不影響邊界！';
+            }
+            if (window.renderMathInElement) {
+                renderMathInElement(desc, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false });
+            }
+
+            // 統計目前 R 下的三類點數與目標函數 Loss
+            let nInt = 0, nBnd = 0, nOut = 0;
+            let slackSum = 0;
+            for (const p of s1Points) {
+                const dist = s1Mode === 'sphere'
+                    ? Math.hypot(p.x - s1Center.x, p.y - s1Center.y)
+                    : (78.0 - (p.x * 0.707 + p.y * 0.707) + 23.5);
+                if (Math.abs(dist - s1Radius) <= 1.1) {
+                    nBnd++;
+                } else if (dist < s1Radius - 1.1) {
+                    nInt++;
+                } else {
+                    nOut++;
+                    slackSum += (dist - s1Radius);
+                }
+            }
+
+            document.getElementById('s1CountInterior').textContent = nInt;
+            document.getElementById('s1CountBoundarySV').textContent = nBnd;
+            document.getElementById('s1CountOutlierSV').textContent = nOut;
+
+            const volLoss = (s1Radius * s1Radius) / 65.0;
+            const slackLoss = slackSum * 0.85;
+            const totalLoss = volLoss + slackLoss;
+            document.getElementById('s1TotalLossBadge').textContent =
+                `Total Loss = ${totalLoss.toFixed(1)} (體積 ${volLoss.toFixed(1)} + 鬆弛懲罰 ${slackLoss.toFixed(1)})`;
+
+            drawStage1GeoCanvas();
+            drawStage1LossCanvas();
+        }
+
+        function drawStage1GeoCanvas() {
+            const canvas = document.getElementById('s1GeoCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 44, right: 20, top: 20, bottom: 34 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const toPxX = x => pad.left + (x / 100) * plotW;
+            const toPxY = y => pad.top + plotH - (y / 100) * plotH;
+
+            // 1. 座標網格
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10.5px Inter, sans-serif';
+            for (let v = 0; v <= 100; v += 20) {
+                const px = toPxX(v), py = toPxY(v);
+                ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + plotH); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + plotW, py); ctx.stroke();
+                ctx.textAlign = 'center';
+                ctx.fillText(s1Mode === 'sphere' ? `${320 + v}°C` : `${(v / 100).toFixed(1)}`, px, pad.top + plotH + 15);
+                ctx.textAlign = 'right';
+                ctx.fillText(s1Mode === 'sphere' ? `${10 + v * 0.1}b` : `${(v / 100).toFixed(1)}`, pad.left - 6, py + 3.5);
+            }
+
+            const cx = toPxX(s1Center.x);
+            const cy = toPxY(s1Center.y);
+            const rxPx = (s1Radius / 100) * plotW;
+            const ryPx = (s1Radius / 100) * plotH;
+
+            if (s1WalkStep > 1) {
+                if (s1Mode === 'sphere') {
+                    // 繪製最小超球面與中心點 a (使用 ellipse 匹配畫布長寬比，使 R=23.5 支持向量精準落在圓周上)
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, rxPx, ryPx, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(79, 70, 229, 0.16)';
+                    ctx.fill();
+                    ctx.lineWidth = 2.8;
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.stroke();
+
+                    // 繪製球心 a 與半徑箭頭 R
+                    ctx.fillStyle = '#a5b4fc';
+                    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'rgba(165, 180, 252, 0.65)';
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx + rxPx * Math.cos(-0.4), cy + ryPx * Math.sin(-0.4));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#e0e7ff';
+                    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`中心 a, 半徑 R=${s1Radius.toFixed(1)}`, cx + 8, cy + 14);
+                    ctx.restore();
+                } else {
+                    // 視角 B：高維特徵空間超平面 w^T φ(x) = ρ 將數據與左下角原點 (0,0) 推開
+                    const origX = toPxX(6), origY = toPxY(6);
+                    // 原點 (0,0) 標記
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.beginPath(); ctx.arc(origX, origY, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#fda4af';
+                    ctx.font = 'bold 11px "Noto Sans TC", sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('原點 0 (虛擬異常類)', origX + 10, origY + 4);
+
+                    // 超平面截線 x + y = cLine
+                    const cLine = 108 - (s1Radius - 23.5) * 1.45;
+                    const xA = Math.max(0, cLine - 100), yA = cLine - xA;
+                    const yB = Math.max(0, cLine - 100), xB = cLine - yB;
+
+                    // 填滿超平面右上側正常半空間
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(79, 70, 229, 0.16)';
+                    ctx.beginPath();
+                    ctx.moveTo(toPxX(xA), toPxY(yA));
+                    ctx.lineTo(toPxX(100), toPxY(100));
+                    ctx.lineTo(toPxX(xB), toPxY(yB));
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 超平面實線
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 2.8;
+                    ctx.beginPath();
+                    ctx.moveTo(toPxX(xA), toPxY(yA));
+                    ctx.lineTo(toPxX(xB), toPxY(yB));
+                    ctx.stroke();
+
+                    // 原點到超平面的法向量距離 ρ / ||w||
+                    const midX = toPxX(cLine / 2), midY = toPxY(cLine / 2);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath(); ctx.moveTo(origX, origY); ctx.lineTo(midX, midY); ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                    ctx.fillText(`距離 ρ/||w|| (最大化推離原點)`, (origX + midX) / 2 - 20, (origY + midY) / 2 + 14);
+                    ctx.restore();
+                }
+            }
+
+            // 2. 繪製所有訓練點與鬆弛變數 ξ_i 連線
+            for (const p of s1Points) {
+                const dist = s1Mode === 'sphere'
+                    ? Math.hypot(p.x - s1Center.x, p.y - s1Center.y)
+                    : (78.0 - (p.x * 0.707 + p.y * 0.707) + 23.5);
+
+                const isMarginSV = s1WalkStep > 1 && Math.abs(dist - s1Radius) <= 1.1;
+                const isOutlier  = s1WalkStep > 1 && dist > s1Radius + 1.1;
+                const isInterior = !isMarginSV && !isOutlier;
+
+                if (s1HideInterior && isInterior) continue;
+
+                const px = toPxX(p.x), py = toPxY(p.y);
+
+                // 若為界外違規點，畫出到邊界的鬆弛變數 ξ_i 紅色虛線
+                if (isOutlier && s1Mode === 'sphere') {
+                    const ang = Math.atan2(p.y - s1Center.y, p.x - s1Center.x);
+                    const bx = toPxX(s1Center.x + Math.cos(ang) * s1Radius);
+                    const by = toPxY(s1Center.y + Math.sin(ang) * s1Radius);
+                    ctx.save();
+                    ctx.strokeStyle = '#fb7185';
+                    ctx.lineWidth = 1.8;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(px, py); ctx.stroke();
+                    ctx.fillStyle = '#fda4af';
+                    ctx.font = '10px "JetBrains Mono", monospace';
+                    ctx.fillText(`ξ>0`, px + 8, py - 4);
+                    ctx.restore();
+                }
+
+                // 若為邊界支持向量，畫綠色大光環
+                if (isMarginSV) {
+                    ctx.beginPath();
+                    ctx.arc(px, py, 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#34d399';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(px, py, isMarginSV ? 5.5 : (isOutlier ? 6 : 4.5), 0, Math.PI * 2);
+                ctx.fillStyle = isOutlier ? '#f43f5e' : (isMarginSV ? '#10b981' : '#38bdf8');
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = '#0f172a';
+                ctx.stroke();
+            }
+
+            // 3. 繪製使用者點擊放置的測試點 x_test
+            const tx = toPxX(s1TestPt.x), ty = toPxY(s1TestPt.y);
+            const tDist = s1Mode === 'sphere'
+                ? Math.hypot(s1TestPt.x - s1Center.x, s1TestPt.y - s1Center.y)
+                : (78.0 - (s1TestPt.x * 0.707 + s1TestPt.y * 0.707) + 23.5);
+            const fVal = (s1Radius - tDist) / 10.0;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(tx, ty, 8, 0, Math.PI * 2);
+            ctx.fillStyle = fVal >= 0 ? '#a855f7' : '#ef4444';
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`x_test (f=${fVal >= 0 ? '+' : ''}${fVal.toFixed(2)})`, Math.min(tx + 10, w - 135), ty - 6);
+            ctx.restore();
+
+            const testBadge = document.getElementById('s1TestPointBadge');
+            if (fVal >= 0) {
+                testBadge.textContent = `f(x_test) = +${fVal.toFixed(2)} ≥ 0 (判定：正常 +1)`;
+                testBadge.className = 'text-xs font-mono-code bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded border border-emerald-300';
+            } else {
+                testBadge.textContent = `f(x_test) = ${fVal.toFixed(2)} < 0 (判定：異常 -1)`;
+                testBadge.className = 'text-xs font-mono-code bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded border border-rose-300';
+            }
+        }
+
+        // 點擊 Stage 1 左側畫布移動測試樣本點 x_test
+        document.getElementById('s1GeoCanvas').addEventListener('click', function(evt) {
+            const rect = this.getBoundingClientRect();
+            const pad = { left: 44, right: 20, top: 20, bottom: 34 };
+            const plotW = rect.width - pad.left - pad.right;
+            const plotH = rect.height - pad.top - pad.bottom;
+            const vx = ((evt.clientX - rect.left - pad.left) / plotW) * 100;
+            const vy = (1.0 - (evt.clientY - rect.top - pad.top) / plotH) * 100;
+            if (vx >= 2 && vx <= 98 && vy >= 2 && vy <= 98) {
+                s1TestPt = { x: vx, y: vy };
+                drawStage1GeoCanvas();
+            }
+        });
+
+        // 繪製 Stage 1 右側：凸優化目標函數曲線 (Volume R^2 + C Σ ξ_i vs. R)
+        function drawStage1LossCanvas() {
+            const canvas = document.getElementById('s1LossCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 38, right: 18, top: 16, bottom: 26 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const minR = 13, maxR = 36;
+            const maxLoss = 42;
+            const toPxX = r => pad.left + ((r - minR) / (maxR - minR)) * plotW;
+            const toPxY = l => pad.top + plotH - Math.min(1, l / maxLoss) * plotH;
+
+            const evalLossAtR = (r) => {
+                const vol = Math.pow(r - 9.0, 2) / 14.5;
+                let slack = 0;
+                for (const p of s1Points) {
+                    const d = Math.hypot(p.x - s1Center.x, p.y - s1Center.y);
+                    if (d > r) slack += (d - r) * 0.42;
+                }
+                return { vol, slack, total: vol + slack };
+            };
+
+            // 繪製三條曲線：體積項 (藍虛線)、鬆弛懲罰項 (紅虛線)、總目標函數 (黃實線)
+            const drawCurve = (key, color, dashed, width) => {
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                if (dashed) ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                for (let i = 0; i <= 90; i++) {
+                    const r = minR + (i / 90) * (maxR - minR);
+                    const res = evalLossAtR(r);
+                    const px = toPxX(r), py = toPxY(res[key]);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            drawCurve('vol', '#38bdf8', true, 1.5);
+            drawCurve('slack', '#fb7185', true, 1.5);
+            drawCurve('total', '#fbbf24', false, 2.6);
+
+            // 目前 R 的標記點
+            const cur = evalLossAtR(s1Radius);
+            const ux = toPxX(s1Radius), uy = toPxY(cur.total);
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath(); ctx.arc(ux, uy, 6, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+
+            // 圖例文字
+            ctx.font = '10px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#fbbf24'; ctx.fillText('━ 總目標函數 Loss', pad.left + 6, pad.top + 11);
+            ctx.fillStyle = '#38bdf8'; ctx.fillText('--- 邊界體積項 R²', pad.left + 110, pad.top + 11);
+            ctx.fillStyle = '#fb7185'; ctx.fillText('--- 違規懲罰 CΣξᵢ', pad.left + 208, pad.top + 11);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.textAlign = 'center';
+            ctx.fillText('邊界大小參數 R (最佳平衡點 ★ R = 23.5)', pad.left + plotW / 2, h - 6);
+        }
+
+        // =========================================================================
+        // 3. STAGE 2: 核技巧魔法與支持向量高斯核疊加剖面圖
+        // =========================================================================
+        let s2DatasetType = 'banana';
+        let s2KernelType = 'rbf';
+        let s2TrainPts = [];
+        let s2AnomPts = [];
+        let s2Model = null;
+
+        function generateStage2Data(type) {
+            s2TrainPts = [];
+            s2AnomPts = [];
+            const rng = mulberry32(type === 'banana' ? 77101 : (type === 'bimodal' ? 77202 : 77303));
+
+            if (type === 'banana') {
+                // 弧形放熱反應操作窗 (50 點正常)
+                for (let i = 0; i < 50; i++) {
+                    const t = -1.65 + (i / 49) * 3.3;
+                    const x = t + randGaussian(rng) * 0.14;
+                    const y = 0.52 * t * t - 0.85 + randGaussian(rng) * 0.16;
+                    s2TrainPts.push({ x, y });
+                }
+                // 6 個異常點 (包含弧形凹口內部與外圍)
+                s2AnomPts = [
+                    { x: 0.0, y: 0.35 }, { x: -0.4, y: 0.65 }, { x: 0.5, y: 0.55 },
+                    { x: -1.8, y: -1.2 }, { x: 1.8, y: -1.1 }, { x: 0.0, y: -1.75 }
+                ];
+            } else if (type === 'bimodal') {
+                // 雙模態品級區 Grade A & Grade B (50 點正常)
+                for (let i = 0; i < 25; i++) {
+                    s2TrainPts.push({
+                        x: -1.05 + randGaussian(rng) * 0.28,
+                        y: -0.75 + randGaussian(rng) * 0.28
+                    });
+                    s2TrainPts.push({
+                        x: 1.05 + randGaussian(rng) * 0.28,
+                        y: 0.80 + randGaussian(rng) * 0.28
+                    });
+                }
+                // 6 個異常點 (包含兩模態中間的過渡禁區)
+                s2AnomPts = [
+                    { x: 0.0, y: 0.0 }, { x: -1.5, y: 1.2 }, { x: 1.5, y: -1.2 },
+                    { x: -1.9, y: -1.7 }, { x: 1.9, y: 1.75 }, { x: 0.1, y: -1.6 }
+                ];
+            } else {
+                // 環狀循環操作帶 (50 點正常)
+                for (let i = 0; i < 50; i++) {
+                    const ang = (i / 50) * Math.PI * 2;
+                    const r = 1.42 + randGaussian(rng) * 0.16;
+                    s2TrainPts.push({
+                        x: Math.cos(ang) * r,
+                        y: Math.sin(ang) * r
+                    });
+                }
+                // 6 個異常點 (2 個在環心空洞、4 個在外圍)
+                s2AnomPts = [
+                    { x: 0.0, y: 0.0 }, { x: 0.25, y: -0.2 },
+                    { x: -2.0, y: 1.8 }, { x: 2.0, y: 1.8 },
+                    { x: -2.0, y: -1.8 }, { x: 2.0, y: -1.8 }
+                ];
+            }
+        }
+
+        function setStage2Dataset(type) {
+            s2DatasetType = type;
+            ['Banana', 'Bimodal', 'Ring'].forEach(name => {
+                const key = name.toLowerCase();
+                const btn = document.getElementById(`s2Data${name}`);
+                if (key === type) {
+                    btn.className = 'p-2.5 rounded-lg border-2 border-sky-600 bg-sky-50 text-sky-900 text-left transition';
+                } else {
+                    btn.className = 'p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition';
+                }
+            });
+            generateStage2Data(type);
+            updateStage2Model();
+        }
+
+        function setStage2Kernel(ker) {
+            s2KernelType = ker;
+            const map = { rbf: 's2KerRbf', poly: 's2KerPoly', linear: 's2KerLinear' };
+            for (const [k, id] of Object.entries(map)) {
+                const btn = document.getElementById(id);
+                if (k === ker) {
+                    btn.className = 'p-2.5 rounded-lg border-2 border-indigo-600 bg-indigo-600 text-white shadow-sm text-left transition';
+                } else {
+                    btn.className = 'p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-left transition';
+                }
+            }
+            updateStage2Model();
+        }
+
+        function updateStage2Model() {
+            const gamma = s2KernelType === 'rbf' ? 1.85 : 0.8;
+            const nu = 0.08;
+            s2Model = solveOneClassSVM(s2TrainPts, s2KernelType, nu, gamma);
+
+            // 計算異常偵測 F1
+            let tp = 0, fp = 0, fn = 0;
+            for (const p of s2TrainPts) {
+                if (s2Model.decisionFunction(p) < 0) fp++;
+            }
+            for (const a of s2AnomPts) {
+                if (s2Model.decisionFunction(a) < 0) tp++;
+                else fn++;
+            }
+            const prec = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+            const rec  = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+            const f1   = (prec + rec) > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+
+            const badge = document.getElementById('s2F1Badge');
+            badge.textContent = `異常召回率 ${(rec * 100).toFixed(0)}% ｜ F1 = ${(f1 * 100).toFixed(0)}%`;
+            badge.className = rec >= 0.85
+                ? 'text-xs font-mono-code font-bold bg-teal-100 text-teal-800 px-2.5 py-1 rounded'
+                : 'text-xs font-mono-code font-bold bg-rose-100 text-rose-800 px-2.5 py-1 rounded';
+
+            const diag = document.getElementById('s2KernelDiagnostic');
+            if (s2KernelType === 'rbf') {
+                diag.innerHTML = `✨ <strong>RBF 徑向基核表現：</strong>透過支持向量上的高斯鐘形波疊加，完美貼合非線性幾何邊界（連凹口或中心空洞的異常點都能精準剔除，召回率 <strong>${(rec * 100).toFixed(0)}%</strong>）！`;
+            } else if (s2KernelType === 'poly') {
+                diag.innerHTML = `📐 <strong>二次多項式核表現：</strong>只能產生平滑的二次圓錐曲線（橢圓/拋物線），無法深入凹口或雙模態中間的禁區（召回率 <strong>${(rec * 100).toFixed(0)}%</strong>）。`;
+            } else {
+                diag.innerHTML = `⚠️ <strong>Linear 線性核表現：</strong>在原始空間只能切出一條直線超平面，嚴重欠擬合（Underfitting），大量異常點被包進正常半空間而漏報！`;
+            }
+
+            drawStage2BoundaryCanvas();
+            drawStage2BasisCanvas();
+        }
+
+        function drawStage2BoundaryCanvas() {
+            const canvas = document.getElementById('s2BoundaryCanvas');
+            if (!canvas || !s2Model) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 36, right: 16, top: 16, bottom: 28 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const minV = -2.4, maxV = 2.4;
+            const toPxX = x => pad.left + ((x - minV) / (maxV - minV)) * plotW;
+            const toPxY = y => pad.top + plotH - ((y - minV) / (maxV - minV)) * plotH;
+
+            // 1. 繪製 38 x 30 網格決策分數熱力圖與 f(x)=0 等高線
+            const gx = 38, gy = 30;
+            const cellW = plotW / gx, cellH = plotH / gy;
+            const gridF = [];
+            for (let ix = 0; ix < gx; ix++) {
+                const col = [];
+                const vx = minV + ((ix + 0.5) / gx) * (maxV - minV);
+                for (let iy = 0; iy < gy; iy++) {
+                    const vy = minV + ((iy + 0.5) / gy) * (maxV - minV);
+                    col.push(s2Model.decisionFunction({ x: vx, y: vy }));
+                }
+                gridF.push(col);
+            }
+
+            for (let ix = 0; ix < gx; ix++) {
+                for (let iy = 0; iy < gy; iy++) {
+                    const f = gridF[ix][iy];
+                    const px = pad.left + ix * cellW;
+                    const py = pad.top + (gy - 1 - iy) * cellH;
+
+                    if (f >= 0) {
+                        const inten = Math.min(1, f * 3.5);
+                        ctx.fillStyle = `rgba(14, ${Math.round(90 + inten * 90)}, ${Math.round(140 + inten * 95)}, 0.52)`;
+                    } else {
+                        const inten = Math.min(1, -f * 2.5);
+                        ctx.fillStyle = `rgba(${Math.round(120 + inten * 100)}, 24, 48, 0.45)`;
+                    }
+                    ctx.fillRect(px, py, cellW + 0.8, cellH + 0.8);
+
+                    // 決策邊界 f(x) = 0 黃色高亮線
+                    if (ix + 1 < gx && (f >= 0) !== (gridF[ix + 1][iy] >= 0)) {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillRect(px + cellW - 1.2, py, 2.5, cellH + 1);
+                    }
+                    if (iy + 1 < gy && (f >= 0) !== (gridF[ix][iy + 1] >= 0)) {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillRect(px, py - 1.2, cellW + 1, 2.5);
+                    }
+                }
+            }
+
+            // 2. 繪製水平剖面觀測虛線 (y = -0.35) 對應右圖
+            const sliceY = s2DatasetType === 'banana' ? -0.35 : 0.0;
+            const pySlice = toPxY(sliceY);
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath(); ctx.moveTo(pad.left, pySlice); ctx.lineTo(pad.left + plotW, pySlice); ctx.stroke();
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`1D 剖面線 y=${sliceY.toFixed(1)} →`, pad.left + plotW - 6, pySlice - 5);
+            ctx.restore();
+
+            // 3. 繪製正常訓練點與支持向量綠圈
+            const svSet = new Set(s2Model.svIndices);
+            for (let i = 0; i < s2TrainPts.length; i++) {
+                const p = s2TrainPts[i];
+                const px = toPxX(p.x), py = toPxY(p.y);
+                if (svSet.has(i)) {
+                    ctx.beginPath(); ctx.arc(px, py, 8.5, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2; ctx.stroke();
+                }
+                ctx.beginPath(); ctx.arc(px, py, 4.2, 0, Math.PI * 2);
+                ctx.fillStyle = '#38bdf8'; ctx.fill();
+                ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // 4. 繪製 6 個異常測試點
+            for (const a of s2AnomPts) {
+                const px = toPxX(a.x), py = toPxY(a.y);
+                const detected = s2Model.decisionFunction(a) < 0;
+                ctx.beginPath(); ctx.arc(px, py, 6.5, 0, Math.PI * 2);
+                ctx.fillStyle = detected ? '#ef4444' : '#a855f7';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = detected ? '#ffffff' : '#fde047';
+                ctx.stroke();
+            }
+        }
+
+        // 繪製 Stage 2 右側：沿 1D 剖面線的支持向量核函數疊加圖
+        function drawStage2BasisCanvas() {
+            const canvas = document.getElementById('s2BasisCanvas');
+            if (!canvas || !s2Model) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 42, right: 18, top: 22, bottom: 32 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const minX = -2.4, maxX = 2.4;
+            const sliceY = s2DatasetType === 'banana' ? -0.35 : 0.0;
+            const toPxX = x => pad.left + ((x - minX) / (maxX - minX)) * plotW;
+
+            // 先採樣 120 個點找出 Σ α_i K(x_i, x) 的最大值以正規化縱軸
+            const xs = [];
+            const sumVals = [];
+            let maxSum = Math.max(s2Model.rho * 1.45, 0.35);
+
+            for (let i = 0; i <= 120; i++) {
+                const vx = minX + (i / 120) * (maxX - minX);
+                xs.push(vx);
+                const f = s2Model.decisionFunction({ x: vx, y: sliceY });
+                const rawSum = f + s2Model.rho;
+                sumVals.push(rawSum);
+                if (rawSum > maxSum) maxSum = rawSum;
+            }
+            const minY = -0.05 * maxSum;
+            const maxY = maxSum * 1.12;
+            const toPxY = v => pad.top + plotH - ((v - minY) / (maxY - minY)) * plotH;
+
+            // 1. 繪製個別支持向量貢獻的分量曲線 α_i K(x_i, x) (青綠色半透明鐘形曲線)
+            for (const idx of s2Model.svIndices) {
+                const svPt = s2TrainPts[idx];
+                const alpha = s2Model.alphas[idx];
+                ctx.strokeStyle = 'rgba(52, 211, 153, 0.42)';
+                ctx.lineWidth = 1.4;
+                ctx.beginPath();
+                for (let i = 0; i <= 120; i++) {
+                    const contrib = alpha * evalKernel(svPt, { x: xs[i], y: sliceY }, s2Model.kernelType, s2Model.gamma) * 2.2;
+                    const px = toPxX(xs[i]);
+                    const py = toPxY(Math.min(maxY * 0.9, contrib));
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            }
+
+            // 2. 填滿 Σ α_i K(x_i, x) >= ρ 的正常區間高光
+            const pyRho = toPxY(s2Model.rho);
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+            ctx.beginPath();
+            for (let i = 0; i <= 120; i++) {
+                const px = toPxX(xs[i]);
+                const py = toPxY(Math.max(s2Model.rho, sumVals[i]));
+                if (i === 0) ctx.moveTo(px, pyRho);
+                ctx.lineTo(px, py);
+            }
+            ctx.lineTo(toPxX(maxX), pyRho);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. 繪製總和曲線 Σ_{i ∈ SV} α_i K(x_i, x) (亮天藍粗實線)
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let i = 0; i <= 120; i++) {
+                const px = toPxX(xs[i]);
+                const py = toPxY(sumVals[i]);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // 4. 繪製閾值水平線 ρ (紅黃虛線)
+            ctx.save();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath(); ctx.moveTo(pad.left, pyRho); ctx.lineTo(pad.left + plotW, pyRho); ctx.stroke();
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`閾值平面 ρ = ${s2Model.rho.toFixed(2)} (高於此線 f(x)≥0 為正常)`, pad.left + 8, Math.max(pad.top + 14, pyRho - 6));
+            ctx.restore();
+
+            // 圖例與 X 軸說明
+            ctx.fillStyle = '#34d399';
+            ctx.font = '10.5px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('━ 綠細線：單個支持向量核函數 αᵢK(xᵢ, x) ｜ ━ 藍粗線：疊加總和 Σ αᵢK(xᵢ, x)', pad.left + plotW - 6, pad.top + 12);
+
+            ctx.fillStyle = '#cbd5e1';
+            ctx.textAlign = 'center';
+            ctx.fillText(`沿剖面線 y = ${sliceY.toFixed(1)} 的橫軸座標 x`, pad.left + plotW / 2, h - 6);
+        }
+
+        // =========================================================================
+        // 4. STAGE 3: 超參數實驗室 ν × γ 與 Schölkopf ν-定理驗證
+        // =========================================================================
+        let s3TrainPts = [];
+        let s3AnomPts = [];
+
+        function initStage3Data() {
+            s3TrainPts = [];
+            const rng = mulberry32(359033);
+            // 50 個正常訓練樣本 (略帶弧度的雙核心化工穩態簇)
+            for (let i = 0; i < 50; i++) {
+                const cluster = i < 30 ? 0 : 1;
+                const cx = cluster === 0 ? -0.45 : 0.55;
+                const cy = cluster === 0 ? -0.25 : 0.45;
+                s3TrainPts.push({
+                    x: cx + randGaussian(rng) * 0.48,
+                    y: cy + randGaussian(rng) * 0.45
+                });
+            }
+            // 6 個測試異常樣本
+            s3AnomPts = [
+                { x: -1.85, y: 1.55 }, { x: 1.85, y: -1.45 }, { x: -1.75, y: -1.55 },
+                { x: 1.80, y: 1.75 }, { x: 0.15, y: 1.85 }, { x: -0.25, y: -1.75 }
+            ];
+        }
+
+        function setStage3Preset(nu, gamma) {
+            document.getElementById('s3NuSlider').value = nu;
+            document.getElementById('s3GammaSlider').value = gamma;
+            onStage3SlidersChange();
+        }
+
+        function onStage3SlidersChange() {
+            updateStage3Model();
+        }
+
+        function updateStage3Model() {
+            if (s3TrainPts.length === 0) return;
+            const nu = parseFloat(document.getElementById('s3NuSlider').value);
+            const gamma = parseFloat(document.getElementById('s3GammaSlider').value);
+            const rGamma = 1.0 / Math.sqrt(gamma);
+
+            document.getElementById('s3NuValBadge').textContent = `ν = ${nu.toFixed(2)} (${Math.round(nu * 100)}%)`;
+            document.getElementById('s3GammaValBadge').textContent = `γ = ${gamma.toFixed(2)} (影響半徑 R_γ=${rGamma.toFixed(2)})`;
+
+            const model = solveOneClassSVM(s3TrainPts, 'rbf', nu, gamma);
+
+            // 統計訓練集在邊界外的點數 (f(x_i) < -1e-4) 與支持向量總數
+            const nTrain = s3TrainPts.length;
+            let trainOutliers = 0;
+            for (let i = 0; i < nTrain; i++) {
+                if (model.decisionFunction(s3TrainPts[i]) < -1e-3) trainOutliers++;
+            }
+            const numSV = model.svIndices.length;
+
+            const outPct = (trainOutliers / nTrain) * 100;
+            const nuPct  = nu * 100;
+            const svPct  = (numSV / nTrain) * 100;
+
+            document.getElementById('s3OutlierFrac').textContent = `${outPct.toFixed(1)}%`;
+            document.getElementById('s3OutlierCount').textContent = `(${trainOutliers} / ${nTrain} 點在界外)`;
+            document.getElementById('s3NuCenter').textContent = `≤ ${nuPct.toFixed(1)}% ≤`;
+            document.getElementById('s3SvFrac').textContent = `${svPct.toFixed(1)}%`;
+            document.getElementById('s3SvCount').textContent = `(${numSV} / ${nTrain} 點為 SV)`;
+
+            // 計算異常檢測 Precision / Recall / F1
+            let tp = 0, fn = 0;
+            for (const a of s3AnomPts) {
+                if (model.decisionFunction(a) < 0) tp++;
+                else fn++;
+            }
+            const fp = trainOutliers; // 正常訓練點被排斥在界外即為誤報 FP
+            const prec = (tp + fp) > 0 ? (tp / (tp + fp)) * 100 : 0;
+            const rec  = (tp + fn) > 0 ? (tp / (tp + fn)) * 100 : 0;
+            const f1   = (prec + rec) > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+
+            document.getElementById('s3PrecVal').textContent = `${prec.toFixed(1)}%`;
+            document.getElementById('s3RecVal').textContent  = `${rec.toFixed(1)}%`;
+            document.getElementById('s3F1Val').textContent   = `${f1.toFixed(1)}%`;
+
+            document.getElementById('s3PrecBar').style.width = `${prec}%`;
+            document.getElementById('s3RecBar').style.width  = `${rec}%`;
+            document.getElementById('s3F1Bar').style.width   = `${f1}%`;
+
+            const verdictEl = document.getElementById('s3VerdictText');
+            if (gamma >= 1.3) {
+                verdictEl.textContent = '⚠️ 診斷：γ 過大導致邊界碎裂過擬合！';
+                verdictEl.className = 'text-rose-600 font-bold';
+            } else if (nu >= 0.22) {
+                verdictEl.textContent = '⚠️ 診斷：ν 過大導致大量正常點被誤報！';
+                verdictEl.className = 'text-amber-600 font-bold';
+            } else if (nu <= 0.06 && gamma <= 0.1) {
+                verdictEl.textContent = 'ℹ️ 診斷：邊界極度寬鬆平滑';
+                verdictEl.className = 'text-emerald-700 font-bold';
+            } else {
+                verdictEl.textContent = '✅ 診斷：緊密且平滑的最佳平衡邊界';
+                verdictEl.className = 'text-indigo-700 font-bold';
+            }
+
+            drawStage3ContourCanvas(model, rGamma);
+        }
+
+        function drawStage3ContourCanvas(model, rGamma) {
+            const canvas = document.getElementById('s3ContourCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 36, right: 16, top: 16, bottom: 28 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const minV = -2.3, maxV = 2.3;
+            const toPxX = x => pad.left + ((x - minV) / (maxV - minV)) * plotW;
+            const toPxY = y => pad.top + plotH - ((y - minV) / (maxV - minV)) * plotH;
+
+            // 1. 繪製 40 x 32 網格決策分數與 f(x)=0 邊界
+            const gx = 40, gy = 32;
+            const cellW = plotW / gx, cellH = plotH / gy;
+            const gridF = [];
+            for (let ix = 0; ix < gx; ix++) {
+                const col = [];
+                const vx = minV + ((ix + 0.5) / gx) * (maxV - minV);
+                for (let iy = 0; iy < gy; iy++) {
+                    const vy = minV + ((iy + 0.5) / gy) * (maxV - minV);
+                    col.push(model.decisionFunction({ x: vx, y: vy }));
+                }
+                gridF.push(col);
+            }
+
+            for (let ix = 0; ix < gx; ix++) {
+                for (let iy = 0; iy < gy; iy++) {
+                    const f = gridF[ix][iy];
+                    const px = pad.left + ix * cellW;
+                    const py = pad.top + (gy - 1 - iy) * cellH;
+                    if (f >= 0) {
+                        const inten = Math.min(1, f * 3.2);
+                        ctx.fillStyle = `rgba(16, ${Math.round(85 + inten * 95)}, ${Math.round(135 + inten * 95)}, 0.52)`;
+                    } else {
+                        const inten = Math.min(1, -f * 2.2);
+                        ctx.fillStyle = `rgba(${Math.round(115 + inten * 95)}, 22, 45, 0.45)`;
+                    }
+                    ctx.fillRect(px, py, cellW + 0.8, cellH + 0.8);
+
+                    if (ix + 1 < gx && (f >= 0) !== (gridF[ix + 1][iy] >= 0)) {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillRect(px + cellW - 1.2, py, 2.4, cellH + 1);
+                    }
+                    if (iy + 1 < gy && (f >= 0) !== (gridF[ix][iy + 1] >= 0)) {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillRect(px, py - 1.2, cellW + 1, 2.4);
+                    }
+                }
+            }
+
+            // 2. 若勾選「顯示 γ 影響半徑圓」，在支持向量周圍畫出 1/sqrt(2γ) 影響圈
+            const showRadius = document.getElementById('s3ShowRadiusChk').checked;
+            if (showRadius) {
+                const pxRadius = (rGamma * 0.65 / (maxV - minV)) * plotW;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(52, 211, 153, 0.25)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([3, 3]);
+                for (const idx of model.svIndices) {
+                    const p = s3TrainPts[idx];
+                    ctx.beginPath();
+                    ctx.arc(toPxX(p.x), toPxY(p.y), pxRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // 3. 繪製 50 個正常訓練點 (區分界內藍點、支持向量綠圈、界外誤報橘點)
+            const svSet = new Set(model.svIndices);
+            for (let i = 0; i < s3TrainPts.length; i++) {
+                const p = s3TrainPts[i];
+                const px = toPxX(p.x), py = toPxY(p.y);
+                const f = model.decisionFunction(p);
+                const isSV = svSet.has(i);
+                const isOut = f < -1e-3;
+
+                if (isSV) {
+                    ctx.beginPath(); ctx.arc(px, py, 8.5, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.2; ctx.stroke();
+                }
+                ctx.beginPath(); ctx.arc(px, py, isOut ? 5.2 : 4.3, 0, Math.PI * 2);
+                ctx.fillStyle = isOut ? '#f97316' : '#38bdf8';
+                ctx.fill();
+                ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // 4. 繪製 6 個測試異常點
+            for (const a of s3AnomPts) {
+                const px = toPxX(a.x), py = toPxY(a.y);
+                const detected = model.decisionFunction(a) < 0;
+                ctx.beginPath(); ctx.arc(px, py, 6.8, 0, Math.PI * 2);
+                ctx.fillStyle = detected ? '#ef4444' : '#a855f7';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+            }
+        }
+
+        // =========================================================================
+        // 5. STAGE 4: 特徵尺度敏感度實驗 + 連續 N 點異常告警抑制 + 隨堂測驗
+        // =========================================================================
+        let s4ScaleRatio = 20;
+        let s4ConsecN = 3;
+        let s4BaseNormal = [];
+        let s4BaseAnom = [];
+
+        function initStage4Data() {
+            s4BaseNormal = [];
+            const rng = mulberry32(359044);
+            for (let i = 0; i < 42; i++) {
+                s4BaseNormal.push({
+                    x: randGaussian(rng) * 0.65,
+                    y: randGaussian(rng) * 0.65
+                });
+            }
+            // 4 個異常點：2 個在 X 軸方向偏移，2 個在 Y 軸 (催化劑活性) 方向偏移
+            s4BaseAnom = [
+                { x: -1.85, y: 0.0, axisType: 'x' },
+                { x: 1.85,  y: 0.0, axisType: 'x' },
+                { x: 0.0,   y: 1.85, axisType: 'y' },
+                { x: 0.0,   y: -1.85, axisType: 'y' }
+            ];
+        }
+
+        function setStage4ScaleRatio(ratio) {
+            s4ScaleRatio = ratio;
+            drawStage4ScaleCanvases();
+        }
+
+        function drawStage4ScaleCanvases() {
+            if (s4BaseNormal.length === 0) return;
+
+            // 左圖：未標準化 (X 軸放大 8 倍，Y 軸縮小為 0.28 倍，導致 RBF 距離只看 X 軸！)
+            const drawPanel = (canvasId, isUnscaled) => {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                const { ctx, w, h } = setupHiDPICanvas(canvas);
+                ctx.clearRect(0, 0, w, h);
+
+                const pad = { left: 42, right: 16, top: 16, bottom: 28 };
+                const plotW = w - pad.left - pad.right;
+                const plotH = h - pad.top - pad.bottom;
+
+                const minV = -2.3, maxV = 2.3;
+                const toPxX = x => pad.left + ((x - minV) / (maxV - minV)) * plotW;
+                const toPxY = y => pad.top + plotH - ((y - minV) / (maxV - minV)) * plotH;
+
+                // 若未標準化，計算核函數時 Δy 的權重僅為 Δx 的 1/30
+                const yWeight = isUnscaled ? 0.035 : 1.0;
+                const gamma = 0.85;
+                const evalCustomRBF = (p1, p2) => {
+                    const dx = p1.x - p2.x;
+                    const dy = (p1.y - p2.y) * yWeight;
+                    return Math.exp(-gamma * (dx * dx + dy * dy));
+                };
+
+                // 以核密度分數模擬 One-Class SVM 決策邊界
+                const evalScore = (pt) => {
+                    let s = 0;
+                    for (const np of s4BaseNormal) s += evalCustomRBF(np, pt);
+                    return (s / s4BaseNormal.length) - (isUnscaled ? 0.42 : 0.25);
+                };
+
+                const gx = 36, gy = 26;
+                const cellW = plotW / gx, cellH = plotH / gy;
+                const gridF = [];
+                for (let ix = 0; ix < gx; ix++) {
+                    const col = [];
+                    const vx = minV + ((ix + 0.5) / gx) * (maxV - minV);
+                    for (let iy = 0; iy < gy; iy++) {
+                        const vy = minV + ((iy + 0.5) / gy) * (maxV - minV);
+                        col.push(evalScore({ x: vx, y: vy }));
+                    }
+                    gridF.push(col);
+                }
+
+                for (let ix = 0; ix < gx; ix++) {
+                    for (let iy = 0; iy < gy; iy++) {
+                        const f = gridF[ix][iy];
+                        const px = pad.left + ix * cellW;
+                        const py = pad.top + (gy - 1 - iy) * cellH;
+                        ctx.fillStyle = f >= 0 ? 'rgba(14, 116, 144, 0.52)' : 'rgba(136, 19, 55, 0.45)';
+                        ctx.fillRect(px, py, cellW + 0.8, cellH + 0.8);
+
+                        if (ix + 1 < gx && (f >= 0) !== (gridF[ix + 1][iy] >= 0)) {
+                            ctx.fillStyle = '#fbbf24';
+                            ctx.fillRect(px + cellW - 1.2, py, 2.5, cellH + 1);
+                        }
+                        if (iy + 1 < gy && (f >= 0) !== (gridF[ix][iy + 1] >= 0)) {
+                            ctx.fillStyle = '#fbbf24';
+                            ctx.fillRect(px, py - 1.2, cellW + 1, 2.5);
+                        }
+                    }
+                }
+
+                // 正常點
+                for (const np of s4BaseNormal) {
+                    ctx.beginPath();
+                    ctx.arc(toPxX(np.x), toPxY(np.y), 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#38bdf8'; ctx.fill();
+                }
+
+                // 4 個異常點
+                for (const ap of s4BaseAnom) {
+                    const px = toPxX(ap.x), py = toPxY(ap.y);
+                    const detected = evalScore(ap) < 0;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 7.5, 0, Math.PI * 2);
+                    ctx.fillStyle = detected ? '#ef4444' : '#a855f7';
+                    ctx.fill();
+                    ctx.lineWidth = 2.2;
+                    ctx.strokeStyle = detected ? '#ffffff' : '#fde047';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 10px "Noto Sans TC", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(detected ? 'TP 抓出' : 'FN 漏報!', px, py - 11);
+                }
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '10.5px "Noto Sans TC", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                    isUnscaled ? '未標準化：溫度 T 跨度 100°C ≫ 催化劑活性跨度 0.2' : 'StandardScaler 標準化後：兩軸均為 Z-score (-2 ~ +2)',
+                    pad.left + plotW / 2, h - 6
+                );
+            };
+
+            drawPanel('s4UnscaledCanvas', true);
+            drawPanel('s4ScaledCanvas', false);
+        }
+
+        // Part B: 連續 N 點異常告警抑制時序模擬
+        const s4TimeScores = [
+            0.35, 0.38, 0.31, 0.40, 0.36, 0.33, 0.29, 0.37, 0.34, 0.30,
+            0.32, 0.28, 0.35, -0.18, 0.31, 0.36, 0.39, 0.33, 0.27, 0.34, // t=14 單點雜訊突波
+            0.30, 0.35, 0.32, 0.29, 0.36, 0.31, -0.14, -0.21, 0.29, 0.34, // t=27,28 雙點瞬間干擾
+            0.36, 0.33, 0.30, 0.35, 0.28, 0.32, 0.31, 0.26, 0.22, 0.15,
+            0.06, -0.09, -0.22, -0.35, -0.44, -0.52, -0.58, -0.63, -0.66, -0.70 // t=42 起真實冷卻異常
+        ];
+
+        function setStage4ConsecN(nVal) {
+            s4ConsecN = nVal;
+            [1, 2, 3, 5].forEach(n => {
+                const btn = document.getElementById(`s4ConsecBtn${n}`);
+                if (n === nVal) {
+                    btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-indigo-600 text-white shadow';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700 hover:bg-slate-300';
+                }
+            });
+            drawStage4TimeSeries();
+        }
+
+        function drawStage4TimeSeries() {
+            const canvas = document.getElementById('s4TimeSeriesCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 46, right: 20, top: 22, bottom: 30 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const T = s4TimeScores.length;
+            const minF = -0.8, maxF = 0.55;
+            const toPxX = t => pad.left + (t / (T - 1)) * plotW;
+            const toPxY = f => pad.top + plotH - ((f - minF) / (maxF - minF)) * plotH;
+
+            // f(x) = 0 決策閾值分界線
+            const pyZero = toPxY(0);
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+            ctx.fillRect(pad.left, pyZero, plotW, pad.top + plotH - pyZero);
+
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath(); ctx.moveTo(pad.left, pyZero); ctx.lineTo(pad.left + plotW, pyZero); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 10.5px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('決策閾值線 f(x) = 0 (下方紅區 f(x) < 0 為單點異常)', pad.left + 6, pyZero - 6);
+
+            // 計算連續 N 點異常觸發點
+            let consec = 0;
+            const alertIndices = [];
+            let falseAlarms = 0;
+            let firstTrueAlertIdx = -1;
+
+            for (let t = 0; t < T; t++) {
+                if (s4TimeScores[t] < 0) {
+                    consec++;
+                    if (consec >= s4ConsecN) {
+                        alertIndices.push(t);
+                        if (t < 40 && consec === s4ConsecN) falseAlarms++;
+                        if (t >= 41 && firstTrueAlertIdx === -1) firstTrueAlertIdx = t;
+                    }
+                } else {
+                    consec = 0;
+                }
+            }
+
+            // 繪製決策分數折線
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            for (let t = 0; t < T; t++) {
+                const px = toPxX(t), py = toPxY(s4TimeScores[t]);
+                if (t === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // 繪製每個取樣點與觸發警報標記
+            const alertSet = new Set(alertIndices);
+            for (let t = 0; t < T; t++) {
+                const f = s4TimeScores[t];
+                const px = toPxX(t), py = toPxY(f);
+                const isAlert = alertSet.has(t);
+
+                if (isAlert) {
+                    ctx.beginPath(); ctx.arc(px, py, 8.5, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.35)'; ctx.fill();
+                }
+
+                ctx.beginPath();
+                ctx.arc(px, py, f < 0 ? 5 : 3.2, 0, Math.PI * 2);
+                ctx.fillStyle = isAlert ? '#ef4444' : (f < 0 ? '#f59e0b' : '#38bdf8');
+                ctx.fill();
+                if (isAlert) {
+                    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.8; ctx.stroke();
+                }
+            }
+
+            // 標註事件文字
+            ctx.font = 'bold 10.5px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#fcd34d';
+            ctx.fillText('單點雜訊(t=14)', toPxX(13), toPxY(-0.18) + 16);
+            ctx.fillText('雙點干擾(t=27,28)', toPxX(26.5), toPxY(-0.21) + 16);
+            ctx.fillStyle = '#f87171';
+            ctx.fillText('🚨 真實製程劣化開始 (t=42~)', toPxX(43), toPxY(-0.62) + 15);
+
+            // 更新右側統計卡片
+            document.getElementById('s4FalseAlarmCount').textContent = `${falseAlarms} 次`;
+            document.getElementById('s4FalseAlarmCount').className = falseAlarms === 0
+                ? 'text-2xl font-extrabold text-emerald-700 font-mono-code mt-0.5'
+                : 'text-2xl font-extrabold text-rose-600 font-mono-code mt-0.5';
+
+            const delay = firstTrueAlertIdx !== -1 ? (firstTrueAlertIdx - 41) : 99;
+            document.getElementById('s4DetectionDelay').textContent = `+${delay} 取樣點`;
+
+            const expEl = document.getElementById('s4ConsecExplain');
+            if (s4ConsecN === 1) {
+                expEl.innerHTML = `⚠️ <strong>當 $N=1$ (無抑制) 時：</strong>只要單點 $f(\\mathbf{x}_t)<0$ 就警報，導致 $t=14$ 與 $t=27$ 觸發 <strong>2 次假警報 (狼來了效應)</strong>，讓現場操作員疲於奔命！`;
+            } else if (s4ConsecN === 2) {
+                expEl.innerHTML = `🟠 <strong>當 $N=2$ 時：</strong>雖然擋掉了 $t=14$ 的單點突波，但 $t=27,28$ 的連續兩點感測器干擾仍觸發了 <strong>1 次誤報</strong>。`;
+            } else if (s4ConsecN === 3) {
+                expEl.innerHTML = `✅ <strong>當 $N=3$ (推薦最佳實務 ★) 時：</strong>完全濾除前段所有短暫雜訊（<strong>0 次誤報</strong>），且在真實異常發生後僅延遲 2 個取樣點即刻準確警報！`;
+            } else {
+                expEl.innerHTML = `🐢 <strong>當 $N=5$ 時：</strong>雖然 0 誤報，但要等異常持續 5 個取樣點 ($+4$ 延遲) 才響起警報，對快速失控的放熱反應可能延誤處置時機。`;
+            }
+            if (window.renderMathInElement) {
+                renderMathInElement(expEl, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false });
+            }
+        }
+
+        // =========================================================================
+        // 6. 隨堂觀念自我檢測批改邏輯
+        // =========================================================================
+        const quizState = { 1: false, 2: false, 3: false };
+        const quizExplanations = {
+            1: {
+                ans: 'A',
+                ok: '✅ 答對了！根據 Schölkopf ν-性質定理，ν (nu) 同時是「訓練誤差(界外異常點)比例的上界」與「支持向量比例的下界」！',
+                err: '❌ 再想一下：One-Class SVM 的 ν 參數代表「訓練集界外異常點比例的上限」以及「支持向量比例的下限」喔！'
+            },
+            2: {
+                ans: 'B',
+                ok: '✅ 完全正確！當 γ 過大時，單個樣本的 RBF 影響半徑 1/√γ 變得極小，決策邊界會緊縮成包圍個別樣本的碎裂孤島，造成嚴重過擬合！',
+                err: '❌ 不對喔！在 K(x_i,x_j) = exp(-γ||x_i-x_j||²) 中，γ 在指數負號內，γ 越大代表距離稍微增加核函數值就衰減為 0，會形成碎裂孤島（過擬合）！'
+            },
+            3: {
+                ans: 'A',
+                ok: '✅ 答對了！小樣本、低維度且需要精確非線性合格邊界時，One-Class SVM (RBF 核) 是最佳首選，且務必先進行 StandardScaler 標準化！',
+                err: '❌ 小心！One-Class SVM 使用 RBF 核時對特徵尺度極度敏感，必須先做 StandardScaler 標準化；且它最適合小中規模數據集！'
+            }
+        };
+
+        function checkQuiz(qNum, choice) {
+            const info = quizExplanations[qNum];
+            const fb = document.getElementById(`q${qNum}_feedback`);
+            ['A', 'B', 'C'].forEach(opt => {
+                const btn = document.getElementById(`q${qNum}_${opt}`);
+                btn.className = 'w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition';
+            });
+
+            const clickedBtn = document.getElementById(`q${qNum}_${choice}`);
+            fb.classList.remove('hidden');
+
+            if (choice === info.ans) {
+                quizState[qNum] = true;
+                clickedBtn.className = 'w-full text-left p-2.5 rounded-lg bg-emerald-900/80 border-2 border-emerald-400 text-emerald-100 font-bold transition';
+                fb.className = 'mt-3 text-xs p-2.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-200';
+                fb.textContent = info.ok;
+            } else {
+                clickedBtn.className = 'w-full text-left p-2.5 rounded-lg bg-rose-900/80 border-2 border-rose-400 text-rose-100 font-bold transition';
+                fb.className = 'mt-3 text-xs p-2.5 rounded-lg bg-rose-950/90 border border-rose-500/50 text-rose-200';
+                fb.textContent = info.err;
+            }
+
+            const score = (quizState[1] ? 1 : 0) + (quizState[2] ? 1 : 0) + (quizState[3] ? 1 : 0);
+            document.getElementById('quizScoreBadge').textContent = `答對題數：${score} / 3`;
+        }
+
+        function redrawAllVisibleCanvases() {
+            updateStage1UI();
+            updateStage2Model();
+            updateStage3Model();
+            drawStage4ScaleCanvases();
+            drawStage4TimeSeries();
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initStage1Data();
+            generateStage2Data('banana');
+            initStage3Data();
+            initStage4Data();
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('view') === 'all') {
+                toggleViewAll();
+            }
+            setTimeout(redrawAllVisibleCanvases, 100);
+        });
+
+        window.addEventListener('resize', () => {
+            redrawAllVisibleCanvases();
+        });
+    </script>
+</body>
+</html>

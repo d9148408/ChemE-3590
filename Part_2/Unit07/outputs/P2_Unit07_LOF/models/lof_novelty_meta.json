@@ -1,0 +1,17 @@
+{
+  "n_neighbors": 20,
+  "contamination": 0.05,
+  "features": [
+    "Temperature",
+    "Pressure",
+    "Flow_Rate"
+  ],
+  "n_training_samples": 330,
+  "decision_threshold_LOF": 1.4377767439814162,
+  "new_sample_test": {
+    "precision": 0.7931034482758621,
+    "recall": 0.6388888888888888,
+    "f1": 0.7076923076923077,
+    "auc": 0.9236111111111112
+  }
+}

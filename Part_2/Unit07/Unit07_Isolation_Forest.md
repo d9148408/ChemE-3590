@@ -2,7 +2,7 @@
 
 ## 課程目標
 
-本單元將深入介紹孤立森林 (Isolation Forest) 異常檢測演算法，這是目前工業界最廣泛應用的異常檢測方法之一。透過本單元的學習，您將能夠：
+本單元將深入介紹孤立森林 (Isolation Forest) 異常檢測演算法，這是工業界常被採用的非監督式異常檢測方法之一。透過本單元的學習，您將能夠：
 
 - 理解孤立森林演算法的核心原理與數學基礎
 - 掌握孤立森林的演算法步驟與實作細節
@@ -20,7 +20,7 @@
 
 孤立森林 (Isolation Forest) 是由 Fei Tony Liu 等人於 2008 年提出的一種基於決策樹的異常檢測演算法。其核心理念非常直觀：**異常數據點更容易被「孤立」**。
 
-與傳統異常檢測方法不同，孤立森林不需要先建立正常數據的分布模型，而是直接尋找容易被孤立的樣本。這種設計使其在高維數據和大規模數據集上具有卓越的效能。
+與傳統異常檢測方法不同，孤立森林不需要先建立正常數據的分布模型，而是直接尋找容易被孤立的樣本。由於每棵樹只使用小規模子樣本，且不需計算距離或密度，其計算成本在大規模數據集上相對較低。
 
 ### 1.2 核心理念：為什麼異常點容易被孤立？
 
@@ -88,7 +88,7 @@
 
 **停止條件**：
 - 子節點只包含一個樣本（完全孤立）
-- 樹達到指定的最大深度
+- 樹達到指定的最大深度（scikit-learn 預設為 $\lceil \log_2 \psi \rceil$ ， $\psi$ 為子樣本大小）
 - 所有樣本具有相同的特徵值（無法再分割）
 
 ### 2.2 路徑長度 (Path Length)
@@ -108,7 +108,9 @@ $$
 
 其中 $H(i)$ 是調和數 (Harmonic Number)： $H(i) = \ln(i) + \gamma$ （ $\gamma \approx 0.5772$ 為歐拉常數）。
 
-對於大樣本量： $c(n) \approx 2\ln(n-1)$
+對於大樣本量： $c(n) \approx 2\ln(n-1) + 2\gamma - 2 \approx 2\ln n - 0.85$ 。例如子樣本大小 $\psi = 256$ 時， $c(256) \approx 10.24$ 。
+
+**注意**：若樹因達到最大深度而在葉節點仍殘留 $m$ 個樣本，該樣本的路徑長度需再加上 $c(m)$ 作為修正（約定 $c(1)=0$ ， $c(2)=1$ ）。
 
 ### 2.3 異常分數 (Anomaly Score)
 
@@ -121,26 +123,27 @@ $$
 **異常分數 (Anomaly Score)** 定義為：
 
 $$
-s(x, n) = 2^{-\frac{E[h(x)]}{c(n)}}
+s(x, \psi) = 2^{-\frac{E[h(x)]}{c(\psi)}}
 $$
 
 其中：
-- $n$ 是訓練樣本數量
-- $c(n)$ 是歸一化常數（平均路徑長度的期望值）
+- $\psi$ 是建構每棵樹所用的子樣本大小（scikit-learn 中即 `max_samples` 所決定的樣本數）
+- $c(\psi)$ 是歸一化常數（以 $\psi$ 個樣本建構的樹，其平均路徑長度的期望值）
 
 **異常分數的解釋**：
 
 - $s \approx 1$ ：明顯異常 (Highly anomalous)
-  - $E[h(x)] \ll c(n)$ ：路徑長度遠小於平均值
+  - $E[h(x)] \ll c(\psi)$ ：路徑長度遠小於平均值
   
 - $s \approx 0.5$ ：正常樣本 (Normal)
-  - $E[h(x)] \approx c(n)$ ：路徑長度接近平均值
+  - $E[h(x)] \approx c(\psi)$ ：路徑長度接近平均值
   
 - $s < 0.5$ ：明顯正常 (Highly normal)
-  - $E[h(x)] > c(n)$ ：路徑長度大於平均值
+  - $E[h(x)] > c(\psi)$ ：路徑長度大於平均值
 
 **決策規則**：
-- 若 $s(x) > \text{threshold}$ （通常設為 0.6-0.7），則判定為異常
+- 原論文以固定閾值判斷：若 $s(x) > \text{threshold}$ （例如 0.6-0.7），則判定為異常
+- scikit-learn 的 `score_samples` 回傳的是 $-s(x, \psi)$ ，範圍為 $[-1, 0]$ ，值越小越異常；閾值 `offset_` 則由 `contamination` 參數決定（`contamination='auto'` 時固定為 $-0.5$ ，對應 $s = 0.5$ ）
 
 ### 2.4 演算法流程
 
@@ -167,7 +170,7 @@ $$
      a. 計算 x 在該 iTree 中的路徑長度 h(x)
      b. path_sum += h(x)
 3. 計算平均路徑長度 E[h(x)] = path_sum / t
-4. 計算異常分數 s(x) = 2^(-E[h(x)] / c(n))
+4. 計算異常分數 s(x) = 2^(-E[h(x)] / c(ψ))
 5. 回傳 s(x)
 ```
 
@@ -179,27 +182,27 @@ $$
 
 1. **計算效率高**：
    - 訓練時間複雜度： $O(t \cdot \psi \cdot \log \psi)$ （ $t$ 為樹數量， $\psi$ 為子樣本大小）
-   - 預測時間複雜度： $O(t \cdot \log \psi)$
-   - 適合大規模數據集（百萬級樣本）
+   - 預測時間複雜度： $O(t \cdot \log \psi)$ （每個樣本）
+   - 因訓練只使用子樣本，成本與總樣本數無關，適合大規模數據集（百萬級樣本）
 
 2. **適合高維數據**：
-   - 不需要計算距離或密度
-   - 不受維度災難 (Curse of Dimensionality) 影響
-   - 適合處理 50+ 維度的數據
+   - 不需要計算距離或密度，計算成本隨維度線性增加
+   - 相較於距離型方法，受維度災難 (Curse of Dimensionality) 影響較小
+   - 但若大量特徵與異常無關，隨機切分會被稀釋而降低偵測力（見 6.3 節步驟 8 特徵重要性）
 
 3. **無需標籤數據**：
    - 純非監督式學習，不需要異常樣本標籤
    - 適合異常樣本稀少或難以標記的場景
 
 4. **魯棒性強**：
-   - 對特徵尺度不敏感（無需標準化）
-   - 對特徵間的相關性不敏感
+   - 對特徵尺度不敏感（切分點在各特徵的範圍內均勻抽取，無需標準化；6.3 節步驟 7 實測標準化前後結果完全一致）
    - 對雜訊數據具有一定的容忍度
+   - 注意：切分方向與座標軸平行，若異常是「特徵間關係」被破壞（例如斜向的相關結構），效果會下降
 
 5. **易於解釋**：
    - 基於決策樹，具有一定的可解釋性
    - 可以追蹤異常樣本的分割路徑
-   - 可以識別哪些特徵導致異常
+   - 模型本身不直接提供特徵貢獻度，需搭配 permutation importance 或 SHAP 等方法（見 6.3 節步驟 8）
 
 ### 3.2 缺點
 
@@ -210,7 +213,7 @@ $$
 
 2. **超參數敏感性**：
    - `contamination` 參數需要預先設定異常比例
-   - 若設定不當，會影響檢測性能
+   - 它只決定判定閾值，不改變樣本的異常分數排序（AUC 不變），但會直接影響精確率與召回率（見 6.3 節步驟 6）
    - 需要領域知識或歷史數據輔助設定
 
 3. **無法檢測局部異常**：
@@ -224,7 +227,7 @@ $$
    - 需要設定隨機種子以確保可重現性
 
 5. **閾值設定問題**：
-   - 異常分數連續分布， $s \in [0, 1]$
+   - 異常分數連續分布， $s \in (0, 1)$ （scikit-learn 的 `score_samples` 為 $-s$ ）
    - 需要設定閾值將分數轉換為二元標籤
    - 閾值選擇會影響精確率與召回率的權衡
 
@@ -232,19 +235,19 @@ $$
 
 **適合使用孤立森林的情境**：
 
-- ✅ 數據量大（> 10,000 樣本）
-- ✅ 特徵維度高（> 10 維）
+- ✅ 數據量大（可達百萬級樣本），或需要快速訓練與預測
+- ✅ 特徵維度中高，且多個特徵與異常有關
 - ✅ 異常點是孤立的、稀少的
-- ✅ 需要快速訓練與預測
-- ✅ 無異常樣本標籤
-- ✅ 數據分布近似均勻
+- ✅ 無異常樣本標籤（僅需少量標籤用於驗證與調整閾值）
+
+> 本單元教學案例僅有 2000 筆、6 維，主要為了展示完整流程；孤立森林在小數據集上亦可運作，但結果的隨機波動較大（見 6.3 節步驟 7）。
 
 **不適合使用孤立森林的情境**：
 
 - ❌ 異常點自成群集（建議使用 DBSCAN）
-- ❌ 數據量極小（< 1,000 樣本）
+- ❌ 數據量極小（例如 < 200 樣本），子樣本無法代表整體分布
 - ❌ 需要檢測局部密度異常（建議使用 LOF）
-- ❌ 數據分布高度非均勻（建議使用 One-Class SVM）
+- ❌ 異常僅表現為特徵間關係改變（建議使用 Elliptic Envelope 或 PCA 重建誤差）
 - ❌ 需要精確的概率估計（建議使用 Gaussian Mixture Models）
 
 ---
@@ -265,9 +268,9 @@ from sklearn.ensemble import IsolationForest
 
 | 參數 | 說明 | 預設值 | 建議設定 |
 |------|------|--------|----------|
-| `n_estimators` | 孤立樹的數量 | 100 | 100-300（數據量越大，可增加樹數） |
+| `n_estimators` | 孤立樹的數量 | 100 | 100-300（樹越多結果越穩定，約 200 棵後收益遞減） |
 | `max_samples` | 建構每棵樹的樣本數量 | 'auto' | 'auto' (自動設為 min(256, n_samples)) |
-| `contamination` | 異常比例（用於設定決策閾值） | 'auto' | 0.01-0.1（根據領域知識設定） |
+| `contamination` | 異常比例（僅用於設定決策閾值，不影響異常分數） | 'auto' | 0.01-0.1（根據領域知識設定） |
 | `max_features` | 建構每棵樹時隨機選擇的特徵數量 | 1.0 | 1.0（使用所有特徵） |
 | `bootstrap` | 是否使用 bootstrap 抽樣 | False | False（避免重複樣本） |
 | `random_state` | 隨機種子 | None | 固定值（確保可重現性） |
@@ -291,7 +294,7 @@ X_train = np.random.randn(1000, 5)  # 1000 個樣本，5 個特徵
 # 建立孤立森林模型
 iso_forest = IsolationForest(
     n_estimators=100,           # 使用 100 棵樹
-    max_samples='auto',         # 每棵樹使用 256 個樣本
+    max_samples='auto',         # 每棵樹使用 min(256, n_samples) 個樣本
     contamination=0.05,         # 假設 5% 的數據是異常
     random_state=42,            # 設定隨機種子
     n_jobs=-1                   # 使用所有 CPU 核心
@@ -324,41 +327,47 @@ print(f"檢測到 {len(anomalies)} 個異常樣本")
 **步驟 5：決策函數**
 
 ```python
-# decision_function 回傳負的異常分數
-# 值越負越異常，值越正越正常
+# decision_function = score_samples - offset_
+# 值 < 0 判為異常，值 > 0 判為正常；值越小越異常
 decision_scores = iso_forest.decision_function(X_train)
 
-# 關係：decision_function(X) = score_samples(X) - offset_
 # 其中 offset_ 是根據 contamination 計算的閾值
+# （訓練集異常分數的 contamination 百分位數；contamination='auto' 時為 -0.5）
 ```
 
 ### 4.3 超參數調整建議
 
 #### 4.3.1 contamination（異常比例）
 
-**定義**：預期數據中異常樣本的比例，用於設定決策閾值。
+**定義**：預期數據中異常樣本的比例，**僅用於設定決策閾值** (`offset_`)，不會改變模型結構與每個樣本的異常分數排序，因此 AUC 與 contamination 無關。
 
 **設定建議**：
 
 - **已知異常比例**：根據歷史數據設定（如 0.02 表示 2% 異常）
 - **未知異常比例**：
-  - 保守設定：0.01-0.05（避免過多誤報）
-  - 寬鬆設定：0.05-0.10（提高召回率）
-- **敏感應用**：設定較小值（0.01），降低漏報風險
-- **探索性分析**：設定 'auto'，讓模型自動決定
+  - 較小值（0.01-0.05）：告警較少，精確率較高，但會漏掉較多異常
+  - 較大值（0.05-0.10）：告警較多，召回率提高，但誤報增加
+- **漏報代價高（如安全關鍵製程）**：設定較大值，並搭配人工複核過濾誤報
+- **誤報代價高（如告警疲勞）**：設定較小值
+- **探索性分析**：設定 'auto'（閾值固定為 $-0.5$ ），再依分數分布與領域知識調整
 
 **化工應用範例**：
 
 ```python
-# 製程安全監控：保守設定，降低誤報
-iso_forest_safety = IsolationForest(contamination=0.01)
+# 安全關鍵製程：容忍較多誤報，降低漏報風險
+iso_forest_safety = IsolationForest(contamination=0.10)
 
 # 品質控制：適度設定
 iso_forest_quality = IsolationForest(contamination=0.05)
 
+# 告警疲勞嚴重的產線：只保留最可疑的樣本
+iso_forest_conservative = IsolationForest(contamination=0.01)
+
 # 探索性數據分析：使用 auto
 iso_forest_explore = IsolationForest(contamination='auto')
 ```
+
+> 本單元實測（2000 筆模擬反應器數據，測試集 30 筆真實異常）：contamination 由 0.01 增至 0.15 時，Recall 由 0.133 升至 0.567，Precision 由 0.800 降至 0.198，AUC 維持 0.8026 不變（詳見 6.3 節步驟 6）。
 
 #### 4.3.2 n_estimators（樹的數量）
 
@@ -384,10 +393,12 @@ iso_forest_explore = IsolationForest(contamination='auto')
 
 **設定建議**：
 
-- **小數據集**（< 10,000 樣本）： 100 棵樹
-- **中型數據集**（10,000-100,000 樣本）： 200 棵樹
-- **大數據集**（> 100,000 樣本）： 300 棵樹
+- **起點**：100 棵樹（預設值）
+- **追求穩定**：200-300 棵，可降低不同隨機種子之間的結果波動
+- **不建議過少**：10 棵樹結果波動大
 - **權衡**：樹數量增加會提高穩定性，但訓練時間也會線性增加
+
+> 本單元實測（10 個隨機種子，測試集 AUC 平均值 ± 標準差）：10 棵 0.7755 ± 0.0225；50 棵 0.8120 ± 0.0127；100 棵 0.8151 ± 0.0117；200 棵 0.8181 ± 0.0099；300 棵 0.8187 ± 0.0089；500 棵 0.8215 ± 0.0063。增加樹數主要降低波動，平均 AUC 的提升有限（詳見 6.3 節步驟 7）。
 
 **實驗設定**：
 
@@ -418,7 +429,7 @@ for n in n_estimators_list:
 **化工情境舉例**：
 
 假設工廠有 50,000 筆感測器歷史紀錄，使用 `max_samples=256`：
-- 每棵樹隨機抽取 256 筆，相當於工程師翻閱 **過去約 8 小時**（若每分鐘一筆）的紀錄
+- 每棵樹隨機抽取 256 筆，數量約相當於每分鐘一筆紀錄下 **4 小時多**的資料量（實際上是隨機抽取，並非連續時段）
 - 在這 256 筆中，若溫度驟升的異常點僅需 3 次切分就能被孤立，而正常點平均需要 8 次，模型就能學到此異常的特徵
 - 100 棵樹 × 256 筆 = 從全部數據的不同時段各自獨立採樣，最終涵蓋豐富的操作情境
 
@@ -428,6 +439,8 @@ for n in n_estimators_list:
 - **小數據集**（< 500 樣本）：使用 `'auto'` 或 `1.0`（全部使用），避免資訊不足
 - **大數據集**（> 50,000 樣本）：使用 256-512，充分利用孤立森林的高效優勢
 - **權衡**：較小的子樣本增加樹的多樣性，但可能讓個別樹對稀疏分布的估計不穩定
+
+> 本單元實測（訓練集 1400 筆，10 個隨機種子，測試集 AUC 平均值）：`max_samples` = 64 → 0.7970；128 → 0.8065；256 → 0.8151；512 → 0.8203；1.0（全部 1400 筆）→ 0.8156。子樣本太小（64）略差，256 以上差異不大（詳見 6.3 節步驟 7）。
 
 | `max_samples` | 樹的多樣性 | 單棵樹精度 | 記憶體 / 速度 | 適用場景 |
 |:---:|:---:|:---:|:---:|:---|
@@ -451,22 +464,22 @@ iso_forest_small = IsolationForest(max_samples=1.0)      # 100% 樣本
 
 #### 4.3.4 max_features（每棵樹的特徵數量）
 
-**定義**：建構每棵孤立樹時，從所有特徵中**隨機選取**的特徵數量（或比例）。
+**定義**：建構每棵孤立樹時，**隨機抽取**多少個特徵（數量或比例）供該棵樹使用。
 
 **物理意義與真實情境類比**
 
 延續「多位工程師各自分析資料」的比喻：`max_features` 決定每位工程師**被允許查閱幾個感測器的數據**。
 
-- `max_features=1.0`（預設，所有特徵）：每位工程師可同時查閱所有 50 個感測器——每棵樹每次分割時，隨機從全部特徵中挑一個維度做切割
-- `max_features=0.5`（50% 特徵）：每位工程師只看一半的感測器——增加樹之間的多樣性，但單棵樹的資訊不完整
+- `max_features=1.0`（預設，所有特徵）：每位工程師可同時查閱所有感測器——每棵樹每次分割時，隨機從全部特徵中挑一個維度做切割
+- `max_features=0.5`（50% 特徵）：每位工程師只看一半的感測器（該棵樹的特徵子集固定）——增加樹之間的多樣性，但單棵樹的資訊不完整
 
-> **孤立森林的重要特性**：每次節點分割仍只用**一個**隨機特徵（這是孤立樹的基本原理），`max_features` 控制的是「每次可從哪些特徵中抽選」的範圍大小。預設 `1.0` 表示從全部特徵中隨機抽選，這已具備足夠的隨機性，因此幾乎不需要調整此參數。
+> **孤立森林的重要特性**：每次節點分割仍只用**一個**隨機特徵（這是孤立樹的基本原理），`max_features` 控制的是「每棵樹可使用的特徵子集大小」。預設 `1.0` 表示每棵樹都可使用全部特徵，已具備足夠的隨機性，因此幾乎不需要調整此參數。
 
 **設定建議**：
 
 - **一般情況：維持預設值 `1.0`**，孤立森林本身的隨機分割機制已提供充分多樣性
-- **特徵數極高**（> 500 維）：可嘗試 `0.5` 或 `'sqrt'`，降低計算開銷並增加樹的多樣性
-- **注意**：與隨機森林（Random Forest）不同，孤立森林對此參數較不敏感，通常無需特別調整
+- **特徵數極高**（> 500 維）：可嘗試 `0.5` 等比例值，降低計算開銷並增加樹的多樣性
+- **注意**：`max_features` 只接受整數（特徵個數）或 $(0, 1]$ 的浮點數（比例），不接受 `'sqrt'` 等字串；與隨機森林 (Random Forest) 不同，孤立森林對此參數較不敏感
 
 **範例**：
 
@@ -626,10 +639,10 @@ print(f"AUC-ROC: {roc_auc:.4f}")
 > **直覺解釋**：ROC 曲線描述「我們調整警報靈敏度時，正確警報 vs 誤報 的比例如何變化」。
 
 想像一個化工廠的異常警報系統：
-- 橫軸 **FPR（假陽性率）**＝ 誤報率：正常晶圓中被誤標為異常的比例
+- 橫軸 **FPR（假陽性率）**＝ 誤報率：正常樣本中被誤標為異常的比例
 - 縱軸 **TPR（真陽性率）**＝ 召回率：真實異常中被正確偵測的比例
 
-調整 `contamination`（警報靈敏度）時，會描繪出一條曲線：
+調整警報閾值（等同於調整 `contamination`）時，會描繪出一條曲線：
 - 靈敏度**低**（嚴格）→ 左下角（少誤報、也少偵測）
 - 靈敏度**高**（寬鬆）→ 右上角（多偵測、也多誤報）
 - 理想模型 → 曲線緊貼**左上角**（高偵測率、低誤報率）
@@ -648,11 +661,11 @@ print(f"AUC-ROC: {roc_auc:.4f}")
 
 | AUC 值 | 評級 | 化工應用解讀 |
 |--------|------|-------------|
-| **1.0** | 完美 | 完全無誤報、無漏報（理想情況） |
-| **> 0.9** | 優秀 | 模型排序能力很強，可信賴 |
-| **0.8 – 0.9** | 良好 | 適合工業部署，可接受 |
-| **0.7 – 0.8** | 尚可 | 需要改進，謹慎使用 |
-| **< 0.7** | 較差 | 模型幾乎無效，需重新設計 |
+| **1.0** | 完美 | 存在某個閾值可完全區分正常與異常（理想情況） |
+| **> 0.9** | 優秀 | 模型排序能力很強 |
+| **0.8 – 0.9** | 良好 | 可作為輔助告警，部署前仍需以歷史數據驗證 |
+| **0.7 – 0.8** | 尚可 | 排序能力有限，需改進特徵或方法 |
+| **< 0.7** | 較差 | 排序能力弱，需重新設計 |
 | **0.5** | 隨機 | 等同於隨機猜測 |
 
 > **注意**：AUC 與 contamination 設定**無關**（它評估所有閾值的整體排序能力）。
@@ -751,9 +764,12 @@ print(normal_df.describe())
 ```python
 from sklearn.decomposition import PCA
 
-# 使用 PCA 降維至 2D
+# 使用 PCA 降維至 2D（PCA 對尺度敏感，先標準化；孤立森林本身仍使用原始數據）
+from sklearn.preprocessing import StandardScaler
+
+X_train_scaled = StandardScaler().fit_transform(X_train)
 pca = PCA(n_components=2, random_state=42)
-X_pca = pca.fit_transform(X_train)
+X_pca = pca.fit_transform(X_train_scaled)
 
 # 繪製散布圖
 plt.figure(figsize=(10, 8))
@@ -777,14 +793,17 @@ plt.show()
 
 | 應用場景 | 優先考量 | 調整策略 |
 |----------|----------|----------|
-| 製程安全監控 | 避免漏報（高召回率） | 降低 `contamination`，容忍較多誤報 |
+| 製程安全監控 | 避免漏報（高召回率） | 提高 `contamination`，容忍較多誤報 |
 | 品質控制 | 平衡誤報與漏報 | 適中的 `contamination`（0.05） |
-| 設備維護規劃 | 避免誤報（高精確率） | 提高 `contamination`，僅關注明顯異常 |
+| 設備維護規劃 | 避免誤報（高精確率） | 降低 `contamination`，僅關注最明顯的異常 |
+
+> `contamination` 越大，被標為異常的樣本越多，召回率上升、精確率下降（實測結果見 6.3 節步驟 6）。
 
 #### 5.4.2 告警抑制策略
 
 ```python
 # 連續 N 點異常才觸發告警（降低雜訊影響）
+# 注意：predictions 必須按時間順序排列（時間序列數據），對被打亂順序的測試集無意義
 def consecutive_anomaly_detection(predictions, window_size=3):
     """
     連續 window_size 個異常點才視為真正異常
@@ -805,7 +824,7 @@ y_pred_filtered = consecutive_anomaly_detection(y_pred, window_size=3)
 #### 5.4.3 A/B Testing 上線驗證
 
 ```python
-# 模擬上線前後的異常檢測結果比較
+# 模擬上線前後的異常檢測結果比較（以下數字僅為示意，非本單元實驗結果）
 # 假設 baseline_alerts 是舊方法的告警數
 # new_alerts 是新方法的告警數
 
@@ -818,6 +837,7 @@ print(f"Baseline Method: {baseline_alerts} alerts/month")
 print(f"New Method (Isolation Forest): {new_alerts} alerts/month")
 print(f"Reduction: {(1 - new_alerts/baseline_alerts)*100:.1f}%")
 print(f"True Anomalies Detected: {true_anomalies}")
+# 實務上還需比較兩種方法的召回率（告警減少不代表模型更好）
 ```
 
 ---
@@ -837,8 +857,8 @@ print(f"True Anomalies Detected: {true_anomalies}")
 - 產物濃度 (Product Concentration, mol/L)
 
 **挑戰**：
-1. 感測器數據高度相關（多重共線性）
-2. 異常事件稀少（< 1% 的數據）
+1. 實際製程的感測器數據常高度相關（多重共線性）；本教學案例為簡化而模擬為各變數獨立（見 6.2.2）
+2. 異常事件稀少（實務上通常 < 5%；本案例模擬為 5%，以便在測試集中有足夠的異常樣本）
 3. 需要即時檢測（< 1 秒響應時間）
 4. 需要降低誤報率（避免虛驚一場）
 
@@ -851,8 +871,8 @@ print(f"True Anomalies Detected: {true_anomalies}")
 ### 6.2 數據生成（模擬）
 
 我們在 Jupyter Notebook 中生成了模擬數據，包含：
-- **正常操作數據**（95%）：基於穩態操作條件
-- **異常操作數據**（5%）：包含溫度失控、壓力異常、流量異常等
+- **正常操作數據**（95%）：基於穩態操作條件，各變數彼此獨立
+- **異常操作數據**（5%）：5 種異常類型各 20 筆（溫度失控、壓力異常、冷卻流量異常、攪拌故障、產物濃度異常），每種異常只讓 2-4 個變數偏離正常值（軟異常）
 
 #### 6.2.1 數據集基本資訊
 
@@ -886,8 +906,8 @@ print(f"True Anomalies Detected: {true_anomalies}")
 
 2. **異常特徵差異明顯但不極端**：
    - **Temperature**：異常樣本平均高出 7.71°C（約 2.2%），標準差增加 58%
-   - **Stirring_Speed**：異常樣本平均降低 19.56 rpm（約 6.5%），標準差增加 93%
-   - **Pressure**：異常樣本平均高出 0.36 bar（約 4.5%），標準差增加 61%
+   - **Stirring_Speed**：異常樣本平均降低 19.56 rpm（約 6.5%），標準差增加 94%
+   - **Pressure**：異常樣本平均高出 0.36 bar（約 4.6%），標準差增加 60%
 
 3. **挑戰性設計**：
    - 正常與異常數據有重疊區域，不是完全分離
@@ -895,9 +915,9 @@ print(f"True Anomalies Detected: {true_anomalies}")
    - 為模型提供適當的挑戰難度，避免完美分類
 
 4. **多變量異常模式**：
-   - 溫度失控：溫度↑、壓力↑、冷卻流量↑
+   - 溫度失控：溫度↑、壓力↑、冷卻流量↑、產物濃度略降
    - 攪拌故障：攪拌速度↓、產物濃度↓
-   - 不同異常類型具有不同的特徵模式
+   - 不同異常類型具有不同的特徵模式，且每種只有 2-4 個變數偏離，這也是整體偏離程度不大的原因
 
 #### 6.2.2 特徵相關性分析
 
@@ -908,19 +928,17 @@ print(f"True Anomalies Detected: {true_anomalies}")
 **分析與討論**：
 
 1. **特徵獨立性高**：
-   - 所有特徵間的相關係數 |r| < 0.05
+   - 所有特徵間的相關係數 |r| < 0.05（最大約 0.04）
    - 沒有明顯的多重共線性問題
-   - 這是理想的情況，有利於異常檢測
+   - 這是模擬數據的設計結果（各變數獨立生成），實際製程數據通常會有顯著相關性
 
-2. **孤立森林的優勢**：
-   - 對特徵相關性不敏感
-   - 即使存在相關性，隨機分割機制也能有效處理
-   - 不需要進行特徵降維或相關性處理
+2. **孤立森林與相關性**：
+   - 孤立森林不計算距離，因此不像基於距離的方法那樣受共線性影響
+   - 但切分軸與特徵軸平行，若異常是「相關結構被破壞」，對單一特徵而言卻落在正常範圍內，孤立森林較難捕捉
 
 3. **實務意義**：
    - 每個感測器提供獨立的資訊
    - 異常檢測可以利用所有特徵的資訊
-   - 不會因為共線性而降低模型性能
 
 #### 6.2.3 特徵分布視覺化
 
@@ -932,8 +950,8 @@ print(f"True Anomalies Detected: {true_anomalies}")
 
 1. **Temperature（溫度）**：
    - 正常：集中在 350°C 附近，呈現正態分布
-   - 異常：向右偏移，350-375°C 區間有重疊
-   - 高溫異常較容易識別
+   - 異常：分布較寬且帶有右側尾端（溫度失控、冷卻異常等類型），與正常範圍重疊區很大
+   - 在本案例中特徵重要性最高（見 6.3 節步驟 8）
 
 2. **Pressure（壓力）**：
    - 正常：穩定在 8.0 bar
@@ -946,19 +964,19 @@ print(f"True Anomalies Detected: {true_anomalies}")
    - 需要結合其他變量判斷
 
 4. **Cooling_Flow（冷卻流量）**：
-   - 分布模式相似
-   - 異常樣本變異性稍大
+   - 分布模式相似，異常樣本變異性較大（標準差 3.26 vs 2.08）
+   - 異常樣本在兩端都有尾端：冷卻流量異常向下，溫度失控則向上，平均值因互相抵銷而幾乎不變
    - 單變量區分能力有限
 
 5. **Stirring_Speed（攪拌速度）**：
-   - 異常樣本明顯偏低（220-280 rpm）
-   - 攪拌故障是重要的異常指標
+   - 只有攪拌故障類型（20 筆）明顯偏低（平均約 220 rpm），其餘異常類型的攪拌速度仍在正常範圍
+   - 異常群整體平均 280.85 rpm，標準差 38.76 rpm（正常為 300.41 ± 20.02）
    - 低攪拌速度會影響反應均勻性
 
 6. **Product_Conc（產物濃度）**：
-   - 異常樣本濃度偏低（0.60-0.70 mol/L）
-   - 反映異常操作對產品品質的影響
-   - 可作為異常檢測的重要指標
+   - 異常樣本平均濃度 0.705 mol/L，略低於正常的 0.748 mol/L（約 0.5 個標準差）
+   - 僅產物濃度異常類型的平均明顯較低（約 0.60 mol/L）
+   - 單一指標的區分能力有限
 
 **關鍵洞察**：
 
@@ -992,9 +1010,8 @@ print(f"True Anomalies Detected: {true_anomalies}")
   正常: 570 (95.0%)
   異常: 30 (5.0%)
 
-=== 特徵標準化（選擇性） ===
-註：孤立森林對特徵尺度不敏感，此步驟為示範用途
-實務上可直接使用原始數據
+=== 特徵標準化（僅供 PCA 視覺化使用） ===
+孤立森林模型使用原始數據訓練與預測（步驟 7 將驗證標準化不影響結果）
 ```
 
 **分析與討論**：
@@ -1007,12 +1024,12 @@ print(f"True Anomalies Detected: {true_anomalies}")
 2. **標準化的必要性**：
    - 孤立森林使用隨機分割，不基於歐式距離
    - 對特徵尺度不敏感，無需強制標準化
-   - 但若與其他方法比較（如 LOF、One-Class SVM），建議保留標準化流程
+   - 本單元將標準化只用於 PCA 視覺化（PCA 對尺度敏感）；若與 LOF、One-Class SVM 等距離/核函數方法比較，則需對該些方法標準化
 
 3. **訓練集規模**：
-   - 1400 樣本足以訓練穩定的孤立森林
+   - 1400 樣本已可訓練出可用的孤立森林
    - 每棵樹使用 256 個子樣本（max_samples='auto'）
-   - 100 棵樹可覆蓋足夠的特徵空間
+   - 訓練集中含有 70 筆（5%）未標記的異常樣本，反映實務上訓練資料無法保證純淨（孤立森林對此有一定容忍度）
 
 #### 步驟 3：模型建立與訓練
 
@@ -1032,7 +1049,7 @@ IsolationForest(
 
 ```
 === 開始訓練孤立森林模型 ===
-✓ 訓練完成！訓練時間: 0.2060 秒
+✓ 訓練完成！訓練時間: 0.2541 秒
 
 === 訓練後模型屬性 ===
 決策閾值偏移量 (offset_): -0.5185
@@ -1042,14 +1059,14 @@ IsolationForest(
 
 **分析與討論**：
 
-1. **訓練效率極高**：
-   - 訓練時間僅 0.2060 秒
-   - 驗證了孤立森林的高效性（ $O(n \log n)$ 複雜度）
-   - 適合即時異常檢測場景（< 1 秒要求）
+1. **訓練效率高**：
+   - 訓練時間僅 0.2541 秒（視硬體與執行環境而異）
+   - 訓練只使用子樣本，理論成本為 $O(t \cdot \psi \log \psi)$ ，與訓練集總筆數無關
+   - 預測 600 筆測試樣本約 10 毫秒（單筆呼叫約 5 毫秒，實測值視硬體而異），滿足即時異常檢測的需求（< 1 秒）
 
 2. **決策閾值 (offset_)**：
    - 值為 -0.5185
-   - 由 `contamination=0.05` 參數自動計算
+   - 由 `contamination=0.05` 參數自動計算（訓練集異常分數的第 5 百分位數）
    - 異常分數 < -0.5185 → 判定為異常
    - 異常分數 ≥ -0.5185 → 判定為正常
 
@@ -1094,8 +1111,8 @@ F1-Score: 0.3548 - 精確率與召回率的調和平均
 
 1. **整體準確率 93.33%**：
    - 看似很高，但需注意類別不平衡（正常:異常 = 19:1）
-   - 準確率不是異常檢測的最佳指標
-   - 應該關注精確率和召回率
+   - 「全部預測為正常」的基準模型準確率就有 95%，反而高於本模型的 93.33%
+   - 準確率不是異常檢測的最佳指標，應該關注精確率和召回率
 
 2. **正常類別性能優秀**：
    - Precision = 96.65%：被判定為正常的樣本中，96.65% 確實是正常
@@ -1110,7 +1127,7 @@ F1-Score: 0.3548 - 精確率與召回率的調和平均
 4. **誤報分析 (FP = 21)**：
    - 21 個正常樣本被誤判為異常
    - 誤報率 = 21/570 = 3.68%
-   - 對於製程監控，誤報率 < 5% 是可接受的
+   - 誤報率看似不高，但因為正常樣本遠多於異常，告警中仍有近 2/3 是誤報（Precision = 34.38%）
    - 誤報會導致無效的人工檢查，增加操作負擔
 
 5. **漏報分析 (FN = 19)**：
@@ -1120,10 +1137,10 @@ F1-Score: 0.3548 - 精確率與召回率的調和平均
    - 可能導致異常狀況未被及時處理
 
 6. **性能權衡考量**：
-   - 當前 `contamination=0.05` 設定較保守
-   - 若要提高召回率（減少漏報）：降低 `contamination` 至 0.03
-   - 若要提高精確率（減少誤報）：提高 `contamination` 至 0.07
-   - 實務上需根據誤報與漏報的相對成本調整
+   - 當前 `contamination=0.05` 與真實異常比例相符，但因分數重疊大，Precision 與 Recall 仍約為 35%
+   - 若要提高召回率（減少漏報）：**提高** `contamination`（如 0.10 時 Recall = 50.0%，Precision = 22.7%）
+   - 若要提高精確率（減少誤報）：**降低** `contamination`（如 0.03 時 Precision = 47.4%，Recall = 30.0%）
+   - 實務上需根據誤報與漏報的相對成本調整（完整掃描見步驟 6）
 
 7. **化工應用啟示**：
    - **製程安全監控**：優先保證召回率（避免漏報），可容忍較多誤報
@@ -1148,18 +1165,23 @@ AUC-ROC: 0.8026
    > 孤立森林有 **80.26%** 的機率讓異常樣本的分數排得比正常樣本更高。
    > 換句話說，如果把所有測試樣本依異常分數從高排到低，異常樣本通常會出現在清單的前面。
 
-   - 位於「良好」(Good) 區間（0.8–0.9）
-   - 比隨機猜測（AUC=0.5）好 60.52%（= (0.8026-0.5)/0.5）
-   - 模型確實學到了異常模式，而非隨機猜測
+   - 位於「良好」(Good) 區間的下緣（0.8–0.9）
+   - 高於隨機猜測（AUC=0.5）約 0.30
+   - 模型確實學到了部分異常模式，但排序能力仍有限
+   - 單一隨機種子 (42) 的 AUC 約為 0.80；改變種子時，100 棵樹的 AUC 平均為 0.8151（標準差 0.0117，見步驟 7）
 
 2. **ROC 曲線各區域對應的操作含義**：
 
    | 曲線上的點 | FPR | TPR | 對應的操作策略 |
    |-----------|-----|-----|--------------|
-   | 左下角 (0, 0) | 0% | 0% | contamination = 0（不標記任何異常） |
-   | 曲線中段 | ~5% | ~55% | contamination = 0.05（本案例） |
-   | 曲線右端 | ~60% | ~100% | 高 contamination（標記 60% 正常品） |
-   | 右上角 (1, 1) | 100% | 100% | contamination = 1（全部標為異常） |
+   | 左下角 (0, 0) | 0% | 0% | 不標記任何異常 |
+   | 曲線上的點 | 0.2% | 13.3% | contamination = 0.01 |
+   | 曲線上的點 | 1.8% | 30.0% | contamination = 0.03 |
+   | 本案例工作點 | 3.7% | 36.7% | contamination = 0.05 |
+   | 曲線上的點 | 8.9% | 50.0% | contamination = 0.10 |
+   | 曲線上的點 | 12.1% | 56.7% | contamination = 0.15 |
+   | 曲線右端 | 約 75% | 100% | 要抓到全部 30 筆異常，將約 75% 的正常樣本也標為異常 |
+   | 右上角 (1, 1) | 100% | 100% | 全部標為異常 |
 
    - **曲線愈靠近左上角**，代表同樣的召回率下誤報更少，模型更強
    - AUC 就是衡量「曲線整體有多靠近左上角」的數字
@@ -1170,15 +1192,15 @@ AUC-ROC: 0.8026
    - 要提升 AUC，需改善模型本身（特徵工程、超參數調整）
 
 4. **性能提升方向**：
-   - 當前 AUC = 0.80，距離完美分類（AUC=1.0）還有 20% 差距
+   - 當前 AUC = 0.80，距離完美分類（AUC=1.0）還有明顯差距
    - 可能的改進方向：
-     - 增加樹的數量（`n_estimators`）
-     - 添加更多具有區分能力的特徵
+     - 增加樹的數量（`n_estimators`）：主要降低結果波動，平均 AUC 提升有限（見步驟 7）
+     - 添加更多具有區分能力的特徵，或移除無資訊的特徵（見步驟 8）
      - 進行特徵工程（如差分、滾動統計）
 
 5. **實務應用考量**：
-   - AUC = 0.80 在工業異常檢測中是可接受的水平
-   - 真實製程數據往往更複雜，AUC > 0.75 就已經很好
+   - AUC 約 0.80 屬中等偏上水準，但在 contamination=0.05 時 Precision 與 Recall 僅約 35%，單獨使用不足以作為安全告警
+   - 真實製程數據往往更複雜，需以歷史數據驗證，並結合領域規則
    - 需要與其他方法（LOF、One-Class SVM）比較選擇最佳方法
 
 #### 步驟 5：結果視覺化
@@ -1189,21 +1211,21 @@ AUC-ROC: 0.8026
 
 ```
 === 異常分數統計（按真實標籤） ===
-正常樣本異常分數: Mean = -0.4710, Std = 0.0422
-異常樣本異常分數: Mean = -0.5409, Std = 0.0415
-分數差異: 0.0699
+正常樣本異常分數: Mean = -0.4342, Std = 0.0386
+異常樣本異常分數: Mean = -0.4962, Std = 0.0590
+分數差異: 0.0620
 ```
 
 **深入分析與討論**：
 
 1. **分數分布特性**：
-   - **正常樣本**（藍色）：集中在 -0.45 至 -0.49 區間，呈現正態分布
-   - **異常樣本**（紅色）：集中在 -0.52 至 -0.58 區間，向左偏移
-   - **決策閾值**（綠色虛線）：-0.5185，位於兩分布之間
+   - **正常樣本**（藍色）：25%–75% 分位落在 -0.458 至 -0.405，中位數約 -0.427；左側（分數較低）有一條長尾，部分極端正常樣本分數低至約 -0.54
+   - **異常樣本**（紅色）：分布較廣（約 -0.607 至 -0.405），中位數約 -0.494，平均向左偏移至 -0.4962，但與正常樣本大幅重疊
+   - **決策閾值**（綠色虛線）：-0.5185，位於兩分布的左側尾端，僅捕捉到最極端的少數樣本
 
 2. **分離度分析**：
-   - 平均分數差異僅 0.0699（約 15%）
-   - 兩分布有明顯重疊區域
+   - 平均分數差異僅 0.0620（約為正常樣本分數 Std 0.0386 的 1.6 倍）
+   - 兩分布有大面積重疊區域
    - 這解釋了為什麼 Precision 和 Recall 都不高
 
 3. **重疊區域的意義**：
@@ -1214,15 +1236,16 @@ AUC-ROC: 0.8026
      - 模型難以區分的樣本
 
 4. **閾值選擇影響**：
-   - 當前閾值 -0.5185 由 `contamination=0.05` 自動決定
-   - 若閾值右移（如 -0.50）：
+   - 當前閾值 -0.5185 由 `contamination=0.05` 自動決定（訓練集分數的第 5 百分位）
+   - 閾值右移（如 -0.50，分數低於閾值者為異常）：
      - 更多樣本被判定為異常
      - 召回率↑，精確率↓
-   - 若閾值左移（如 -0.54）：
+   - 閾值左移（如 -0.54）：
      - 更少樣本被判定為異常
      - 召回率↓，精確率↑
+   - 不同 `contamination` 對應的閾值見步驟 6 的 `offset_` 欄位
 
-5. **實務調整建議**：
+5. **實務調整建議**（閾值僅為示意，需依實際數據的分數分布決定）：
    - 根據業務需求動態調整閾值
    - 製程安全：閾值 = -0.50（優先召回率）
    - 品質控制：閾值 = -0.52（平衡）
@@ -1233,33 +1256,42 @@ AUC-ROC: 0.8026
 <img src="outputs/P2_Unit07_Isolation_Forest/figs/pca_visualization.png" alt="PCA Visualization" width="1000">
 
 ```
-=== PCA 解釋變異數 ===
-PC1: 51.23%
-PC2: 20.45%
-累積解釋變異數: 71.68%
+=== PCA 解釋變異數（標準化後） ===
+PC1: 18.18%
+PC2: 17.74%
+累積解釋變異數: 35.92%
+
+=== PCA 主成分負荷量 (loadings) ===
+                  PC1    PC2
+Temperature     0.509  0.356
+Pressure        0.538  0.206
+Feed_Flow      -0.178  0.701
+Cooling_Flow    0.082  0.419
+Stirring_Speed -0.404 -0.002
+Product_Conc   -0.500  0.405
 ```
 
 **深入分析與討論**：
 
 1. **降維效果**：
-   - 前兩個主成分保留了 71.68% 的資訊
-   - 可以在 2D 平面上觀察異常檢測結果
-   - 損失的 28.32% 資訊可能影響可視化效果
+   - 前兩個主成分僅保留 35.92% 的變異數，2D 投影損失約 64% 的資訊
+   - 6 個變數彼此獨立（見 6.2.2），無法用兩個主成分有效濃縮（完全獨立的標準化變數，每個主成分約只佔 1/6 ≈ 16.7%）
+   - 因此 2D 圖只能作為示意，不能據此判斷模型在 6D 空間的表現
+   - 註：PCA 對特徵尺度敏感，本例先以 `StandardScaler` 標準化後再做 PCA；若直接使用原始數據，PC1 會被數值尺度最大的變數（Temperature、Stirring_Speed）主導
+   - 負荷量顯示 PC1 主要對應 Temperature、Pressure（正向）與 Product_Conc、Stirring_Speed（負向），PC2 主要對應 Feed_Flow、Cooling_Flow、Product_Conc
 
 2. **左圖：真實標籤 (Ground Truth)**：
    - **藍色點（正常）**：廣泛分布在整個平面
-   - **紅色叉（異常）**：散布在各處，沒有明顯聚集
-   - 說明異常樣本不是「群集異常」，而是「孤立異常」
-   - 這正是孤立森林擅長處理的情況
+   - **紅色叉（異常）**：偏向右側（PC1 較大，即溫度、壓力偏高、濃度偏低的方向），但與正常樣本大量重疊，並未形成獨立的群集
+   - 這與模擬設計相符：異常是各變數的軟偏移，而非另成一群
 
 3. **右圖：預測結果 (Isolation Forest)**：
    - **淺藍色點（預測正常）**：與真實正常樣本高度重疊
-   - **橙色叉（預測異常）**：散布位置與真實異常大致相符
-   - 部分橙色叉出現在密集的藍色區域（誤報）
-   - 部分紅色叉未被標記為橙色（漏報）
+   - **橙色叉（預測異常）**：除了右側的真實異常，也出現在左側邊緣的極端正常樣本（誤報）
+   - 部分紅色叉位於密集的藍色區域，未被標記為橙色（漏報）
 
 4. **預測準確性觀察**：
-   - 右下角、左上角的異常樣本被正確識別
+   - 孤立森林抓的是「極端值」，而非「偏向特定方向」，故任一方向的離群正常樣本都會被標為異常
    - 中心密集區域的異常樣本較難識別（與正常樣本混雜）
    - PCA 降維後的可視化與實際 6D 空間的模型性能不完全一致
 
@@ -1274,7 +1306,92 @@ PC2: 20.45%
    - 需要結合多種視覺化與統計分析
    - 領域知識對解釋結果至關重要
 
-#### 步驟 6：模型儲存與總結
+#### 步驟 6：contamination 敏感度分析
+
+`contamination` 只改變「判定閾值」（`offset_`），不改變模型的分數排序，因此 AUC 不變，變化的是 Precision 與 Recall 的取捨。
+
+<img src="outputs/P2_Unit07_Isolation_Forest/figs/contamination_sensitivity.png" alt="Contamination Sensitivity" width="1000">
+
+```
+=== contamination 敏感度（測試集 600 筆，其中 30 筆真實異常） ===
+ contamination  offset_  flagged  precision  recall     f1    auc
+          0.01  -0.5731        5     0.8000  0.1333 0.2286 0.8026
+          0.03  -0.5358       19     0.4737  0.3000 0.3673 0.8026
+          0.05  -0.5185       32     0.3438  0.3667 0.3548 0.8026
+          0.07  -0.5073       40     0.2750  0.3667 0.3143 0.8026
+          0.10  -0.4939       66     0.2273  0.5000 0.3125 0.8026
+          0.15  -0.4801       86     0.1977  0.5667 0.2931 0.8026
+```
+
+**深入分析與討論**：
+
+1. **方向性**：提高 `contamination` → 閾值右移（`offset_` 變大）→ 標記的樣本數增加（flagged 5 → 86）→ Recall 上升、Precision 下降。
+2. **AUC 不變**：各設定的 AUC 均為 0.8026，證實 `contamination` 不影響排序能力，只是決定工作點。
+3. **F1 最高點**：`contamination=0.03` 時 F1 = 0.3673，略高於 0.05 的 0.3548，但差異很小，且單一測試集只有 30 筆異常，統計不確定性很大。
+4. **高精確率的代價**：`contamination=0.01` 時 Precision = 80%，但只抓到 4/30 筆異常（Recall = 13.3%）。
+5. **高召回率的代價**：`contamination=0.15` 時 Recall = 56.7%，但 86 筆告警中只有 17 筆是真異常（Precision = 19.8%）。
+6. **實務選擇**：對於分數重疊這麼大的資料，無法同時達到高 Precision 與高 Recall，應依誤報/漏報的相對成本選擇工作點。
+
+#### 步驟 7：穩定性與超參數驗證
+
+以 10 個不同隨機種子重複訓練，評估 AUC 的平均與波動，並確認標準化對孤立森林的影響。
+
+<img src="outputs/P2_Unit07_Isolation_Forest/figs/stability_check.png" alt="Stability Check" width="1000">
+
+```
+=== n_estimators 與 AUC（10 個隨機種子） ===
+n_estimators =  10: AUC = 0.7755 ± 0.0225
+n_estimators =  50: AUC = 0.8120 ± 0.0127
+n_estimators = 100: AUC = 0.8151 ± 0.0117
+n_estimators = 200: AUC = 0.8181 ± 0.0099
+n_estimators = 300: AUC = 0.8187 ± 0.0089
+n_estimators = 500: AUC = 0.8215 ± 0.0063
+
+=== max_samples 與 AUC（10 個隨機種子） ===
+max_samples =    64: AUC = 0.7970 ± 0.0193
+max_samples =   128: AUC = 0.8065 ± 0.0156
+max_samples =   256: AUC = 0.8151 ± 0.0117
+max_samples =   512: AUC = 0.8203 ± 0.0106
+max_samples =   1.0: AUC = 0.8156 ± 0.0086
+
+=== 標準化前後比較（random_state=42） ===
+原始數據 AUC: 0.8026
+標準化數據 AUC: 0.8026
+預測標籤一致率: 100.00%
+```
+
+**深入分析與討論**：
+
+1. **單一種子結果的波動**：`random_state=42` 的 AUC = 0.8026，低於 10 個種子平均 0.8151；種子間的標準差約 0.012，因此小於約 0.01 的 AUC 差異不宜解讀為模型優劣。
+2. **n_estimators**：10 棵樹的 AUC 明顯較低且波動大；從 100 增加到 300 棵只提升約 0.004（大致在種子波動範圍內），主要效益是 Std 縮小（0.0117 → 0.0089）。約 100–200 棵即有足夠的性價比。
+3. **max_samples**：子樣本太小（64）AUC 較低；增加到 256–512 後趨於平穩，與論文建議的 256 一致。全樣本（1.0）並未更好，且訓練成本更高。
+4. **標準化不影響結果**：標準化前後 AUC 相同，且預測標籤 100% 一致。原因是孤立樹的分割點在「特徵範圍」中均勻抽取，線性縮放不改變樣本間的大小順序。
+
+#### 步驟 8：特徵重要性分析
+
+使用排列重要性（Permutation Importance）：對測試集逐一打亂某個特徵，觀察 AUC 下降幅度（重複 20 次）。同時計算樹中各特徵被選為分割特徵的頻率供對照。
+
+<img src="outputs/P2_Unit07_Isolation_Forest/figs/feature_importance.png" alt="Feature Importance" width="1000">
+
+```
+=== 特徵重要性（基準 AUC = 0.8026，重複 20 次） ===
+       Feature  AUC_drop_mean  AUC_drop_std  Split_ratio
+   Temperature         0.0878        0.0167       0.1603
+      Pressure         0.0672        0.0162       0.1623
+Stirring_Speed         0.0335        0.0219       0.1849
+     Feed_Flow         0.0178        0.0108       0.1635
+  Product_Conc         0.0073        0.0118       0.1654
+  Cooling_Flow         0.0006        0.0128       0.1637
+```
+
+**深入分析與討論**：
+
+1. **Temperature 與 Pressure 最重要**：打亂它們後 AUC 分別下降 0.0878 與 0.0672，與資料生成時對這兩個變數設定的異常偏移相符。
+2. **Cooling_Flow 貢獻最低**：下降量約 0.0006（小於其標準差 0.0128），打亂該變數幾乎不影響 AUC。雖然異常樣本的 Cooling_Flow 變異較大（Std 3.26 vs 2.08），但其方向有上有下（見 6.2.3），且相關異常類型的樣本已主要由其他變數貢獻分數，因此此變數的邊際貢獻極小。
+3. **分割頻率無法反映重要性**：各特徵的 Split_ratio 皆在 0.16–0.185 之間，幾乎均勻。原因是孤立樹每次分割都「隨機」選特徵，不考慮特徵是否有區分能力。因此不應用分割頻率評估重要性，應使用排列重要性。
+4. **使用限制**：排列重要性依賴真實標籤（評估 AUC），實務上若沒有標籤則需以領域知識或少量標記樣本驗證。
+
+#### 步驟 9：模型儲存與總結
 
 **模型儲存**：
 
@@ -1287,7 +1404,7 @@ Precision: 0.3438
 Recall: 0.3667
 F1-Score: 0.3548
 AUC-ROC: 0.8026
-訓練時間: 0.2060 秒
+訓練時間: 0.2541 秒
 
 === 所有圖檔已儲存至 ===
 📁 d:\MyGit\ChemE-3590\Part_2\Unit07\outputs\P2_Unit07_Isolation_Forest\figs
@@ -1297,36 +1414,40 @@ AUC-ROC: 0.8026
   - roc_curve.png
   - anomaly_score_distribution.png
   - pca_visualization.png
+  - contamination_sensitivity.png
+  - stability_check.png
+  - feature_importance.png
 ```
 
 **最終分析與總結**：
 
-1. **模型部署就緒**：
-   - 模型已序列化為 `.pkl` 檔案
-   - 可載入至生產環境進行即時檢測
+1. **模型已存檔**：
+   - 模型已序列化為 `.pkl` 檔案，可再次載入進行推論
+   - 正式上線前仍需以真實製程數據驗證、設定告警策略與監控模型漂移
    - 所有視覺化圖檔已備份，供報告使用
 
 2. **性能評估總結**：
-   - **訓練效率**：0.2060 秒，非常快速 ✅
-   - **整體準確率**：93.33%，看似良好 ⚠️
+   - **訓練效率**：0.2541 秒，快速 ✅
+   - **整體準確率**：93.33%，但低於「全部預測正常」的 95% 基準 ⚠️
    - **異常召回率**：36.67%，較低（漏報多）❌
    - **異常精確率**：34.38%，較低（誤報多）❌
-   - **AUC-ROC**：0.8026，良好水平 ✅
+   - **AUC-ROC**：0.8026，中等偏上 ⚠️
 
 3. **適用性評估**：
-   - ✅ **適合大規模即時檢測**：訓練快速，預測效率高
-   - ✅ **適合孤立異常檢測**：異常樣本確實是分散的
-   - ⚠️ **需要調整閾值**：當前 `contamination=0.05` 可能過於保守
+   - ✅ **訓練與預測成本低**：預測 600 筆約 10 毫秒，適合即時監控
+   - ✅ **適合孤立異常檢測**：本案例異常為各變數的軟偏移，並非獨立群集
+   - ⚠️ **需要調整閾值**：`contamination=0.05` 與真實異常比例相符，但工作點需依誤報/漏報成本決定
    - ❌ **召回率需改進**：對於安全監控，63% 的漏報率不可接受
 
-4. **改進建議**：
+4. **改進建議**（數字皆為本單元實測結果，見步驟 6、7）：
 
-   | 目標 | 策略 | 預期效果 |
+   | 目標 | 策略 | 實測效果 |
    |------|------|----------|
-   | 提高召回率 | 降低 `contamination` 至 0.03 | Recall ↑ 至 50-60%，Precision ↓ 至 25-30% |
-   | 提高精確率 | 提高 `contamination` 至 0.08 | Precision ↑ 至 40-50%，Recall ↓ 至 25-30% |
-   | 提高 AUC | 增加 `n_estimators` 至 300 | AUC ↑ 至 0.82-0.85 |
-   | 減少計算時間 | 降低 `n_estimators` 至 50 | 訓練時間 ↓ 至 0.1 秒，性能略降 |
+   | 提高召回率 | 提高 `contamination` 從 0.05 至 0.10 | Recall 36.7% → 50.0%，Precision 34.4% → 22.7% |
+   | 提高精確率 | 降低 `contamination` 從 0.05 至 0.03 | Precision 34.4% → 47.4%，Recall 36.7% → 30.0% |
+   | 提高 AUC | 增加 `n_estimators` 從 100 至 300 | 10 種子平均 AUC 0.8151 → 0.8187，提升有限，主要降低波動 |
+   | 減少計算時間 | 降低 `n_estimators` 從 100 至 50 | 10 種子平均 AUC 0.8151 → 0.8120，訓練時間隨樹數成比例縮短 |
+   | 超越目前 AUC | 調整特徵而非超參數 | 超參數調整的空間有限，可嘗試特徵工程或移除 Cooling_Flow 等貢獻低的特徵（未在本單元驗證） |
 
 5. **下一步工作**：
    - 與其他方法比較（LOF、One-Class SVM、Elliptic Envelope）
@@ -1349,7 +1470,7 @@ AUC-ROC: 0.8026
    - ✅ 理解 `contamination` 對精確率與召回率的影響
    - ✅ 學會使用異常分數進行連續評估（而非僅依賴二元標籤）
    - ✅ 掌握決策閾值的調整方法
-   - ✅ 理解孤立森林的訓練效率優勢（0.2 秒 vs 其他方法的數秒）
+   - ✅ 理解孤立森林的訓練效率優勢（本案例訓練約 0.25 秒，訓練成本只與子樣本大小與樹數有關）
 
 3. **應用於實際化工問題**：
    - ✅ **反應器異常監控**：
@@ -1374,8 +1495,8 @@ AUC-ROC: 0.8026
      - 適用場景：大規模、孤立異常、即時檢測
    
    - ✅ **與其他方法的比較**：
-     - vs LOF：計算效率高 10-100 倍，但局部異常檢測能力較弱
-     - vs One-Class SVM：訓練更快，但精確度可能略低
+     - vs LOF：LOF 需要 k 近鄰搜尋，大資料量時成本較高，孤立森林訓練僅使用子樣本；但 LOF 對局部密度異常的檢測能力較強
+     - vs One-Class SVM：One-Class SVM 對特徵尺度與核函數參數敏感，需要標準化；本單元第 7.4 節的實測中其 AUC 低於孤立森林
      - vs Elliptic Envelope：不需要高斯分布假設，適用性更廣
    
    - ✅ **實務部署的考量**：
@@ -1395,19 +1516,20 @@ AUC-ROC: 0.8026
 6. **實際化工案例的關鍵洞察**：
 
    **關鍵發現 1：異常檢測的難度設計**
-   - 異常與正常數據有 15% 的重疊（分數差異 0.0699）
+   - 異常與正常數據大幅重疊（分數差異僅 0.0620）
    - 這反映真實製程中的「軟異常」特性
    - 完全分離的數據不具教學價值
 
    **關鍵發現 2：性能指標的權衡**
    - 整體準確率 93.33% 具有誤導性（類別不平衡）
    - 異常類別的 F1-Score 僅 35.48%，顯示真實挑戰
-   - AUC = 0.8026 是更客觀的性能指標
+   - AUC = 0.8026 與閾值無關，是比單一工作點更客觀的指標
+   - 但單一種子結果有波動：10 個種子平均 AUC 為 0.8151（Std 0.0117）
 
    **關鍵發現 3：閾值調整的重要性**
    - 當前設定：召回率 36.67%，精確率 34.38%
-   - 降低閾值：召回率↑（減少漏報），適合安全監控
-   - 提高閾值：精確率↑（減少誤報），適合維護規劃
+   - 提高 `contamination`（閾值右移）：召回率↑（減少漏報），適合安全監控
+   - 降低 `contamination`（閾值左移）：精確率↑（減少誤報），適合維護規劃
 
    **關鍵發現 4：多變量監控的價值**
    - 單一特徵無法有效區分異常（分布重疊）
@@ -1415,8 +1537,8 @@ AUC-ROC: 0.8026
    - 多維空間中的「孤立」比 2D 視覺化更複雜
 
    **關鍵發現 5：計算效率的實務意義**
-   - 訓練時間 0.2 秒，滿足即時檢測需求（< 1 秒）
-   - 可部署至邊緣設備（無需強大伺服器）
+   - 訓練時間約 0.25 秒，預測 600 筆約 10 毫秒，滿足即時檢測需求（< 1 秒）
+   - 運算量小，適合資源受限的環境（需在目標硬體上實測）
    - 適合連續製程的在線監控
 
 7. **延伸思考問題**（引導學生深入探索）：
@@ -1445,7 +1567,7 @@ AUC-ROC: 0.8026
 
 1. **初級練習**：調整 `contamination` 參數（0.01, 0.03, 0.05, 0.08, 0.1），觀察 Precision-Recall 的變化，繪製 PR 曲線。
 
-2. **中級練習**：實作特徵重要性分析，識別哪些特徵對異常檢測貢獻最大（提示：統計每個特徵在孤立樹中的分割頻率）。
+2. **中級練習**：參考步驟 8 的做法，對不同特徵進行排列重要性分析，並比較「分割頻率」與「排列重要性」的差異，討論為何分割頻率幾乎均勻。
 
 3. **高級練習**：整合 Isolation Forest、LOF、One-Class SVM 三種方法，使用投票機制（Voting Ensemble）提升檢測性能。
 
@@ -1457,60 +1579,43 @@ AUC-ROC: 0.8026
 
 ### 7.1 特徵重要性分析
 
-孤立森林可以用於估計特徵對異常檢測的重要性：
+孤立森林本身沒有內建的特徵重要性。常見的兩種做法：
+
+1. **分割頻率**：統計各特徵在孤立樹中被選為分割特徵的次數。孤立樹每次分割都「隨機」選特徵，因此各特徵的頻率會接近 $1/d$ ，無法反映特徵對異常檢測的貢獻（本案例實測 0.16–0.185，見 6.3 節步驟 8）。
+2. **排列重要性 (Permutation Importance)**：在評估資料上打亂單一特徵，觀察 AUC 下降多少，下降越多代表該特徵越重要。此方法需要真實標籤（或少量已標記樣本）。
 
 ```python
 import numpy as np
-from sklearn.ensemble import IsolationForest
+import pandas as pd
+from sklearn.metrics import roc_auc_score
 
-def compute_feature_importance(model, X, feature_names):
+def permutation_importance_if(model, X, y, feature_names, n_repeats=20, seed=42):
     """
-    計算特徵在異常檢測中的重要性
-    基於每個特徵在分割決策中的使用頻率
+    以 AUC 下降量評估孤立森林的特徵重要性
+    X: 評估資料 (numpy array)，y: 真實標籤 (1 = 異常, 0 = 正常)
     """
-    n_features = X.shape[1]
-    feature_counts = np.zeros(n_features)
-    
-    # 遍歷所有樹
-    for tree_idx, tree in enumerate(model.estimators_):
-        # 獲取該樹使用的特徵
-        features = model.estimators_features_[tree_idx]
-        # 計算每個特徵的分割次數
-        tree_feature_counts = np.bincount(
-            tree.tree_.feature[tree.tree_.feature >= 0],
-            minlength=len(features)
-        )
-        # 累加到總計
-        for i, feat_idx in enumerate(features):
-            if i < len(tree_feature_counts):
-                feature_counts[feat_idx] += tree_feature_counts[i]
-    
-    # 正規化
-    feature_importance = feature_counts / feature_counts.sum()
-    
-    # 建立結果 DataFrame
-    importance_df = pd.DataFrame({
-        'Feature': feature_names,
-        'Importance': feature_importance
-    }).sort_values('Importance', ascending=False)
-    
-    return importance_df
+    rng = np.random.RandomState(seed)
+    base_auc = roc_auc_score(y, -model.score_samples(X))
+    rows = []
+    for j, name in enumerate(feature_names):
+        drops = []
+        for _ in range(n_repeats):
+            X_perm = X.copy()
+            X_perm[:, j] = rng.permutation(X_perm[:, j])
+            drops.append(base_auc - roc_auc_score(y, -model.score_samples(X_perm)))
+        rows.append({'Feature': name,
+                     'AUC_drop_mean': np.mean(drops),
+                     'AUC_drop_std': np.std(drops)})
+    return pd.DataFrame(rows).sort_values('AUC_drop_mean', ascending=False)
 
 # 使用範例
-feature_names = ['Temperature', 'Pressure', 'Feed_Flow', 
-                'Cooling_Flow', 'Stirring_Speed', 'Product_Conc']
-importance_df = compute_feature_importance(iso_forest, X_train, feature_names)
-print(importance_df)
-
-# 視覺化
-plt.figure(figsize=(10, 6))
-plt.barh(importance_df['Feature'], importance_df['Importance'])
-plt.xlabel('Importance')
-plt.title('Feature Importance in Anomaly Detection')
-plt.gca().invert_yaxis()
-plt.grid(alpha=0.3)
-plt.show()
+feature_names = ['Temperature', 'Pressure', 'Feed_Flow',
+                 'Cooling_Flow', 'Stirring_Speed', 'Product_Conc']
+importance_df = permutation_importance_if(iso_forest, X_test, y_test, feature_names)
+print(importance_df.round(4).to_string(index=False))
 ```
+
+本案例結果：Temperature（AUC 下降 0.0878）與 Pressure（0.0672）最重要，Cooling_Flow（0.0006）幾乎沒有貢獻。
 
 ### 7.2 異常貢獻圖 (Contribution Plot)
 
@@ -1620,121 +1725,133 @@ for batch in data_batches:
         predictions = online_model.predict(new_data)
 ```
 
-**策略 2：增量式森林**
+**策略 2：增量式追加新樹 (warm_start)**
+
+scikit-learn 的 `warm_start=True` 可保留既有的樹，只針對新增的樹用傳入的資料訓練：
 
 ```python
-def incremental_isolation_forest(old_model, new_data, n_new_trees=10):
-    """
-    向現有孤立森林添加新樹
-    保留舊樹，添加基於新數據的新樹
-    """
-    # 訓練新樹
-    new_model = IsolationForest(
-        n_estimators=n_new_trees,
-        max_samples='auto',
-        contamination=old_model.contamination,
-        random_state=None
-    )
-    new_model.fit(new_data)
-    
-    # 合併舊樹與新樹
-    combined_estimators = (
-        old_model.estimators_ + 
-        new_model.estimators_
-    )
-    
-    # 更新模型
-    old_model.estimators_ = combined_estimators
-    old_model.n_estimators = len(combined_estimators)
-    
-    return old_model
+from sklearn.ensemble import IsolationForest
+
+model = IsolationForest(
+    n_estimators=100,
+    contamination=0.05,
+    warm_start=True,
+    random_state=42
+)
+model.fit(X_old)                      # 先以舊數據訓練 100 棵樹
+
+model.set_params(n_estimators=110)    # 追加 10 棵樹
+model.fit(X_new)                      # 舊的 100 棵樹保留，只用 X_new 訓練新增的 10 棵
 ```
+
+**注意事項**：
+- 追加樹後，`offset_`（判定閾值）會依本次傳入的 `X_new` 重新計算，需確認 `X_new` 具代表性。
+- 舊樹不會被淘汰，製程特性漂移時仍需搭配滑動窗口或定期完整重訓練。
+- 若 `n_estimators` 未增加就再次 `fit`，不會有新樹被訓練（scikit-learn 會發出警告）。
 
 ### 7.4 與其他異常檢測方法的整合
 
 **整合策略：投票機制 (Voting Ensemble)**
 
+三種方法的原始分數尺度完全不同（本案例以未標準化資料實測：Isolation Forest 的 score_samples 約 -0.61 至 -0.37，One-Class SVM 約 64 至 68，LOF 約 -1.83 至 -0.95），直接平均會讓尺度最大的模型主導結果。因此軟投票前必須先將分數轉換到共同尺度（以下以訓練集分數的百分位排名正規化）。One-Class SVM 與 LOF 為核函數/距離方法，需先標準化。
+
 ```python
-from sklearn.svm import OneClassSVM
+import numpy as np
+from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
-from sklearn.covariance import EllipticEnvelope
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import OneClassSVM
 
 class EnsembleAnomalyDetector:
     """
     整合多種異常檢測方法的集成檢測器
     """
     def __init__(self, contamination=0.05):
+        self.contamination = contamination
         self.models = {
             'IsolationForest': IsolationForest(
                 contamination=contamination, random_state=42
             ),
-            'OneClassSVM': OneClassSVM(nu=contamination),
-            'LOF': LocalOutlierFactor(
-                contamination=contamination, novelty=True
-            )
+            'OneClassSVM': make_pipeline(
+                StandardScaler(), OneClassSVM(nu=contamination, gamma='scale')
+            ),
+            'LOF': make_pipeline(
+                StandardScaler(),
+                LocalOutlierFactor(contamination=contamination, novelty=True)
+            ),
         }
-        self.contamination = contamination
-    
+
+    def _anomaly_score(self, model, X):
+        """統一方向：分數越大越異常"""
+        return -model.score_samples(X)
+
     def fit(self, X):
         """
-        訓練所有模型
+        訓練所有模型，並記錄各模型在訓練集上的分數分布（供分數正規化）
         """
+        self.train_scores_ = {}
         for name, model in self.models.items():
-            print(f"Training {name}...")
             model.fit(X)
+            self.train_scores_[name] = np.sort(self._anomaly_score(model, X))
+        # 軟投票的閾值：訓練集平均百分位排名的 (1 - contamination) 分位數
+        train_soft = self._soft_score(X)
+        self.soft_threshold_ = np.quantile(train_soft, 1 - self.contamination)
         return self
-    
+
+    def _soft_score(self, X):
+        """將各模型分數轉為訓練集上的百分位排名 (0~1) 後取平均"""
+        ranks = []
+        for name, model in self.models.items():
+            s = self._anomaly_score(model, X)
+            ref = self.train_scores_[name]
+            ranks.append(np.searchsorted(ref, s) / len(ref))
+        return np.mean(ranks, axis=0)
+
     def predict(self, X, voting='hard'):
         """
-        預測異常
-        voting: 'hard' (多數投票) 或 'soft' (平均分數)
+        預測異常（-1 = 異常, 1 = 正常）
+        voting: 'hard' (多數投票) 或 'soft' (平均百分位排名)
         """
-        predictions = []
-        for name, model in self.models.items():
-            pred = model.predict(X)
-            predictions.append(pred)
-        
-        predictions = np.array(predictions)
-        
         if voting == 'hard':
-            # 多數投票：至少 2/3 的模型認為是異常
-            final_pred = np.where(
-                np.sum(predictions == -1, axis=0) >= 2, -1, 1
-            )
-        else:  # soft
-            # 平均投票：基於分數的平均
-            scores = []
-            for model in self.models.values():
-                score = model.score_samples(X)
-                scores.append(score)
-            avg_score = np.mean(scores, axis=0)
-            threshold = np.percentile(avg_score, self.contamination * 100)
-            final_pred = np.where(avg_score < threshold, -1, 1)
-        
-        return final_pred
-    
+            votes = np.array([model.predict(X) for model in self.models.values()])
+            # 至少 2/3 的模型認為是異常
+            return np.where(np.sum(votes == -1, axis=0) >= 2, -1, 1)
+        return np.where(self._soft_score(X) > self.soft_threshold_, -1, 1)
+
     def get_individual_predictions(self, X):
-        """
-        獲取每個模型的預測結果
-        """
-        results = {}
-        for name, model in self.models.items():
-            results[name] = model.predict(X)
-        return results
+        """獲取每個模型的預測結果"""
+        return {name: model.predict(X) for name, model in self.models.items()}
 
 # 使用範例
 ensemble = EnsembleAnomalyDetector(contamination=0.05)
 ensemble.fit(X_train)
 
 # 集成預測
-y_pred_ensemble = ensemble.predict(X_test, voting='hard')
+y_pred_hard = ensemble.predict(X_test, voting='hard')
+y_pred_soft = ensemble.predict(X_test, voting='soft')
 
 # 查看各模型的預測
-individual_preds = ensemble.get_individual_predictions(X_test)
-for name, pred in individual_preds.items():
-    n_anomalies = np.sum(pred == -1)
-    print(f"{name}: {n_anomalies} anomalies detected")
+for name, pred in ensemble.get_individual_predictions(X_test).items():
+    print(f"{name}: {np.sum(pred == -1)} anomalies detected")
 ```
+
+**本案例實測**（測試集 600 筆，30 筆異常）：
+
+| 方法 | AUC | Precision | Recall |
+|------|-----|-----------|--------|
+| Isolation Forest（原始數據） | 0.8026 | 0.344 | 0.367 |
+| One-Class SVM（未標準化） | 0.643 | - | - |
+| One-Class SVM（標準化後） | 0.802 | - | - |
+| LOF（未標準化） | 0.803 | - | - |
+| LOF（標準化後） | 0.835 | - | - |
+| 集成：硬投票（標準化流程） | - | 0.324 | 0.400 |
+| 集成：軟投票（標準化流程） | - | 0.308 | 0.400 |
+
+**注意**：
+- One-Class SVM 若未標準化，AUC 僅 0.643，標準化後與孤立森林相當，顯示距離/核函數方法對尺度非常敏感。
+- 本案例 LOF 標準化後的 AUC 略高（0.835），但單一測試集僅 30 筆異常，差異需以多次切分或交叉驗證確認。
+- 集成後 Recall 略升（0.367 到 0.400）而 Precision 略降，並未明顯優於單一模型；集成是否有益必須以驗證資料實測。
 
 ---
 
@@ -1745,14 +1862,14 @@ for name, pred in individual_preds.items():
 | 特性 | Isolation Forest | LOF |
 |------|------------------|-----|
 | **演算法類型** | 基於決策樹 | 基於密度 |
-| **計算複雜度** | $O(n \log n)$ | $O(n^2)$ |
-| **適合數據規模** | 大規模（> 100,000 樣本） | 中小規模（< 10,000 樣本） |
-| **高維數據** | ✅ 適合 | ❌ 受維度災難影響 |
+| **計算複雜度** | 訓練 $O(t \cdot \psi \log \psi)$ ，只與子樣本大小 $\psi$ 與樹數 $t$ 有關 | 暴力搜尋約 $O(n^2)$ （可用樹狀索引降低） |
+| **適合數據規模**（經驗法則） | 大規模（> 100,000 樣本） | 中小規模（< 10,000 樣本） |
+| **高維數據** | ✅ 相對適合 | ❌ 受維度災難影響 |
 | **局部異常檢測** | ❌ 較弱 | ✅ 優秀 |
 | **全局異常檢測** | ✅ 優秀 | ⚠️ 尚可 |
-| **訓練速度** | 快 | 慢 |
-| **記憶體需求** | 低 | 高（需存儲距離矩陣） |
-| **參數敏感性** | 低 | 高（需調整 k） |
+| **訓練速度** | 快 | 資料量大時較慢 |
+| **記憶體需求** | 低（只儲存樹結構） | 較高（需保留訓練資料與近鄰資訊） |
+| **參數敏感性** | 相對較低 | 較高（需調整 k，且需標準化） |
 
 **選擇建議**：
 
@@ -1761,16 +1878,17 @@ for name, pred in individual_preds.items():
 
 ### 8.2 是否需要對數據進行標準化？
 
-**答案**：孤立森林對特徵尺度不敏感，理論上不需要標準化。
+**答案**：孤立森林對特徵尺度不敏感，不需要標準化。
 
 **原因**：
 - 孤立森林使用隨機分割，不基於距離計算
-- 每個特徵在其自身的範圍內被隨機分割
-- 特徵尺度不影響孤立效率
+- 每個特徵在其自身的範圍內被隨機分割（分割點在該特徵的 min 至 max 之間均勻抽取）
+- 線性縮放（標準化、歸一化）不改變樣本間的相對順序，因此樹的分割結果等價
+- 本單元實測（見 6.3 節步驟 7）：標準化前後預測標籤 100% 一致、AUC 相同
 
-**例外情況**：
-- 若某些特徵的量級差異極大（如 $10^{-3}$ vs $10^6$ ），可能影響隨機抽樣的多樣性
-- 若需要與其他需要標準化的方法比較，可以進行標準化
+**仍需注意的情況**：
+- 若特徵分布高度偏斜（如跨數量級的濃度），均勻切分會集中浪費在極端值附近，可考慮對數轉換（這是分布形狀問題，不是尺度問題）
+- 若需要與 One-Class SVM、LOF 等距離/核函數方法比較，該些方法必須標準化（見 7.4 節實測）
 
 **實驗驗證**：
 
@@ -1800,14 +1918,16 @@ print(f"Prediction agreement: {agreement:.2%}")
 
 孤立森林僅接受數值型特徵，需要對類別型特徵進行編碼：
 
-**方法 1：Label Encoding（有序類別）**
+**方法 1：Ordinal Encoding（有序類別）**
 
 ```python
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 
 # 假設有序類別：'Low' < 'Medium' < 'High'
-le = LabelEncoder()
-X['Quality_Level'] = le.fit_transform(['Low', 'Medium', 'High', ...])
+# 必須明確指定 categories 順序
+# （LabelEncoder 會依字母順序編碼為 High=0, Low=1, Medium=2，會破壞大小關係）
+enc = OrdinalEncoder(categories=[['Low', 'Medium', 'High']])
+X['Quality_Level'] = enc.fit_transform(X[['Quality_Level']])
 ```
 
 **方法 2：One-Hot Encoding（無序類別）**
@@ -1827,6 +1947,7 @@ X_encoded = np.hstack([X.drop('Product_Type', axis=1), type_encoded])
 
 ```python
 # 根據目標變數的平均值編碼類別
+# 注意：需只用訓練資料計算平均，避免資料洩漏
 category_means = X.groupby('Supplier')['Defect_Rate'].mean()
 X['Supplier_Encoded'] = X['Supplier'].map(category_means)
 ```
@@ -1843,24 +1964,26 @@ contamination = historical_anomaly_rate
 print(f"Historical anomaly rate: {contamination:.2%}")
 ```
 
-**策略 2：使用交叉驗證**
+**策略 2：使用帶標籤的驗證集**
+
+`contamination` 不改變 AUC（見 6.3 節步驟 6），因此不能用 AUC 選擇，應改用依成本定義的指標（如 F1 或加權成本）：
 
 ```python
-from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import IsolationForest
+from sklearn.metrics import f1_score
 
 contamination_values = [0.01, 0.02, 0.05, 0.1, 0.15]
-best_contamination = None
-best_score = -np.inf
+best_contamination, best_f1 = None, -1
 
 for c in contamination_values:
     model = IsolationForest(contamination=c, random_state=42)
-    # 使用自定義評分函數（需要有標籤）
-    score = custom_anomaly_score(model, X_train, y_train)
-    if score > best_score:
-        best_score = score
-        best_contamination = c
+    model.fit(X_train)
+    y_pred = (model.predict(X_val) == -1).astype(int)   # 1 = 異常
+    f1 = f1_score(y_val, y_pred)
+    if f1 > best_f1:
+        best_f1, best_contamination = f1, c
 
-print(f"Best contamination: {best_contamination}")
+print(f"Best contamination: {best_contamination} (F1 = {best_f1:.3f})")
 ```
 
 **策略 3：業務規則**
@@ -1911,9 +2034,10 @@ iso_forest.fit(X_ts)
 # 假設有多個感測器的時間序列數據
 # X.shape = (n_timesteps, n_sensors)
 
-# 可以直接使用每個時間點的所有感測器值作為特徵
+# 可以直接使用每個時間點的所有感測器值作為特徵（忽略時間順序，只能抓到「數值極端」的異常）
 iso_forest.fit(X)
 anomaly_scores = iso_forest.score_samples(X)
+threshold = iso_forest.offset_
 
 # 繪製時間序列異常檢測圖
 plt.figure(figsize=(14, 6))
@@ -2082,11 +2206,11 @@ plt.show()
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Unit07 Isolation Forest 孤立森林異常檢測
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-03
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

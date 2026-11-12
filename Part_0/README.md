@@ -2,11 +2,9 @@
 
 ## 📚 單元簡介
 
-在開始AI與機器學習的學習之旅前，建立一個穩定且功能完整的Python開發環境是至關重要的基礎工作。本單元將帶領您完成兩種主流的Python開發環境設定：**Google Colab雲端環境**與**Windows本地開發環境**。
+在開始 AI 與機器學習的學習之旅前，建立一個穩定且功能完整的 Python 開發環境是至關重要的基礎工作。本單元將帶領您完成兩種主流的 Python 開發環境設定：**Google Colab 雲端環境**與 **Windows 本地開發環境 (`PY310`)**，並額外介紹可輔助程式開發與文獻研究的自主型 AI 代理工具（**Hermes Agent**）。
 
-Google Colab提供了免費的雲端運算資源與GPU加速，適合快速開始學習與原型開發；而本地環境則提供了更高的自由度與穩定性，適合長期專案開發與實際工作需求。掌握這兩種環境的設定與使用，將為您後續的課程學習奠定堅實基礎。
-
-本單元涵蓋從環境安裝、套件管理、到開發工具使用的完整流程，並提供實際的驗證測試程式，確保您的環境已準備就緒，可以順利進行後續的AI課程學習。
+Google Colab 提供了免安裝的雲端運算資源與免費 GPU 加速，適合快速開始學習與原型開發；而 Windows 本地環境則透過輕量化 Miniconda 與本課程專屬的 `PY310_environment.yml` 配置檔，一鍵部署包含科學計算、梯度提升樹、深度學習（TensorFlow 2.10.1）與原生 Windows GPU 硬體加速（CUDA 11.2 / cuDNN 8.1）的獨立虛擬環境，提供無時間限制與高安全性的開發體驗。同時，本課程所有範例 Notebook 皆採用**跨環境（Colab 與 Local）雙相容標準路徑範本**，讓您能根據需求在雲端與本地端之間無縫切換。
 
 ---
 
@@ -14,143 +12,147 @@ Google Colab提供了免費的雲端運算資源與GPU加速，適合快速開�
 
 完成本單元後，您將能夠：
 
-1. **理解Python環境管理的核心概念**：虛擬環境、套件管理、相依性控制
-2. **掌握雙重開發環境**：Google Colab雲端環境與Windows本地環境
-3. **選擇合適的開發環境**：根據專案需求、運算資源、協作需求選擇最適合的環境
-4. **實作環境建立與驗證**：使用Miniconda、Jupyter Notebook/Lab進行實際操作
-5. **應用於化工領域AI學習**：確保所有必要套件正確安裝，可進行數據分析、機器學習與深度學習開發
+1. **理解 Python 環境管理的核心概念**：掌握虛擬環境（Virtual Environment）隔離、套件相依性控制與實驗可重現性
+2. **掌握雙重開發環境與跨環境工作流**：熟練操作 Google Colab 雲端環境與 Windows 本地端 Conda + JupyterLab/Notebook 環境，並理解本課程跨環境路徑設定範本
+3. **完成課程專案同步與本地環境建置**：在 Colab 中透過 `git clone` 同步課程儲存庫至 Google Drive，並在本地端使用 `PY310_environment.yml` 建立支援原生 Windows GPU 的 `PY310` 環境
+4. **執行端到端化工數據分析與環境驗證**：透過連續攪拌槽反應器（CSTR）與間歇式反應器（Batch Reactor）實作案例，完整測試 NumPy、Pandas、Matplotlib、Seaborn、Scikit-learn 與 TensorFlow GPU 運算功能
+5. **善用 AI Agent 輔助工具（延伸選讀）**：認識並操作 Hermes Agent，協助化工資料清理、程式除錯與研究自動化
 
 ---
 
 ## 📖 單元內容架構
 
+```
+Part_0/
+├── README.md                                  # 本單元總覽與快速指南
+├── PY310_environment.yml                      # Windows 本地端 Conda 虛擬環境定義檔
+├── Unit00_Colab_Environment_Setup.md          # Google Colab 雲端環境設定完整講義
+├── Unit00_Colab_Environment_Setup.ipynb       # Google Colab 環境實作與 CSTR 數據分析範例
+├── Unit00_Local_Environment_Setup.md          # Windows 本地環境設定完整講義
+├── Unit00_Local_Environment_Setup.ipynb       # Windows 本地環境驗證與批次反應器分析範例
+├── Unit00_Hermes_Agent_Setup.md               # [延伸選讀] Hermes Agent 安裝與使用教學
+├── Unit00_Hermes_Agent_Command.md             # [延伸選讀] Hermes Agent 常用指令詳細教學
+├── Unit00_Hermes_Agent_Skills&Plugins.md      # [延伸選讀] Hermes Agent 必裝技能與外掛推薦指南
+└── outputs/                                   # 範例 Notebook 執行產出結果與圖表目錄
+    ├── P0_Unit00_Colab_Environment_Setup/
+    │   ├── reactor_data.csv
+    │   └── figs/
+    │       ├── reactor_data_distribution.png
+    │       ├── correlation_heatmap.png
+    │       └── actual_vs_predicted.png
+    └── P0_Unit00_Local_Environment_Setup/
+        ├── batch_reactor_data.csv
+        └── figs/
+            ├── matplotlib_basic_plots.png
+            └── sklearn_linear_regression.png
+```
+
+---
+
 ### 1️⃣ Google Colab 雲端環境設定
 
 **檔案**：
-- 講義：[Unit00_Colab_Environment_Setup.md](Unit00_Colab_Environment_Setup.md)
-- 程式範例：[Unit00_Colab_Environment_Setup.ipynb](Unit00_Colab_Environment_Setup.ipynb)
+- 📄 講義：[Unit00_Colab_Environment_Setup.md](Unit00_Colab_Environment_Setup.md)
+- 📓 程式範例：[Unit00_Colab_Environment_Setup.ipynb](Unit00_Colab_Environment_Setup.ipynb)
 
 **內容重點**：
-- **Google Colab 簡介**：
-  - 什麼是Google Colab及其主要特色
-  - 為什麼選擇Colab作為學習平台
-  - Colab的限制與注意事項
-  
-- **基本操作教學**：
-  - 建立與管理Colab筆記本
-  - Notebook介面與功能說明
-  - Cell的類型與執行方式
-  - 快捷鍵與效率技巧
-  
-- **檔案與資料管理**：
-  - 上傳與下載檔案的多種方法
-  - Google Drive掛載與使用
-  - 資料持久化策略
-  - 檔案路徑管理技巧
-  
-- **套件與環境管理**：
-  - 預裝套件清單
-  - 安裝額外套件（pip、apt-get）
-  - 套件版本管理
-  - 環境變數設定
-  
-- **GPU/TPU加速運算**：
-  - 如何啟用GPU/TPU
-  - 運算資源監控
-  - GPU記憶體管理
-  - 效能優化建議
-  
-- **實作練習**：
-  - 基本Python程式執行
-  - NumPy、Pandas數據處理
-  - Matplotlib資料視覺化
-  - 簡單的機器學習模型訓練
+- **Google Colab 簡介與運作機制**：
+  - 什麼是 Google Colab 及其核心特色（免安裝、雲端硬碟整合、免費 T4 GPU）
+  - 虛擬機運作限制（`/content/` 暫存空間、最長 12 小時運行、閒置 90 分鐘斷線與動態配額）
+
+- **基本介面與儲存格操作**：
+  - 從 Google Drive、Colab 官網或 GitHub 開啟筆記本（含「在雲端硬碟中儲存副本」重要提醒）
+  - 頂部選單、左側邊欄（目錄、變數檢查器 `{x}`、密鑰 Secrets、檔案管理）
+  - 程式碼儲存格（Code Cell）與文字儲存格（Markdown / MathJax）操作及 `Ctrl + M` 系列快捷鍵
+
+- **檔案管理與本課程 GitHub 儲存庫同步 SOP**：
+  - 掛載個人 Google Drive（`drive.mount('/content/drive')`）、本地檔案上傳與下載
+  - **課程專案同步三步驟**：首次 `git clone` 下載全課程教材至雲端硬碟、`git reset --hard origin/main` 更新全庫、以及單一單元局部更新
+  - **本課程標準跨環境路徑設定範本**：自動偵測 Colab / Local 環境、建立 `/content/ChemE-3590` 符號連結（Symlink），並統一管理 `OUTPUT_DIR` 與 `FIG_DIR`
+
+- **Python 套件管理與 GPU / TPU 硬體加速**：
+  - 檢查預裝科學計算與機器學習套件版本
+  - 使用 `!pip install` 與跨環境自動檢查安裝（`importlib` + `subprocess`），以及化工常用擴充套件（`rdkit`、`chempy`、`coolprop`、`thermo`、`optuna`）
+  - 啟用 NVIDIA T4 GPU、`!nvidia-smi` 硬體狀態檢視，以及 TensorFlow GPU 動態記憶體成長（`set_memory_growth`）設定
+
+- **實作範例：連續攪拌槽反應器 (CSTR) 數據分析與多元線性回歸建模**：
+  - 產生 $N = 200$ 組包含反應溫度 $T$ 、壓力 $P$ 、進料流量 $F$ 與產物轉化率 $y$ 的合成反應器數據
+  - 繪製 $2 \times 3$ 單變量直方圖分布與雙變量散佈趨勢圖，解析為何單變量視角會掩蓋次要變數效應
+  - 皮爾森相關係數熱力圖（Correlation Heatmap）與自變數獨立性（無多重共線性）檢驗
+  - Scikit-learn 多元線性回歸建模（測試集 $R^2 = 0.9236$ 、 $\mathrm{RMSE} = 0.0437$ ）、理論物理參數還原驗證（相對誤差 $< 9\%$ ）、對角預測圖（Parity Plot）與殘差圖（Residual Plot）診斷
+
+- **Colab 進階技巧**：
+  - IPython Magic Commands（單行 `%timeit`、`%whos` 與儲存格第一行 `%%time`、`%%writefile`）
+  - Linux Shell 指令（`!pwd`、`!ls -lh`、`!df -h`）與互動式表單模擬器（`#@param` 滑桿與下拉選單）
 
 **適合場景**：
-- 初學者快速開始學習
-- 需要GPU加速的訓練任務
-- 團隊協作與程式碼分享
-- 不想在本地安裝環境
-- 需要從不同裝置存取專案
+- 初學者快速開始學習（零安裝門檻）
+- 個人電腦無獨立 NVIDIA 顯示卡，需要免費雲端 GPU 進行 Part 4 深度學習訓練
+- 跨裝置存取與團隊即時協作分享
 
 ---
 
 ### 2️⃣ Windows 本地環境設定 ⭐
 
 **檔案**：
-- 講義：[Unit00_Local_Environment_Setup.md](Unit00_Local_Environment_Setup.md)
-- 程式範例：[Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb)
+- 📄 講義：[Unit00_Local_Environment_Setup.md](Unit00_Local_Environment_Setup.md)
+- 📓 程式範例：[Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb)
 
 **內容重點**：
-- **本地開發環境簡介**：
-  - 為什麼需要本地開發環境
-  - 虛擬環境（Virtual Environment）概念
-  - Miniconda vs Anaconda比較
-  
-- **Miniconda安裝教學**：
-  - 下載與安裝步驟（含圖文說明）
-  - 安裝選項說明
-  - 驗證安裝是否成功
-  - 初始設定與更新
-  
-- **虛擬環境建立與管理**：
-  - 使用YAML檔案批次建立環境
-  - `PY310_environment.yml` 檔案結構說明
-  - 環境啟動、切換、刪除指令
-  - 套件安裝、更新、移除
-  - 環境匯出與分享
-  
-- **Jupyter Notebook/Lab 使用教學**：
-  - Jupyter Notebook vs JupyterLab 比較
-  - 啟動與關閉Jupyter
-  - 建立與管理Notebook
-  - Cell操作與快捷鍵
-  - Kernel管理
-  
-- **環境驗證與測試**：
-  - Python版本檢查
-  - 核心套件版本確認（NumPy、Pandas、Matplotlib等）
-  - 機器學習套件測試（Scikit-learn、TensorFlow、XGBoost等）
-  - GPU可用性檢查
-  - 基本功能測試範例
-  
-- **常見問題與解決方案**：
-  - 10個常見安裝與設定問題
-  - 詳細的故障排除步驟
-  - 套件衝突解決方法
-  
-- **最佳實務建議**：
-  - 環境管理策略
-  - Notebook使用技巧
-  - 專案檔案組織
-  - 開發習慣養成
+- **本地開發環境與虛擬環境核心概念**：
+  - 本地開發環境的六大工程優勢（無連線時間限制、完全離線可用、製程資料保密、高速本地 SSD I/O）
+  - 虛擬環境（Virtual Environment）沙盒隔離機制與環境可重現性
+  - Miniconda vs. Anaconda 深度比較（為何本課程採用極致輕量的 Miniconda）
+
+- **Miniconda 下載與 Windows 安裝詳解**：
+  - 官方安裝檔選擇與觀念釐清（`base` 環境僅負責運行 Conda，`PY310` 環境將獨立配置 Python 3.10）
+  - Windows 10/11 圖文安裝選項解析（強烈建議選擇 `Just Me` 與純英文無空白安裝路徑）
+  - 開啟 Anaconda Prompt 驗證安裝與更新基礎工具
+
+- **建立本課程專屬虛擬環境 (`PY310`) 與工程背景解析**：
+  - `PY310_environment.yml` 完整架構解析
+  - **關鍵工程設計背景**：為何精確鎖定 `Python 3.10` + `tensorflow==2.10.1` + Conda 內建 `cudatoolkit=11.2` / `cudnn=8.1` + `protobuf==3.19.6`（原生 Windows 最後支援 GPU 之 TensorFlow 版本，由 Conda 自動配置底層 `.dll`，免除學生手動安裝 3 GB 系統層級 CUDA Toolkit 之痛點）
+  - 一鍵建立環境標準 SOP 與手動逐步建立替代方案
+
+- **Conda / Pip 管理與 JupyterLab / Notebook (v7+) 實務操作**：
+  - 虛擬環境啟動（`conda activate PY310`）、套件安裝查詢、快取清理（`conda clean --all`）與 YAML 備份匯出
+  - JupyterLab（多視窗並排 IDE，推薦）與 Jupyter Notebook (v7+) 介面比較、標準四步驟啟動流程、快捷鍵速查與安全關閉伺服器
+
+- **環境設定驗證與實作演練（6 大完整測試）**：
+  1. **系統硬體、進階套件與本地 GPU 張量運算測試**：驗證 `sys.executable` 路徑、10 大進階 ML/DL 套件版本，並於本地 GPU 執行 $2000 \times 2000$ 矩陣乘法計時測試
+  2. **NumPy 數值與線性代數測試**：一維陣列統計、二維矩陣乘法 $C = A B$ 、行列式與線性聯立方程組 $A \mathbf{x} = \mathbf{b}$ 求解
+  3. **Pandas 間歇式反應器數據處理與本地 CSV 讀寫**：模擬 $12$ 批次反應器數據、描述性統計、高產率批次篩選（ $Y > 85\%$ ）、相關性矩陣（ $r_{T,Y} = 0.921$ ）與 `utf-8-sig` 本地 CSV 讀寫驗證
+  4. **Matplotlib $2 \times 2$ 多子圖科學繪圖**：折線圖、散佈趨勢圖、催化劑批次長條圖（含目標門檻線與數值標註）及常態分布直方圖（`300 DPI` 高解析度輸出）
+  5. **Scikit-learn 線性回歸與殘差診斷**：訓練集/測試集切分、OLS 參數估計 vs. 真實物理定律比較（斜率相對誤差 $5.35\%$ ）、決定係數（測試集 $R^2 = 0.8740$ 、 $\mathrm{RMSE} = 1.6170\%$ ）評估與殘差圖診斷
+  6. **本地環境 10 項自動檢核清單（Final Readiness Checklist）**：一鍵輸出 `[PASS]` 驗證報告
+
+- **常見問題故障排除（Troubleshooting Top 10）與最佳實務**：
+  - 涵蓋 PowerShell 初始化、SSL 憑證更新、`protobuf` 版本衝突、`cudart64_110.dll` 載入機制、`imbalanced-learn` 相容性、Jupyter Kernel 註冊與中文路徑處理
 
 **適合場景**：
-- 長期專案開發
-- 需要離線工作
-- 敏感資料處理
-- 完整的環境控制權
-- 符合實際工作環境需求
+- 長期課程學習、專題研究與畢業論文開發
+- 需要長時間連續運算（超參數搜尋、大型深度神經網路訓練）
+- 具備 NVIDIA 獨立顯示卡，希望發揮本地硬體極致效能
+- 離線開發或處理具機密性之化工廠製程數據
 
 ---
 
-### 3️⃣ 環境配置檔案
+### 3️⃣ 環境配置定義檔
 
-**檔案**：[PY310_environment.yml](PY310_environment.yml)
+**檔案**：⚙️ [PY310_environment.yml](PY310_environment.yml)
 
 **內容說明**：
-- Python 3.10 基礎環境
-- **數值運算**：numpy, scipy
-- **資料處理**：pandas, openpyxl（Excel 支援）
-- **視覺化**：matplotlib, seaborn, kaleido
-- **機器學習**：scikit-learn, imbalanced-learn, mlxtend
-- **進階演算法**：py-xgboost-gpu（GPU版XGBoost）, lightgbm, catboost
-- **降維與分群**：umap-learn
-- **網路分析**：networkx, pydot
-- **深度學習**：tensorflow==2.10.1, tensorboard==2.10.1
-- **TF生態系**：tensorflow-datasets, tensorflow-metadata, protobuf
-- **開發工具**：jupyterlab, notebook, ipykernel, ipywidgets
-- **GPU支援**：cudatoolkit=11.2, cudnn=8.1（已內建於環境）
+- **基礎環境與頻道**：`name: PY310`、優先使用 `conda-forge` 頻道、`python=3.10`
+- **原生 Windows GPU 加速底層庫**：`cudatoolkit=11.2`、`cudnn=8.1`（由 Conda 自動配置於環境內部 `Library/bin`）
+- **科學計算與數值分析**：`numpy=1.23.5`、`scipy`
+- **表格資料與試算表處理**：`pandas`、`openpyxl`（Excel `.xlsx` 讀寫支援）
+- **資料視覺化與圖表匯出**：`matplotlib`、`seaborn`、`python-kaleido`、`pydot`
+- **傳統機器學習與非監督式學習**：`scikit-learn`、`imbalanced-learn`（SMOTE 不平衡數據處理）、`umap-learn`（流形降維）、`mlxtend`（Apriori / FP-Growth 關聯規則）、`networkx`（網路拓樸分析）
+- **梯度提升樹三劍客**：`py-xgboost-gpu=1.7.6`（支援 GPU 加速之 XGBoost）、`lightgbm`、`catboost`
+- **深度學習與 TensorFlow 生態系（透過 `pip` 精確鎖定版本）**：
+  - `tensorflow==2.10.1`、`tensorboard==2.10.1`
+  - `protobuf==3.19.6`、`tensorflow-datasets==4.6.0`、`tensorflow-metadata==1.13.0`、`googleapis-common-protos==1.56.4`
+- **互動式開發工具**：`jupyterlab`、`notebook`、`ipykernel`、`ipywidgets`
 
 **使用方式**：
 ```powershell
@@ -160,36 +162,53 @@ conda activate PY310
 
 ---
 
+### 4️⃣ AI Agent 輔助學習工具：Hermes Agent 教學（延伸選讀）
+
+**檔案**：
+- 📄 安裝與基礎操作講義：[Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)
+- 📄 常用指令與實戰講義：[Unit00_Hermes_Agent_Command.md](Unit00_Hermes_Agent_Command.md)
+- 📄 必裝技能與外掛推薦指南：[Unit00_Hermes_Agent_Skills&Plugins.md](Unit00_Hermes_Agent_Skills&Plugins.md)
+
+**內容重點**：
+- **認識自主型 AI 代理（Hermes Agent）**：
+  - 由 Nous Research 開發的開源自主型 AI Agent，具備**持久記憶（Persistent Memory）**、**程序性技能系統（`SKILL.md`）**、**多步驟工具呼叫**與**子代理平行委派（Subagents）**能力
+  - 同一份代理核心與記憶可同時在 Windows 桌面應用（Desktop App）、命令列（CLI `hermes`）與現代終端介面（TUI `hermes --tui`）間無縫接續
+
+- **Windows 安裝與模型供應商設定**：
+  - 桌面引導式安裝程式（`Hermes-Setup.exe`）與 PowerShell 命令列安裝步驟
+  - Windows 資料儲存架構（`%LOCALAPPDATA%\hermes\` 下的 `config.yaml`、`.env`、`skills\` 與 `sessions\`）
+  - 使用 Nous Portal 或自備 API 金鑰（OpenAI、Anthropic、Gemini、OpenRouter 等）完成模型與工具設定
+
+- **四大類常用指令詳解與化工實戰應用**：
+  - **對話管理**：`hermes`、`hermes --tui --in <路徑>`、`hermes --continue (-c)`、`hermes -r "<標題>"`、`hermes sessions list`
+  - **設定管理**：`hermes setup --portal`、`hermes model`、`hermes config`、`hermes tools`
+  - **功能擴充**：`hermes skills`（瀏覽、搜尋與安裝程序性技能）、`hermes gateway`、`hermes pm`、`hermes desktop`
+  - **維護診斷與斜線指令**：`hermes doctor`（萬用環境健康診斷）、`hermes update`、`hermes uninstall`，以及對話內斜線指令（`/title`、`/compress`、`/usage`、`/model`、`/tools` 等）與反應器溫度數據分析實戰工作流
+
+---
+
 ## 🎓 環境比較與選擇指南
 
-| 特性 | Google Colab | Windows 本地環境 |
-|------|-------------|----------------|
-| **安裝難度** | 無需安裝 | 需要安裝設定 |
-| **成本** | 免費 | 免費（需有電腦） |
-| **網路需求** | 必需穩定網路 | 離線可用 |
-| **運算資源** | GPU/TPU免費配額 | 依電腦硬體而定 |
-| **執行時間** | 最長12小時 | 無限制 |
-| **閒置限制** | 90分鐘自動中斷 | 無限制 |
-| **儲存空間** | Google Drive配額 | 本地硬碟空間 |
-| **套件自由度** | 中等（需要sudo權限的受限） | 完全自由 |
-| **協作功能** | ✅ 優秀（即時協作） | ❌ 需額外工具 |
-| **資料安全** | 雲端儲存 | 本地儲存 |
-| **環境持久性** | Session結束即清除 | 永久保存 |
-| **適合對象** | 初學者、快速原型 | 進階使用者、正式開發 |
+| 比較項目 | Google Colab 雲端環境 | Windows 本地環境 (`PY310`) |
+| :--- | :--- | :--- |
+| **環境建置難度** | 極低（免安裝，瀏覽器開啟即用） | 中等（需安裝 Miniconda 與建立虛擬環境） |
+| **成本** | 免費（另有 Colab Pro 付費升級方案） | 免費（使用個人電腦硬體） |
+| **網路連線需求** | 必須全程保持穩定網路連線 | 環境建置後支援完全離線開發 |
+| **運算硬體資源** | 免費共享雲端 T4 GPU / CPU（有動態配額） | 取決於個人電腦 CPU / RAM / NVIDIA GPU 配置 |
+| **單次執行時間** | 最長 12 小時 | 無時間限制，可連續執行數天 |
+| **閒置斷線限制** | 閒置約 90 分鐘自動中斷並回收虛擬機 | 無限制 |
+| **儲存空間與持久性** | `/content/` 為暫存；需掛載 Google Drive 持久化 | 直接讀寫本地 SSD/HDD，環境與套件永久保存 |
+| **套件管理自由度** | 額外安裝之套件於虛擬機回收後需重新安裝 | 安裝於 `PY310` 環境後永久有效，完全可控 |
+| **協作與分享功能** | ✅ 優秀（雲端連結共用、修訂歷史與留言） | 需透過 Git / GitHub 或傳送檔案分享 |
+| **製程資料機密性** | 數據需上傳至雲端伺服器 | 數據保存於本地加密硬碟，機密不外流 |
+| **適合對象** | 初學者、無獨顯筆電使用者、快速原型驗證 | 長期專案開發、具備 NVIDIA 獨顯者、實務研發 |
 
 **選擇建議**：
-1. **初學階段** → Google Colab（快速開始，無需設定）
-2. **課程作業** → Google Colab 或 本地環境皆可
-3. **大型模型訓練** → Google Colab（免費GPU）
-4. **長時間運算** → 本地環境（無時間限制）
-5. **實際工作專案** → 本地環境（完整控制）
-6. **團隊協作** → Google Colab（即時協作功能）
-7. **敏感資料處理** → 本地環境（資料安全）
-
-**建議學習策略**：
-- **同時掌握兩種環境**，根據需求彈性切換
-- 初期使用Colab快速學習，後期轉向本地環境深入開發
-- Colab用於實驗與快速驗證，本地環境用於正式專案
+1. **初學入門階段** $\to$ **Google Colab**（零安裝門檻，立即專注於 Python 與 AI 語法學習）
+2. **課程日常作業** $\to$ **Google Colab** 或 **Windows 本地環境** 皆可（本課程 Notebook 雙向完全相容）
+3. **無獨立顯卡但需訓練深度學習（Part 4）** $\to$ **Google Colab**（啟用免費 T4 GPU 加速）
+4. **長時間超參數搜尋或大型模型訓練** $\to$ **Windows 本地環境**（無 90 分鐘閒置與 12 小時斷線限制）
+5. **學士專題、碩士論文與工廠機密數據分析** $\to$ **Windows 本地環境**（完整環境控制權與資料安全性）
 
 ---
 
@@ -197,145 +216,122 @@ conda activate PY310
 
 ### 本地環境硬體建議
 
-**最低需求**：
-- CPU: Intel i3 或同等級
-- RAM: 8 GB
-- 硬碟空間: 10 GB 可用空間
-- 作業系統: Windows 10/11 (64-bit)
+**最低配置需求**：
+- **CPU**：Intel Core i3 / AMD Ryzen 3 或同等級處理器
+- **RAM**：8 GB
+- **硬碟空間**：15 GB 以上可用空間（用於存放 Miniconda、`PY310` 虛擬環境與課程數據集）
+- **作業系統**：Windows 10 / 11 (64-bit)
 
-**建議配置**：
-- CPU: Intel i5/i7 或 AMD Ryzen 5/7
-- RAM: 16 GB 以上
-- 硬碟: SSD 20 GB 以上可用空間
-- GPU: NVIDIA GPU（選配，用於深度學習加速）
-- 作業系統: Windows 10/11 (64-bit)
+**建議配置（流暢執行全課程與深度學習）**：
+- **CPU**：Intel Core i5/i7 或 AMD Ryzen 5/7 以上多核心處理器
+- **RAM**：16 GB 以上（處理大型資料集與影像資料更流暢）
+- **硬碟**：SSD 固態硬碟 25 GB 以上可用空間
+- **GPU**：NVIDIA 獨立顯示卡（選配，支援 CUDA Compute Capability 3.5+；若無獨立顯卡，全課程皆可以 CPU 模式正常完成）
+- **作業系統**：Windows 10 / 11 (64-bit)
 
-**GPU支援**（選配）：
-- NVIDIA GPU with CUDA Compute Capability 3.5+
-- CUDA Toolkit 11.2
-- cuDNN 8.1
-
-### 必要套件清單
+### 本課程標準環境配置 (`PY310_environment.yml`)
 
 ```yaml
-# 核心套件
-python=3.10
-numpy=1.23.5
-pandas
-scipy
-matplotlib
-seaborn
-
-# 機器學習
-scikit-learn
-imbalanced-learn
-mlxtend
-
-# 進階演算法
-xgboost
-lightgbm
-catboost
-umap-learn
-
-# 深度學習
-tensorflow==2.10.1
-tensorboard==2.10.1
-
-# 開發工具
-jupyterlab
-notebook
-ipykernel
-ipywidgets
+name: PY310
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - cudatoolkit=11.2
+  - cudnn=8.1
+  - numpy=1.23.5
+  - pandas
+  - openpyxl
+  - scipy
+  - scikit-learn
+  - umap-learn
+  - imbalanced-learn
+  - mlxtend
+  - networkx
+  - py-xgboost-gpu=1.7.6
+  - lightgbm
+  - catboost
+  - matplotlib
+  - seaborn
+  - python-kaleido
+  - jupyterlab
+  - notebook
+  - ipykernel
+  - ipywidgets
+  - pydot
+  - pip
+  - pip:
+      - tensorflow==2.10.1
+      - tensorboard==2.10.1
+      - protobuf==3.19.6
+      - tensorflow-datasets==4.6.0
+      - tensorflow-metadata==1.13.0
+      - googleapis-common-protos==1.56.4
 ```
 
 ---
 
 ## 📈 學習路徑建議
 
-### 🔰 第一階段：快速開始（建議時間：1-2小時）
+### 🔰 第一階段：建立主開發環境（建議時間：1–2 小時）
 
-**選項A：使用 Google Colab（推薦初學者）**
-1. 閱讀 [Unit00_Colab_Environment_Setup.md](Unit00_Colab_Environment_Setup.md)（30分鐘）
-2. 執行 [Unit00_Colab_Environment_Setup.ipynb](Unit00_Colab_Environment_Setup.ipynb)（30分鐘）
-3. 熟悉Colab基本操作與功能
-4. 完成環境驗證測試
+**路線 A：使用 Google Colab 雲端環境（推薦初學者或無獨顯筆電）**
+1. 閱讀 [Unit00_Colab_Environment_Setup.md](Unit00_Colab_Environment_Setup.md)（30 分鐘）
+2. 依照第 3.3 節 SOP 將本課程 GitHub 儲存庫 `git clone` 至個人 Google Drive（10 分鐘）
+3. 開啟並逐格執行 [Unit00_Colab_Environment_Setup.ipynb](Unit00_Colab_Environment_Setup.ipynb)（30 分鐘），完成 CSTR 反應器數據分析與多元回歸驗證
 
-**選項B：建立本地環境（建議有基礎者）**
-1. 閱讀 [Unit00_Local_Environment_Setup.md](Unit00_Local_Environment_Setup.md)（40分鐘）
-2. 依照步驟安裝Miniconda與建立環境（30-60分鐘）
-3. 執行 [Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb)（30分鐘）
-4. 完成所有驗證測試
+**路線 B：建立 Windows 本地開發環境（推薦有基礎或配備 NVIDIA 獨顯者）**
+1. 閱讀 [Unit00_Local_Environment_Setup.md](Unit00_Local_Environment_Setup.md)（40 分鐘）
+2. 安裝 Miniconda，並使用 `conda env create -f PY310_environment.yml` 建立 `PY310` 虛擬環境（20–30 分鐘）
+3. 啟動 `jupyter lab`，開啟並執行 [Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb)（30 分鐘），確認最後 10 項檢核清單全數顯示 `[PASS]`
 
-### 🔧 第二階段：環境熟悉與驗證（建議時間：2-3小時）
+### 🔧 第二階段：熟悉雙環境切換與核心操作（建議時間：1–2 小時）
 
-1. **理解環境管理概念**
-   - 虛擬環境的重要性
-   - 套件相依性管理
-   - 環境隔離與重現性
+1. **掌握跨環境路徑架構**：理解各單元開頭 `### 0. 環境設定` 如何透過 `IN_COLAB` 自動切換雲端 Symlink 與本地 `Path.cwd()`，並將結果輸出至 `OUTPUT_DIR` 與 `FIG_DIR`
+2. **熟練日常操作指令**：練習啟動/退出環境、查詢套件版本、切換 GPU 硬體加速器，以及使用快捷鍵高效操作儲存格
+3. **建立故障排除能力**：瀏覽講義中的 Troubleshooting Top 10，了解遇到 `ModuleNotFoundError`、路徑錯誤或顯存不足時的標準解法
 
-2. **熟練基本操作**
-   - 啟動/關閉環境
-   - 安裝/更新/移除套件
-   - 建立/執行Notebook
-   - Cell的編輯與執行
+### 🎯 第三階段：探索 AI Agent 輔助工具（延伸選讀，建議時間：1 小時）
 
-3. **驗證核心功能**
-   - Python基本語法測試
-   - NumPy數值運算
-   - Pandas資料處理
-   - Matplotlib視覺化
-   - Scikit-learn機器學習
-
-4. **故障排除練習**
-   - 熟悉常見錯誤訊息
-   - 學習查找解決方案
-   - 了解套件版本衝突處理
-
-### 🎯 第三階段：進階設定（選修，建議時間：1-2小時）
-
-1. **建立第二種環境**
-   - 如果已完成Colab，嘗試本地環境
-   - 如果已完成本地環境，了解Colab用法
-
-2. **環境客製化**
-   - 安裝額外需要的套件
-   - 設定Jupyter擴充功能
-   - 客製化程式碼自動完成
-
-3. **專案結構建立**
-   - 建立標準化的專案資料夾結構
-   - 學習版本控制（Git）基礎
-   - 了解.gitignore的設定
+1. 閱讀 [Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)，了解自主型 AI 代理如何結合終端機與持久記憶協助程式學習
+2. 參考 [Unit00_Hermes_Agent_Command.md](Unit00_Hermes_Agent_Command.md)，嘗試使用 `hermes --tui` 輔助整理數據或檢查程式碼
 
 ---
 
 ## 🔍 核心操作指令速查
 
-### Google Colab 指令
+### Google Colab 常用指令
 
-**檔案操作**：
+**課程專案同步與檔案操作**：
 ```python
-# 掛載 Google Drive
+# 1. 掛載 Google Drive
 from google.colab import drive
-drive.mount('/content/drive')
+drive.mount('/content/drive', force_remount=True)
 
-# 上傳檔案
+# 2. 首次下載本課程 GitHub 儲存庫至 Google Drive（全學期只需執行一次）
+%cd "/content/drive/My Drive/Colab Notebooks/"
+!git clone https://github.com/d9148408/ChemE-3590.git
+
+# 3. 更新本課程儲存庫至官方最新版本
+%cd "/content/drive/My Drive/Colab Notebooks/ChemE-3590/"
+!git fetch origin
+!git reset --hard origin/main
+
+# 4. 上傳本地檔案與下載雲端檔案
 from google.colab import files
 uploaded = files.upload()
-
-# 下載檔案
 files.download('filename.csv')
 
-# 檢查GPU
+# 5. 檢查雲端虛擬機 NVIDIA GPU 狀態
 !nvidia-smi
 ```
 
 **套件管理**：
 ```python
-# 安裝套件
-!pip install package_name
+# 安裝套件（加上 -q 可靜默安裝）
+!pip install -q package_name
 
-# 安裝特定版本
+# 安裝指定版本
 !pip install package_name==1.2.3
 
 # 升級套件
@@ -345,404 +341,323 @@ files.download('filename.csv')
 !pip list
 ```
 
-### Windows 本地環境指令
+### Windows 本地環境 (`PY310`) 常用指令
 
-**環境管理**：
+**虛擬環境管理（於 Anaconda Prompt 執行）**：
 ```powershell
-# 啟動環境
+# 啟動本課程環境（極重要！每次工作前必做）
 conda activate PY310
 
-# 退出環境
+# 退出目前環境
 conda deactivate
 
-# 列出所有環境
+# 列出所有虛擬環境與路徑
 conda env list
 
-# 建立新環境
-conda create -n env_name python=3.10
+# 從 YAML 定義檔建立環境
+conda env create -f PY310_environment.yml
 
-# 從YAML建立環境
-conda env create -f environment.yml
+# 匯出環境備份檔
+conda env export > environment_backup.yml
 
-# 刪除環境
-conda env remove -n env_name
-
-# 匯出環境
-conda env export > environment.yml
+# 清理下載快取壓縮包（釋放硬碟空間）
+conda clean --all -y
 ```
 
 **套件管理**：
 ```powershell
-# 安裝套件
-conda install package_name
+# 優先使用 conda-forge 頻道安裝套件
+conda install -c conda-forge package_name
+
+# 使用 pip 安裝套件
 pip install package_name
 
-# 安裝特定版本
-conda install package_name=1.2.3
-pip install package_name==1.2.3
+# 安裝指定版本（注意：conda 用單等號 =，pip 用雙等號 ==）
+conda install -c conda-forge numpy=1.23.5
+pip install tensorflow==2.10.1
 
-# 更新套件
-conda update package_name
-pip install --upgrade package_name
-
-# 移除套件
-conda remove package_name
-pip uninstall package_name
-
-# 列出已安裝套件
+# 查詢目前環境已安裝之套件
 conda list
-pip list
 ```
 
-**Jupyter操作**：
+**啟動與關閉 Jupyter**：
 ```powershell
-# 啟動 Jupyter Notebook
+# 1. 啟動環境並切換至課程專案目錄
+conda activate PY310
+cd /d D:\MyGit\ChemE-3590
+
+# 2. 啟動 JupyterLab（推薦）或 Jupyter Notebook
+jupyter lab
+# 或
 jupyter notebook
 
-# 啟動 JupyterLab
-jupyter lab
+# 3. 指定連接埠啟動（當預設 8888 埠被佔用時）
+jupyter lab --port 8889
 
-# 指定埠口
-jupyter notebook --port 8889
+# 4. 安全停止服務：在 Anaconda Prompt 視窗連按兩次 Ctrl + C
+```
 
-# 列出執行中的服務
-jupyter notebook list
+### Hermes Agent 常用指令（延伸選讀）
 
-# 停止服務（在Anaconda Prompt中按 Ctrl + C）
+```powershell
+# 1. 快速設定 Nous Portal 或選擇模型供應商
+hermes setup --portal
+hermes model
+
+# 2. 萬用環境健康診斷（遇到問題時優先執行）
+hermes doctor
+
+# 3. 啟動現代終端介面（TUI）並指定課程工作目錄
+hermes --tui --in D:\MyGit\ChemE-3590
+
+# 4. 接續最近一次對話或依標題接續對話
+hermes -c
+hermes -r "reactor-temp-analysis"
+
+# 5. 啟動桌面應用程式
+hermes desktop
 ```
 
 ---
 
 ## 📝 環境驗證檢查清單
 
-### ✅ Google Colab 環境檢查
+### ✅ 快速驗證腳本（Colab 與本地環境皆適用）
 
-執行以下程式碼確認環境正常：
+在 Notebook 儲存格中執行以下程式碼，確認核心套件與 GPU 狀態正常：
 
 ```python
 import sys
-print(f"Python version: {sys.version}")
-
 import numpy as np
+import scipy
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib
+import seaborn as sns
 import sklearn
-
-print(f"NumPy: {np.__version__}")
-print(f"Pandas: {pd.__version__}")
-print(f"Matplotlib: {plt.__version__}")
-print(f"Scikit-learn: {sklearn.__version__}")
-
-# 檢查GPU
 import tensorflow as tf
-print(f"TensorFlow: {tf.__version__}")
+
+print(f"Python       : {sys.version.split()[0]}")
+print(f"Executable   : {sys.executable}")
+print(f"NumPy        : {np.__version__}")
+print(f"SciPy        : {scipy.__version__}")
+print(f"Pandas       : {pd.__version__}")
+print(f"Matplotlib   : {matplotlib.__version__}")
+print(f"Seaborn      : {sns.__version__}")
+print(f"Scikit-learn : {sklearn.__version__}")
+print(f"TensorFlow   : {tf.__version__}")
 print(f"GPU Available: {tf.config.list_physical_devices('GPU')}")
 ```
 
-**預期結果**：
-- Python 3.10.x
-- 所有套件成功匯入
-- 版本號正常顯示
-- GPU狀態顯示（如有）
+### ✅ Windows 本地環境 10 項完整檢核清單
 
-### ✅ Windows 本地環境檢查
+執行 [Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb) 最後一節的自動檢核程式，確認以下 10 個項目全數顯示 `[PASS]`：
 
-在 [Unit00_Local_Environment_Setup.ipynb](Unit00_Local_Environment_Setup.ipynb) 中執行完整的驗證測試：
-
-**檢查項目**：
-- ✓ Python 3.10+ 已安裝
-- ✓ NumPy 可用
-- ✓ Pandas 可用
-- ✓ Matplotlib 可用
-- ✓ Scikit-learn 可用
-- ✓ TensorFlow 可用
-- ✓ Jupyter Notebook 正常運作
-- ✓ 基本數值運算測試通過
-- ✓ 資料處理功能正常
-- ✓ 視覺化功能正常
-- ✓ 機器學習模型可訓練
-
-**如果所有項目顯示 PASS，表示環境設定完成！**
+- [x] `1. Python 3.10+ interpreter active`
+- [x] `2. Running inside 'PY310' environment`
+- [x] `3. NumPy & SciPy scientific computing`
+- [x] `4. Pandas & OpenPyXL data processing`
+- [x] `5. Matplotlib & Seaborn visualization`
+- [x] `6. Scikit-learn machine learning`
+- [x] `7. Gradient Boosting (XGBoost/LightGBM/CatBoost)`
+- [x] `8. Unsupervised & Graph tools (UMAP/mlxtend/NetworkX)`
+- [x] `9. TensorFlow 2.x deep learning framework`
+- [x] `10. Local CSV & Figure outputs verified`
 
 ---
 
-## 🚀 故障排除指南
+## 🚀 故障排除指南 (Troubleshooting Top 10)
 
-### 常見問題 Top 10
+### 1. 安裝完 Miniconda 後找不到 Anaconda Prompt
+- **解決方案**：
+  - 在 Windows 底部搜尋列輸入 `Anaconda Prompt`，點選開啟 **Anaconda Prompt (miniconda3)**。
+  - 若想在一般 Windows PowerShell 中直接使用 `conda`，請先在 Anaconda Prompt 執行一次初始化：
+    ```powershell
+    conda init powershell
+    conda init cmd.exe
+    ```
 
-#### 1. **找不到 Anaconda Prompt**
-**症狀**：安裝完Miniconda後找不到Anaconda Prompt  
-**解決方案**：
-- 使用Windows搜尋列搜尋「Anaconda Prompt」
-- 到開始選單 → Anaconda3 資料夾內查找
-- 使用一般PowerShell，手動啟動conda
+### 2. 在 PowerShell 輸入 `conda activate PY310` 出現腳本禁止執行錯誤
+- **原因**：Windows PowerShell 預設的執行原則（Execution Policy）阻擋了 Conda 啟動腳本。
+- **解決方案**：直接使用 **Anaconda Prompt**，或在 PowerShell 中放寬目前使用者的執行權限：
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
 
-#### 2. **conda 指令無法執行**
-**症狀**：輸入conda指令出現「找不到命令」  
-**解決方案**：
-```powershell
-# 初始化conda
-conda init cmd.exe
-# 或
-conda init powershell
-# 重新開啟終端機
-```
+### 3. 建立環境時出現 `CondaSSLError` 或網路中斷
+- **解決方案**：更新 `base` 環境的安全憑證庫並清理損壞快取後重試（請勿隨意加入已停止維護的舊版 `pkgs/free/` 鏡像頻道）：
+  ```powershell
+  conda install -n base -c conda-forge ca-certificates certifi openssl -y
+  conda clean --all -y
+  conda env create -f PY310_environment.yml
+  ```
 
-#### 3. **環境建立時出現 SSL 錯誤**
-**症狀**：下載套件時出現SSL憑證錯誤  
-**解決方案**：
-```powershell
-# 方法1：暫時停用SSL驗證（不建議長期使用）
-conda config --set ssl_verify false
+### 4. 匯入 TensorFlow 時出現 `TypeError: Descriptors cannot not be created directly`
+- **原因**：環境中的 `protobuf` 被其他新套件升級至 `4.x` 以上版本，與 TensorFlow 2.10.1 不相容。
+- **解決方案**：在 `PY310` 環境中將 `protobuf` 降回鎖定版本：
+  ```powershell
+  conda activate PY310
+  pip install protobuf==3.19.6
+  ```
 
-# 方法2：使用鏡像站點
-conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
-```
+### 5. 本地匯入 TensorFlow 時出現 `Could not load dynamic library 'cudart64_110.dll'` 或偵測不到 GPU
+- **原因**：在 Windows Conda 環境中，CUDA 11.2 與 cuDNN 8.1 的 `.dll` 動態連結庫位於 `envs\PY310\Library\bin`。若未先執行 `conda activate PY310` 就直接呼叫 `python.exe`，該目錄不會載入 `PATH` 環境變數。
+- **解決方案**：務必先在 Anaconda Prompt 執行 `conda activate PY310`，再從該視窗啟動 `jupyter lab`。
 
-#### 4. **TensorFlow 無法安裝或啟動**
-**症狀**：安裝失敗或匯入時出錯  
-**解決方案**：
-```powershell
-# 使用pip安裝（推薦）
-pip install tensorflow==2.10.1
+### 6. 匯入 `imblearn` (`imbalanced-learn`) 時出現 `ImportError: cannot import name '_safe_tags'`
+- **原因**：`scikit-learn 1.6+` 調整了內部標籤 API，舊版 `imbalanced-learn 0.12.x` 需同步升級。
+- **解決方案**：
+  ```powershell
+  conda activate PY310
+  pip install --upgrade imbalanced-learn
+  ```
 
-# 確認Python版本相容（TensorFlow 2.10需要Python 3.7-3.10）
-python --version
-```
+### 7. 在 Notebook 中匯入套件卻顯示 `ModuleNotFoundError: No module named 'tensorflow'`
+- **原因**：在預設的 `(base)` 環境下啟動了 Jupyter，或 Notebook 綁定到了錯誤的 Kernel。
+- **解決方案**：
+  1. 在儲存格執行 `import sys; print(sys.executable)`，確認路徑包含 `\envs\PY310\python.exe`。
+  2. 將 `PY310` 註冊為獨立 Kernel（**註冊前必須先啟動 `PY310` 環境**）：
+     ```powershell
+     conda activate PY310
+     python -m ipykernel install --user --name PY310 --display-name "Python 3.10 (PY310)"
+     ```
+     隨後於 Jupyter 頂部選單點選 `Kernel → Change Kernel...` 切換為 `Python 3.10 (PY310)`。
 
-#### 5. **Jupyter 無法啟動**
-**症狀**：執行jupyter notebook沒有反應  
-**解決方案**：
-```powershell
-# 重新安裝Jupyter
-conda install jupyterlab notebook -y
+### 8. Windows 使用者名稱含中文導致 Jupyter 啟動報錯 `UnicodeDecodeError`
+- **解決方案**：確保 Miniconda 與課程專案皆位於純英文無空白路徑（如 `C:\miniconda3` 與 `D:\MyGit\ChemE-3590`）。若系統暫存目錄含中文，可先設定英文 Runtime 目錄再啟動：
+  - **於 Anaconda Prompt (`cmd.exe`) 執行**：
+    ```cmd
+    set JUPYTER_RUNTIME_DIR=C:\temp\jupyter_runtime
+    jupyter lab
+    ```
+  - **於 Windows PowerShell 執行**：
+    ```powershell
+    $env:JUPYTER_RUNTIME_DIR = "C:\temp\jupyter_runtime"
+    jupyter lab
+    ```
 
-# 清除配置
-jupyter notebook --generate-config
-```
+### 9. Colab 出現 `⚠️ 找不到雲端 ChemE-3590 路徑` 或連線中斷遺失檔案
+- **解決方案**：
+  - 確認已依照 [Unit00_Colab_Environment_Setup.md](Unit00_Colab_Environment_Setup.md) 第 3.3 節，在 `/content/drive/My Drive/Colab Notebooks/` 下執行過 `!git clone https://github.com/d9148408/ChemE-3590.git`。
+  - 切勿在儲存格中使用 `while True: time.sleep(60)` 無窮迴圈防斷線（這會阻塞整個 Python Kernel 導致後續程式無法執行）；應透過掛載 Google Drive 將所有輸出與模型檢查點（`ModelCheckpoint`）直接存入 `OUTPUT_DIR` 實現持久化。
 
-#### 6. **Kernel 無法連接**
-**症狀**：Notebook中Kernel連接失敗  
-**解決方案**：
-```powershell
-# 重新安裝ipykernel
-conda install ipykernel -y
-
-# 手動註冊kernel
-python -m ipykernel install --user --name PY310 --display-name "Python 3.10 (PY310)"
-```
-
-#### 7. **無法匯入已安裝的套件**
-**症狀**：套件已安裝但import失敗  
-**解決方案**：
-- 確認環境已啟動（命令提示字元前有環境名稱）
-- 檢查Python路徑：
-```python
-import sys
-print(sys.executable)
-```
-- 確認路徑指向正確的環境
-
-#### 8. **GPU 無法使用**
-**症狀**：TensorFlow無法偵測到GPU  
-**解決方案**：
-```python
-# 檢查GPU狀態
-import tensorflow as tf
-print(tf.config.list_physical_devices('GPU'))
-```
-- 確認NVIDIA驅動程式已安裝
-- 確認CUDA和cuDNN版本相容
-- TensorFlow 2.10需要CUDA 11.2和cuDNN 8.1
-
-#### 9. **Colab連線中斷**
-**症狀**：Colab執行時突然中斷  
-**解決方案**：
-- 確認網路連線穩定
-- 避免長時間閒置（90分鐘限制）
-- 使用程式碼保持連線活躍：
-```python
-# 定期執行小任務
-import time
-while True:
-    print("Keep alive")
-    time.sleep(60)  # 每分鐘執行一次
-```
-
-#### 10. **記憶體不足錯誤**
-**症狀**：執行大型數據或模型時記憶體耗盡  
-**解決方案**：
-- Colab：使用Colab Pro或減少batch size
-- 本地：增加實體記憶體或使用較小的數據集
-- 優化程式碼，釋放不需要的變數：
-```python
-import gc
-del large_variable
-gc.collect()
-```
+### 10. 執行大型模型時發生記憶體耗盡（RAM / GPU OOM）
+- **解決方案**：
+  - 調降訓練批次大小（`batch_size`，例如由 `128` 降至 `32`）。
+  - 刪除不再使用的大型陣列並觸發垃圾回收：
+    ```python
+    import gc
+    del large_dataframe
+    gc.collect()
+    ```
 
 ---
 
 ## 📚 參考資源
 
 ### 官方文件
-1. [Conda Documentation](https://docs.conda.io/) - Conda完整使用指南
-2. [Jupyter Documentation](https://jupyter.org/documentation) - Jupyter官方文件
-3. [Google Colab FAQ](https://research.google.com/colaboratory/faq.html) - Colab常見問題
-4. [Python Documentation](https://docs.python.org/3/) - Python官方文件
+1. [Conda Official Documentation](https://docs.conda.io/) - Conda 環境與套件管理完整指南
+2. [Conda Cheat Sheet](https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html) - Conda 常用指令速查表
+3. [JupyterLab Documentation](https://jupyterlab.readthedocs.io/en/stable/) - JupyterLab 官方操作手冊
+4. [Google Colab FAQ](https://research.google.com/colaboratory/faq.html) - Google Colab 官方常見問題解答
+5. [Python 3.10 Documentation](https://docs.python.org/3.10/) - Python 官方標準函式庫文件
 
-### 線上教學資源
-- [Conda Cheat Sheet](https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html) - Conda指令速查表
-- [Jupyter Notebook Tutorial](https://jupyter-notebook.readthedocs.io/en/stable/) - Jupyter入門教學
-- [Google Colab Tutorials](https://colab.research.google.com/notebooks/intro.ipynb) - Colab官方教學
-
-### 套件文件
-- [NumPy Documentation](https://numpy.org/doc/)
-- [Pandas Documentation](https://pandas.pydata.org/docs/)
-- [Matplotlib Documentation](https://matplotlib.org/stable/contents.html)
-- [Scikit-learn Documentation](https://scikit-learn.org/stable/)
-- [TensorFlow Documentation](https://www.tensorflow.org/api_docs)
-
-### 社群支援
-- [Stack Overflow](https://stackoverflow.com/) - 程式設計問題解答
-- [GitHub](https://github.com/) - 開源專案與程式碼範例
-- [Reddit r/learnpython](https://www.reddit.com/r/learnpython/) - Python學習社群
+### 核心套件文件
+- [NumPy Documentation](https://numpy.org/doc/stable/) - 多維陣列與線性代數運算
+- [Pandas Documentation](https://pandas.pydata.org/docs/) - 表格資料與時間序列處理
+- [Matplotlib Documentation](https://matplotlib.org/stable/contents.html) - 科學繪圖與視覺化
+- [Seaborn Documentation](https://seaborn.pydata.org/) - 統計資料視覺化
+- [Scikit-learn User Guide](https://scikit-learn.org/stable/user_guide.html) - 機器學習演算法與評估指標
+- [TensorFlow API Documentation](https://www.tensorflow.org/api_docs) - 深度學習與神經網路框架
+- [Hermes Agent Documentation](https://hermes-agent.nousresearch.com/) - Hermes AI Agent 官方指南
 
 ---
 
 ## 💡 學習建議與最佳實務
 
-### 環境管理最佳實務
+### 1. 環境管理守則
+- **保持 `base` 環境純淨**：切勿在 `(base)` 環境中安裝專案套件；所有課程練習一律在 `conda activate PY310` 後進行。
+- **為不同研究主題建立獨立環境**：未來若進行其他專題需使用不同版本的套件，可另建新環境（如 `conda create -n my_research python=3.11`），與本課程的 `PY310` 互不干擾。
 
-1. **為不同專案建立獨立環境**
-   - 避免套件版本衝突
-   - 保持環境乾淨整潔
-   - 便於環境重現與分享
+### 2. 本課程 Notebook 與專案組織規範
+- **統一使用跨環境路徑變數**：在讀取資料或儲存圖表時，統一使用 `pathlib.Path` 物件（如 `OUTPUT_DIR / 'result.csv'`、`FIG_DIR / 'plot.png'`），自動相容 Windows 與 Linux 路徑分隔符。
+- **圖表標籤全英文規範**：Matplotlib 與 Seaborn 圖表的標題（`title`）、軸標籤（`xlabel` / `ylabel`）與圖例（`label`）請統一使用英文，避免跨平台缺少中文字型時產生方框亂碼。
+- **固定隨機種子（`SEED = 42`）**：涉及隨機抽樣、資料切分或神經網路初始化時，務必固定隨機種子以確保實驗 $100\%$ 可重現。
+- **繳交作業前完整重跑驗證**：提交 `.ipynb` 前，請執行 `Kernel → Restart Kernel and Run All Cells...`，確認所有儲存格由 `[1]` 順序執行完畢且無任何報錯。
 
-2. **定期備份環境設定**
-   ```powershell
-   conda env export > environment_backup_$(Get-Date -Format "yyyyMMdd").yml
-   ```
-
-3. **使用有意義的環境名稱**
-   - 好的命名：`ML_Project1`, `DL_TensorFlow2`, `PY310_ChemEng`
-   - 避免：`test`, `env1`, `temp`
-
-4. **記錄環境變更**
-   - 在專案中維護 `requirements.txt` 或 `environment.yml`
-   - 使用版本控制（Git）追蹤環境變更
-   - 在README中記錄環境設定步驟
-
-### Notebook 使用最佳實務
-
-1. **合理組織Cell**
-   - 第一個Cell：匯入所有套件
-   - 第二個Cell：設定常數、路徑、種子
-   - 適時加入Markdown說明
-   - 每個Cell保持功能單一
-
-2. **定期儲存工作**
-   - 養成 `Ctrl + S` 的習慣
-   - 重要階段使用 `File → Save and Checkpoint`
-   - 考慮自動備份機制
-
-3. **管理輸出內容**
-   - 大量輸出考慮儲存到檔案
-   - 定期清除不需要的輸出
-   - 使用進度條（tqdm）追蹤長時間運算
-
-4. **程式碼品質**
-   - 遵循PEP 8命名規範
-   - 使用有意義的變數名稱
-   - 加入適當的註解
-   - 避免在Notebook中寫過長的函式
-
-### 專案檔案組織建議
+### 3. 本課程標準目錄架構
 
 ```
-專案資料夾/
-├── data/                    # 原始數據
-│   ├── raw/                # 未處理數據
-│   └── processed/          # 處理後數據
-├── notebooks/              # Jupyter notebooks
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_preprocessing.ipynb
-│   └── 03_modeling.ipynb
-├── src/                    # Python模組
-│   ├── __init__.py
-│   ├── data_processing.py
-│   └── models.py
-├── results/                # 輸出結果
-│   ├── figures/           # 圖表
-│   └── models/            # 訓練好的模型
-├── environment.yml         # 環境定義檔
-├── requirements.txt        # pip套件清單
-├── README.md              # 專案說明
-└── .gitignore            # Git忽略清單
+ChemE-3590/
+├── Part_0/                              # 環境設定教學與 PY310_environment.yml
+├── Part_1/                              # Unit01–Unit04: AI概論、Python、NumPy/Pandas、視覺化
+├── Part_2/                              # Unit05–Unit09: 非監督式學習（分群、降維、異常檢測、關聯規則）
+├── Part_3/                              # Unit10–Unit14: 監督式學習（回歸、分類、集成學習、模型評估）
+├── Part_4/                              # Unit15–Unit17: 深度學習（DNN、CNN、RNN/LSTM）
+└── Part_5/                              # 進階專題（強化學習、生成式AI、大型語言模型）
+```
+
+每個單元（以 `Part_X/UnitXX/` 為例）的標準輸出結構：
+```
+UnitXX/
+├── data/{dataset_name}/                 # 單元數據集（如有）
+├── outputs/P{X}_Unit{XX}_{Topic}/       # 程式執行產出目錄
+│   ├── figs/                            # 高解析度圖表輸出 (.png)
+│   └── models/                          # 訓練完成的模型權重與轉換器（如有）
+├── Unit{XX}_{Topic}.md                  # 單元教學講義
+├── Unit{XX}_{Topic}.ipynb               # 單元範例演練 Notebook
+└── Unit{XX}_{Topic}_Homework.ipynb      # 單元課後作業 Notebook
 ```
 
 ---
 
 ## ✍️ 學習檢核與下一步
 
-### 完成本單元後，您應該能夠：
+### 完成本單元後，請確認您已達成以下目標：
 
-- [ ] 說明虛擬環境的概念與重要性
-- [ ] 在Google Colab中建立並執行Notebook
-- [ ] 在本地環境成功安裝Miniconda
-- [ ] 使用YAML檔案建立Python虛擬環境
-- [ ] 熟練使用conda基本指令
-- [ ] 啟動並使用Jupyter Notebook/Lab
-- [ ] 執行環境驗證測試並確認所有套件正常
-- [ ] 了解常見問題的排除方法
-- [ ] 根據需求選擇合適的開發環境
+- [ ] 能夠說明虛擬環境（Virtual Environment）的隔離機制與重要性
+- [ ] 已在 Google Colab 或 Windows 本地端建立好可用的課程開發環境
+- [ ] 若使用 Colab：已將 `ChemE-3590` 儲存庫 `git clone` 至 Google Drive，並成功執行 `Unit00_Colab_Environment_Setup.ipynb`
+- [ ] 若使用本地環境：已成功建立 `PY310` 環境，並執行 `Unit00_Local_Environment_Setup.ipynb` 通過全部 10 項 `[PASS]` 檢核
+- [ ] 熟悉本課程 `OUTPUT_DIR` 與 `FIG_DIR` 跨環境路徑設定邏輯
+- [ ] 了解遇到套件匯入失敗、路徑錯誤或 GPU 未啟用時的故障排除方法
 
-### 準備進入下一階段
+### 準備進入下一階段：Part 1 AI與機器學習概論
 
-完成環境設定後，您已準備好開始：
+完成環境設定後，您已準備好開始 **Part 1** 的核心課程：
 
+- **Part 1 總覽**：[Part 1: Python基礎與資料處理](../Part_1/README.md)
 - **Part 1 - Unit01**：[AI與機器學習概論](../Part_1/Unit01/README.md)
 - **Part 1 - Unit02**：[Python程式語言基礎](../Part_1/Unit02/README.md)
 - **Part 1 - Unit03**：[NumPy與Pandas模組](../Part_1/Unit03/README.md)
 - **Part 1 - Unit04**：[Matplotlib與Seaborn視覺化](../Part_1/Unit04/README.md)
 
 **重要提醒**：
-- 每次開始工作前，記得啟動環境：`conda activate PY310`
-- 確保Jupyter Notebook能正常開啟並執行程式碼
-- 如遇到問題，先參考本單元的故障排除章節
+- 每次在本地端開始工作前，請記得先在 Anaconda Prompt 啟動環境：`conda activate PY310`
+- 如遇到任何環境問題，請隨時回來查閱本單元的「故障排除指南」或兩份環境設定詳細講義
 
 ---
 
 ## 📞 技術支援
 
 如有疑問或需要協助，歡迎透過以下方式聯繫：
-- **課程討論區**：提出問題與同學交流
-- **指導教授 Office Hour**：面對面深入討論
-- **課程助教**：協助解決技術問題
+- **課程討論區**：提出問題與同學交流討論
+- **授課教師 Office Hour**：面對面深入討論課程與專題問題
+- **課程助教**：協助解決環境安裝與程式技術問題
 
-### 提問時請提供：
-1. 作業系統版本（Windows 10/11）
-2. Python版本（執行 `python --version`）
-3. 完整的錯誤訊息（截圖或文字）
-4. 已嘗試的解決方法
-5. 相關的程式碼（如適用）
-
----
-
-## 🎉 開始您的 AI 學習之旅！
-
-環境設定是第一步，也是最重要的基礎。完成本單元後，您將擁有一個穩定、功能完整的開發環境，可以順利進行後續的AI與機器學習課程。
-
-記住：遇到問題是正常的，關鍵是學會如何找到解決方案。祝您學習順利！🚀
+### 提問時請一併提供以下資訊，以利快速診斷：
+1. **使用環境**：Google Colab 或 Windows 10/11 本地環境
+2. **Python 與環境路徑**：執行 `import sys; print(sys.version, sys.executable)` 的輸出結果
+3. **完整的錯誤訊息**：包含最後一行的錯誤類型（如 `ModuleNotFoundError`、`FileNotFoundError`）與完整 Traceback 截圖或文字
+4. **已嘗試過的解決步驟**
 
 ---
 
 **課程資訊**
 - 課程名稱：AI在化工上之應用 (ChemE 3590)
-- 課程單元：Part 0 學習環境設定
+- 課程單元：Part 0 Python學習環境設定教學
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-02-26
+- 更新日期：2026-10-31
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

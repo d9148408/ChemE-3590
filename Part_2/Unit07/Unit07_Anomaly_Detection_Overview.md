@@ -1,10 +1,10 @@
 # Unit07 異常檢測總覽 (Anomaly Detection Overview)
 
 **課程名稱**: AI在化工上之應用  
-**課程代碼**: CHE-AI-114  
+**課程代碼**: ChemE-3590  
 **課程教師**: 莊曜禎 助理教授  
 **單元編號**: Unit07  
-**授課時間**: 114學年度第2學期
+**授課時間**: 115學年度第1學期
 
 ---
 
@@ -60,6 +60,8 @@
    - 目標：學習正常與異常的邊界
    - 應用：結合歷史故障數據的異常檢測
 
+> 💡 **sklearn 使用注意**：`LocalOutlierFactor` 預設 `novelty=False`，僅能對訓練數據執行 `fit_predict` (離群值檢測)；若要對新數據呼叫 `predict` / `decision_function` (新奇點檢測)，必須設定 `novelty=True`，且此時不應再對訓練數據呼叫 `fit_predict`。`OneClassSVM` 本質上屬於新奇點檢測，對訓練數據中的離群值較敏感；`IsolationForest` 與 `EllipticEnvelope` 兩種情境皆可使用。
+
 #### 1.2.3 異常的三種型態
 
 依據異常的結構與發生方式，可將異常分為以下三種基本型態：
@@ -67,7 +69,7 @@
 1. **點異常 (Point Anomaly)**
    - 單一數據點明顯偏離整體數據分布
    - 最常見的異常類型，也是本單元主要關注的對象
-   - **化工實例**：反應器溫度突然從 350°C 飆升至 420°C（單一時間點异常）
+   - **化工實例**：反應器溫度突然從 350°C 飆升至 420°C（單一時間點異常）
 
 2. **情境異常 (Contextual Anomaly)**
    - 在特定情境（時間、位置、狀態）下為異常，但在其他情境下則屬正常
@@ -88,6 +90,8 @@
 ---
 
 ## 2. 異常檢測在化工領域的應用場景
+
+> 📌 **說明**：本單元中以「某石化廠」「某製藥廠」等描述的**案例與實例**，皆為輔助理解的教學示意情境，數字 (如預警時間、節省金額、感測器數量) 僅為說明用途，並非特定工廠之實際文獻或實測數據。
 
 ### 2.1 製程安全監控
 
@@ -204,7 +208,7 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 ✅ **高效能**：時間複雜度低，適合大規模數據  
 ✅ **高維適應**：對高維數據表現良好  
 ✅ **無需假設**：不需假設數據分布  
-✅ **參數少**：僅需設定樹的數量與汙染比例
+✅ **參數少**：主要參數僅有樹的數量 (`n_estimators`)、子樣本數 (`max_samples`) 與汙染比例 (`contamination`)
 
 #### 3.2.3 化工應用場景
 
@@ -222,7 +226,9 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 
 - 使用核函數將數據映射到高維空間
 - 在高維空間中建立決策邊界
-- 超球面外的點被視為異常
+- 邊界外的點被視為異常
+
+> 📝 補充：sklearn 的 `OneClassSVM` 採用 Schölkopf 等人的公式，是在特徵空間中尋找「將數據與原點分離的超平面」；使用 RBF 核函數時，其結果與尋找最小超球面的 SVDD (Support Vector Data Description) 等價，因此可直觀理解為「包住正常數據的超球面」。
 
 #### 3.3.2 演算法優勢
 
@@ -269,7 +275,7 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 
 **核心概念**：假設正常數據服從多變數高斯分布，建立橢圓形決策邊界
 
-- 估計數據的均值與協方差矩陣
+- 以穩健協方差估計 (最小協方差行列式, Minimum Covariance Determinant, MCD) 估計數據的均值與協方差矩陣，降低訓練數據中少量離群值的影響
 - 使用馬氏距離 (Mahalanobis Distance) 衡量點到中心的距離
 - 超出橢圓邊界的點被視為異常
 
@@ -298,7 +304,7 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 | **Isolation Forest** | • 高效快速<br>• 適合高維數據<br>• 無需假設分布<br>• 參數少 | • 對局部異常不敏感<br>• 隨機性強<br>• 難以解釋 | $O(n \log n)$ | 大規模 |
 | **One-Class SVM** | • 精確邊界<br>• 非線性核函數<br>• 小樣本友好<br>• 理論完善 | • 計算成本高<br>• 參數敏感<br>• 不適合高維數據 | $O(n^2) \sim O(n^3)$ | 小中規模 |
 | **LOF** | • 局部適應性強<br>• 處理密度不均<br>• 直觀易懂 | • 計算成本高<br>• 參數選擇困難<br>• 不適合高維 | $O(n^2)$ | 小中規模 |
-| **Elliptic Envelope** | • 快速高效<br>• 可解釋性強<br>• 理論完善 | • 假設高斯分布<br>• 對離群值敏感<br>• 線性邊界 | $O(n \cdot p^2)$ | 中大規模 |
+| **Elliptic Envelope** | • 快速高效<br>• 可解釋性強<br>• 理論完善 | • 假設單峰高斯分布<br>• 邊界為橢圓，無法描述多模式或非凸分布<br>• 樣本數需遠大於特徵數 | $O(n \cdot p^2)$ (近似) | 中大規模 (低至中維度) |
 
 *註： $n$ = 樣本數， $p$ = 特徵數*
 
@@ -316,7 +322,7 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 ├─ 數據規模大嗎 (n > 10000)？
 │   ├─ 是 → 特徵維度高嗎 (p > 100)？
 │   │   ├─ 是 → Isolation Forest (高維高效)
-│   │   └─ 否 → Isolation Forest 或 Elliptic Envelope
+│   │   └─ 否 → Isolation Forest (無需假設分布)
 │   └─ 否 → 繼續
 │
 ├─ 數據密度分布均勻嗎？
@@ -369,7 +375,7 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 
 #### 4.4.2 實務建議
 
-✅ **先從簡單方法開始**：先嘗試 Elliptic Envelope，驗證數據是否接近高斯分布  
+✅ **先從簡單方法開始**：以 Isolation Forest 作為通用基準 (baseline)；若數據近似高斯分布，可再以 Elliptic Envelope 建立簡單、可解釋的對照模型  
 ✅ **比較多種方法**：同時訓練多個模型，比較檢測效果  
 ✅ **結合領域知識**：根據製程特性調整參數與閾值  
 ✅ **定期重訓練**：製程特性可能隨時間變化，需定期更新模型  
@@ -381,11 +387,11 @@ sklearn 提供了多種異常檢測演算法，各有其特點與適用場景：
 
 ### 5.1 為什麼異常檢測需要資料前處理？
 
-異常檢測演算法對數據的尺度和分布非常敏感，適當的前處理可以：
+多數基於距離或核函數的異常檢測演算法 (如 One-Class SVM、LOF) 對數據的尺度非常敏感，適當的前處理可以：
 
-- **消除尺度差異**：不同感測器的數值範圍可能差異極大 (如溫度 vs 壓力)
-- **提升演算法效能**：標準化後的數據可以加速收斂
-- **改善檢測效果**：某些演算法假設數據已標準化 (如 Elliptic Envelope)
+- **消除尺度差異**：不同感測器的數值範圍可能差異極大 (如溫度 vs 壓力)，數值範圍大的特徵會主導距離計算
+- **提升演算法效能**：標準化後的數據可以改善核函數參數 (如 `gamma`) 的設定與數值穩定性
+- **改善檢測效果**：One-Class SVM、LOF 必須標準化；Elliptic Envelope 的馬氏距離具有仿射不變性 (理論上不受尺度影響)，標準化主要是為了數值穩定；Isolation Forest 對單一特徵做分割，對尺度不敏感
 - **處理類別變數**：將類別資訊轉換為數值特徵
 
 ### 5.2 常用前處理技術
@@ -412,7 +418,7 @@ X_scaled = scaler.fit_transform(X)
 **適用情境**：
 - ✅ 數據接近正態分布
 - ✅ 特徵尺度差異大
-- ✅ Elliptic Envelope、One-Class SVM
+- ✅ One-Class SVM、LOF、Elliptic Envelope
 
 **化工實例**：標準化反應器數據 (溫度 300-400°C, 壓力 10-50 bar, 流量 100-500 kg/h)
 
@@ -437,6 +443,7 @@ X_normalized = scaler.fit_transform(X)
 - ✅ 數據分布不是正態分布
 - ✅ 數據有明確的上下界
 - ✅ 需要保持數據的原始分布形狀
+- ⚠️ 對極端值敏感：單一離群值會壓縮其他數據的有效範圍，含離群值的數據請改用 `RobustScaler`
 
 **化工實例**：正規化產品品質參數 (純度 95-99.9%, 水分 0.1-2%, pH 6-8)
 
@@ -475,7 +482,7 @@ X_robust = scaler.fit_transform(X)
 ```python
 from sklearn.preprocessing import OneHotEncoder
 
-encoder = OneHotEncoder(sparse_output=False)
+encoder = OneHotEncoder(sparse_output=False)  # sparse_output 需 sklearn >= 1.2 (舊版為 sparse=False)
 X_encoded = encoder.fit_transform(X_categorical)
 ```
 
@@ -483,20 +490,34 @@ X_encoded = encoder.fit_transform(X_categorical)
 - ✅ 類別變數無順序關係 (如反應器類型: A, B, C)
 - ✅ 類別數量不多 (< 10)
 
-**Label Encoding**：將類別變數轉換為整數
+**Label Encoding / Ordinal Encoding**：將類別變數轉換為整數
 
-**sklearn 實作**：`LabelEncoder`
+- `LabelEncoder`：僅用於編碼**一維的目標標籤 (y)**，無法處理二維特徵矩陣 `X`
+- `OrdinalEncoder`：用於編碼**輸入特徵 (X)** 中的類別欄位，可同時處理多個欄位
+
+**sklearn 實作 (目標標籤 y)**：
 
 ```python
 from sklearn.preprocessing import LabelEncoder
 
 encoder = LabelEncoder()
-X_encoded = encoder.fit_transform(X_categorical)
+y_encoded = encoder.fit_transform(y_labels)  # y_labels 為一維陣列
 ```
 
 **適用情境**：
-- ✅ 類別變數有順序關係 (如品質等級: Low, Medium, High)
-- ✅ 樹狀模型 (Isolation Forest)
+- ✅ `LabelEncoder`：編碼目標標籤 (y)
+- ✅ `OrdinalEncoder`：樹狀模型 (Isolation Forest) 的類別特徵，或類別本身有順序關係時
+
+⚠️ **注意**： `LabelEncoder` / `OrdinalEncoder` 預設依**字母順序**編碼 (例如 High→0, Low→1, Medium→2)，**不會**保留語意上的大小順序。若類別本身有明確順序 (如品質等級 Low < Medium < High)，應以 `OrdinalEncoder` 的 `categories` 參數明確指定順序：
+
+```python
+from sklearn.preprocessing import OrdinalEncoder
+
+encoder = OrdinalEncoder(categories=[['Low', 'Medium', 'High']])
+X_encoded = encoder.fit_transform(X_categorical)  # X_categorical 為二維 (n_samples, 1)
+```
+
+⚠️ 對 One-Class SVM、LOF 等距離型方法，無順序關係的類別變數不宜使用整數編碼 (會引入虛假的大小與距離關係)，應使用 One-Hot Encoding。
 
 **化工實例**：編碼原料供應商 (Supplier A, B, C)、反應器類型 (CSTR, PFR, Batch)
 
@@ -504,10 +525,10 @@ X_encoded = encoder.fit_transform(X_categorical)
 
 | 演算法 | 推薦前處理 | 理由 |
 |--------|------------|------|
-| **Isolation Forest** | 標準化或正規化 (可選) | 對尺度不敏感，但標準化可提升效能 |
+| **Isolation Forest** | 標準化 (可選，通常可省略) | 每次僅對單一特徵進行分割，對尺度不敏感 |
 | **One-Class SVM** | **標準化 (必要)** | 核函數對尺度敏感，必須標準化 |
 | **LOF** | **標準化 (必要)** | 距離計算對尺度敏感 |
-| **Elliptic Envelope** | **標準化 (必要)** | 假設標準化後的高斯分布 |
+| **Elliptic Envelope** | 標準化 (建議) | 馬氏距離具仿射不變性，理論上不受尺度影響；標準化可提升數值穩定性並便於比較不同模型 |
 
 ### 5.4 化工數據前處理實務流程
 
@@ -536,7 +557,7 @@ X_encoded = encoder.fit_transform(X_categorical)
    - transform 測試集
     ↓
 6. 類別編碼
-   - One-Hot Encoding 或 Label Encoding
+   - One-Hot Encoding (無順序) 或 Ordinal Encoding (有順序)
     ↓
 準備好的數據 → 訓練異常檢測模型
 ```
@@ -561,7 +582,7 @@ X_test_scaled = scaler.fit_transform(X_test)    # 錯誤！測試集不應 fit
 
 ⚠️ **離群值檢測 vs 新奇點檢測**
 - 離群值檢測：可使用穩健標準化 (RobustScaler)
-- 新奇點檢測：使用標準標準化 (StandardScaler)，假設訓練集無異常
+- 新奇點檢測：使用標準化 (StandardScaler)，假設訓練集不含異常
 
 ⚠️ **保留時間資訊**
 - 時間序列數據：避免打亂順序
@@ -571,7 +592,7 @@ X_test_scaled = scaler.fit_transform(X_test)    # 錯誤！測試集不應 fit
 
 ## 6. 模型評估 (Model Evaluation)
 
-異常檢測的評估具有特殊挑戰：異常樣本通常極少或完全缺乏標籤。因此評估方法需根據標籤可用性分為三種情境。
+異常檢測的評估具有特殊挑戰：異常樣本通常極少或完全缺乏標籤。因此評估方法需根據標籤可用性分為兩種情境 (6.1 有部分標籤、6.2 完全無標籤)，並於 6.3 說明化工領域的特殊考量。
 
 ### 6.1 有部分標籤時 (半監督場景)
 
@@ -591,7 +612,9 @@ from sklearn.metrics import confusion_matrix
 
 # y_true: 真實標籤 (1=正常, -1=異常)  ← sklearn 慣例：-1 為異常 (outlier)
 # y_pred: 模型預測 (1=正常, -1=異常)
-cm = confusion_matrix(y_true, y_pred)
+# labels=[1, -1] 確保矩陣列/欄順序為 [正常, 異常]，與上表一致
+# (預設會依數值升冪排序成 [-1, 1]，導致 TP/TN 位置與上表相反)
+cm = confusion_matrix(y_true, y_pred, labels=[1, -1])
 ```
 
 #### 6.1.2 精確率 (Precision)
@@ -660,11 +683,13 @@ $$
 TPR = \frac{TP}{TP + FN} \quad , \quad FPR = \frac{FP}{FP + TN}
 $$
 
-**AUC (Area Under Curve)**：ROC 曲線下面積， $0.5 \leq AUC \leq 1.0$ 
+**AUC (Area Under Curve)**：ROC 曲線下面積，理論範圍為 $0 \leq AUC \leq 1$ ，有鑑別能力的檢測器應滿足 $AUC \geq 0.5$
 
 - $AUC = 0.5$ ：隨機猜測
 - $AUC = 1.0$ ：完美檢測
 - $AUC > 0.8$ ：通常認為表現良好
+
+⚠️ **分數方向**：sklearn 的 `decision_function` / `score_samples` 數值**越大越正常**。計算 ROC 時必須使用「越大越異常」的分數 (即取負號)，並將標籤轉為「異常 = 1」的二元指標，否則 AUC 會被算成相反的結果。
 
 **sklearn 實作**：
 
@@ -672,9 +697,14 @@ $$
 from sklearn.metrics import roc_curve, roc_auc_score
 import matplotlib.pyplot as plt
 
-# 使用異常分數 (scores) 繪製 ROC 曲線
-fpr, tpr, thresholds = roc_curve(y_true, scores, pos_label=-1)
-auc = roc_auc_score(y_true, scores)
+# y_true: 1=正常, -1=異常 (sklearn 慣例)
+y_anomaly = (y_true == -1).astype(int)        # 異常=1, 正常=0
+anomaly_scores = -model.decision_function(X)  # 取負號：分數越大越異常
+# 註：LOF 需設定 novelty=True 才有 decision_function；
+#     novelty=False 時可改用 anomaly_scores = -model.negative_outlier_factor_ (即 LOF 值，越大越異常)
+
+fpr, tpr, thresholds = roc_curve(y_anomaly, anomaly_scores)
+auc = roc_auc_score(y_anomaly, anomaly_scores)
 
 plt.plot(fpr, tpr, label=f'AUC = {auc:.3f}')
 plt.xlabel('False Positive Rate')
@@ -683,6 +713,8 @@ plt.title('ROC Curve')
 plt.legend()
 plt.show()
 ```
+
+> 💡 異常樣本比例極低 (嚴重類別不平衡) 時，ROC-AUC 可能過於樂觀，建議同時參考 Precision-Recall 曲線與 `average_precision_score`。
 
 ### 6.2 完全無標籤時 (純非監督場景)
 
@@ -745,7 +777,9 @@ plt.show()
 
 #### 6.2.4 統計量檢驗
 
-**方法**：使用統計檢定驗證異常點是否顯著偏離正常分布
+**方法**：使用傳統統計規則 (Z-Score、箱型圖) 檢查異常點是否明顯偏離正常分布，作為模型結果的粗略對照
+
+⚠️ 上述規則皆為**逐變數 (單變量)** 檢驗，無法偵測「各變數單獨看都正常、但變數間相關性被破壞」的多變量異常 (這正是馬氏距離、Elliptic Envelope 等多變量方法的價值)；且樣本均值與標準差本身會受離群值影響。因此模型與統計方法的一致率偏低，不必然代表模型錯誤。
 
 **Z-Score 檢驗**：
 
@@ -761,7 +795,7 @@ $$
 \text{Outlier if } x < Q_1 - 1.5 \times IQR \text{ or } x > Q_3 + 1.5 \times IQR
 $$
 
-**sklearn 實作**：
+**Python (NumPy / SciPy) 實作**：
 
 ```python
 import numpy as np
@@ -799,6 +833,8 @@ from sklearn.ensemble import IsolationForest
 model = IsolationForest(contamination=0.05, random_state=42)  # 5% 異常率
 ```
 
+> 💡 `contamination` 同時決定判定異常的分數閾值：數值越大，被標記為異常的樣本越多 (靈敏度提高、誤報增加)。亦可保留預設模型，改以 `decision_function` 的分數自行設定較寬鬆的告警閾值。
+
 #### 6.3.2 告警抑制 (Alarm Suppression)
 
 **問題**：過多的誤報會導致「告警疲勞」，工程師可能忽略真正的告警
@@ -813,7 +849,12 @@ model = IsolationForest(contamination=0.05, random_state=42)  # 5% 異常率
 
 ```python
 def suppress_alarms(anomaly_flags, window_size=3):
-    """連續確認：連續 window_size 個點為異常才確認"""
+    """連續確認：連續 window_size 個點為異常才確認
+
+    anomaly_flags 須為布林值 (True=異常)。
+    注意 sklearn 的預測值 -1 (異常) 與 1 (正常) 在 Python 中皆為 True，
+    使用前請先轉換：anomaly_flags = (y_pred == -1)
+    """
     confirmed = []
     for i in range(len(anomaly_flags)):
         if i < window_size - 1:
@@ -831,7 +872,7 @@ def suppress_alarms(anomaly_flags, window_size=3):
 | 業務指標 | 定義 | 計算方式 |
 |---------|------|---------|
 | **事故預防率** | 成功預警的嚴重事故比例 | 預警事故數 / 總事故數 |
-| **誤報率** | 假告警佔總告警的比例 | FP / (TP + FP) |
+| **假告警比例** | 假告警佔總告警的比例 (等於 1 - Precision；不同於 6.1.5 的假陽性率 FPR) | FP / (TP + FP) |
 | **平均預警時間** | 事故前多久發出告警 | 平均 (事故時間 - 告警時間) |
 | **可用率** | 系統正常運行時間比例 | 正常運行時間 / 總時間 |
 | **響應時間** | 從告警到處置的時間 | 平均 (處置時間 - 告警時間) |
@@ -869,12 +910,12 @@ def suppress_alarms(anomaly_flags, window_size=3):
 2. **sklearn 的四大異常檢測方法**：
    - Isolation Forest：基於決策樹，適合高維數據
    - One-Class SVM：基於邊界，適合低維數據
-   - Local Outlier Factor：基於密度，適合非線性分布
-   - Elliptic Envelope：基於高斯分布，適合正態分布數據
+   - Local Outlier Factor：基於局部密度，適合密度不均勻、需偵測局部異常的數據
+   - Elliptic Envelope：基於穩健協方差與高斯分布假設，適合近似正態分布數據
 
 3. **方法選擇原則**：
    - 數據維度、分布特性、計算資源、可解釋性需求
-   - 建議從 Isolation Forest 開始嘗試
+   - 建議以 Isolation Forest 作為通用基準 (baseline)，再依數據特性比較其他方法
 
 4. **資料前處理的重要性**：
    - 標準化 (StandardScaler)：最常用
@@ -924,7 +965,7 @@ def suppress_alarms(anomaly_flags, window_size=3):
 | 常見陷阱 | 後果 | 對策 |
 |---------|------|------|
 | **使用全部數據訓練** | 異常點被學習為正常 | 僅用已確認的正常數據訓練 |
-| **忽略資料前處理** | 數值範圍大的特徵主導結果 | 必須進行標準化或縮放 |
+| **忽略資料前處理** | 數值範圍大的特徵主導結果 (One-Class SVM、LOF 尤為明顯) | 依演算法需求進行標準化或縮放 (見 5.3) |
 | **過度依賴默認參數** | 模型表現不佳 | 調整 contamination 等參數 |
 | **忽略時間相關性** | 情境異常檢測失敗 | 加入時間衍生特徵 |
 | **誤報過多導致告警疲勞** | 真正告警被忽略 | 設計告警抑制機制 |
@@ -953,8 +994,10 @@ def suppress_alarms(anomaly_flags, window_size=3):
 
 ### 7.4 下一步學習方向
 
-- **Unit08**：將學習多種異常檢測演算法的**實作與比較**
-- **Unit09**：將探討**時間序列異常檢測**的專門方法
+- **Unit07 演算法詳解**：接續學習四種演算法的**原理與實作** (Isolation Forest、One-Class SVM、LOF、Elliptic Envelope)
+- **Unit07 作業練習**：完成 Unit07 異常檢測作業 (詳見 8.5 作業預告)
+- **Unit08 關聯規則學習**：發現製程變數與配方成分之間的關聯模式 (Apriori、FP-Growth)
+- **Unit09 綜合案例研究**：組合多種非監督式學習方法進行端到端製程分析
 - **後續課程**：深度學習方法 (Autoencoder, VAE) 於異常檢測的應用
 
 ---
@@ -987,6 +1030,9 @@ def suppress_alarms(anomaly_flags, window_size=3):
 3. **Local Outlier Factor**：
    - Breunig, M. M., Kriegel, H. P., Ng, R. T., & Sander, J. (2000). *LOF: identifying density-based local outliers*. SIGMOD.
 
+4. **Elliptic Envelope (最小協方差行列式, MCD)**：
+   - Rousseeuw, P. J., & Van Driessen, K. (1999). *A fast algorithm for the minimum covariance determinant estimator*. Technometrics.
+
 ### 8.3 Python 套件
 
 本單元使用的主要套件：
@@ -1011,6 +1057,10 @@ from sklearn.metrics import (
     roc_auc_score
 )
 
+# 統計檢驗
+import numpy as np
+from scipy import stats
+
 # 視覺化
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
@@ -1028,7 +1078,7 @@ from sklearn.decomposition import PCA
 
 ### 8.5 作業預告
 
-下一份作業 (Unit08) 將要求你：
+本單元作業 (Unit07 異常檢測作業) 將要求你：
 
 1. **實作與比較**：在化工數據集上實作本單元介紹的四種演算法
 2. **參數調整**：調整 `contamination` 等參數，觀察對結果的影響
@@ -1043,11 +1093,11 @@ from sklearn.decomposition import PCA
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Unit07 Anomaly Detection Overview 異常檢測基礎概念與方法選擇
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-12
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

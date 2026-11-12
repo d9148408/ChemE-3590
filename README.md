@@ -315,7 +315,7 @@ drive.mount('/content/drive', force_remount=True)
 
 ```powershell
 # 複製專案
-git clone https://github.com/fcuycchuang/ChemE-3590.git
+git clone https://github.com/d9148408/ChemE-3590.git
 cd ChemE-3590
 
 # 建立 Python 3.10 虛擬環境
