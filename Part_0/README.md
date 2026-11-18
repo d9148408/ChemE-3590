@@ -16,7 +16,7 @@ Google Colab 提供了免安裝的雲端運算資源與免費 GPU 加速，適�
 2. **掌握雙重開發環境與跨環境工作流**：熟練操作 Google Colab 雲端環境與 Windows 本地端 Conda + JupyterLab/Notebook 環境，並理解本課程跨環境路徑設定範本
 3. **完成課程專案同步與本地環境建置**：在 Colab 中透過 `git clone` 同步課程儲存庫至 Google Drive，並在本地端使用 `PY310_environment.yml` 建立支援原生 Windows GPU 的 `PY310` 環境
 4. **執行端到端化工數據分析與環境驗證**：透過連續攪拌槽反應器（CSTR）與間歇式反應器（Batch Reactor）實作案例，完整測試 NumPy、Pandas、Matplotlib、Seaborn、Scikit-learn 與 TensorFlow GPU 運算功能
-5. **善用 AI Agent 輔助工具（延伸選讀）**：認識並操作 Hermes Agent，協助化工資料清理、程式除錯與研究自動化
+5. **建立 AI Agent 使用能力（核心教材）**：安裝並操作 Hermes Agent，擴充技能、外掛與 MCP 工具，協助化工資料清理、程式除錯與研究自動化
 
 ---
 
@@ -30,9 +30,9 @@ Part_0/
 ├── Unit00_Colab_Environment_Setup.ipynb       # Google Colab 環境實作與 CSTR 數據分析範例
 ├── Unit00_Local_Environment_Setup.md          # Windows 本地環境設定完整講義
 ├── Unit00_Local_Environment_Setup.ipynb       # Windows 本地環境驗證與批次反應器分析範例
-├── Unit00_Hermes_Agent_Setup.md               # [延伸選讀] Hermes Agent 安裝與使用教學
-├── Unit00_Hermes_Agent_Command.md             # [延伸選讀] Hermes Agent 常用指令詳細教學
-├── Unit00_Hermes_Agent_Skills&Plugins.md      # [延伸選讀] Hermes Agent 必裝技能與外掛推薦指南
+├── Unit00_Hermes_Agent_Setup.md               # [核心] Hermes Agent 安裝與使用教學
+├── Unit00_Hermes_Agent_Command.md             # [核心] Hermes Agent 常用指令詳細教學
+├── Unit00_Hermes_Agent_Skills&Plugins.md      # [核心] Hermes Agent 技能、外掛與 MCP 工具指南
 └── outputs/                                   # 範例 Notebook 執行產出結果與圖表目錄
     ├── P0_Unit00_Colab_Environment_Setup/
     │   ├── reactor_data.csv
@@ -162,7 +162,7 @@ conda activate PY310
 
 ---
 
-### 4️⃣ AI Agent 輔助學習工具：Hermes Agent 教學（延伸選讀）
+### 4️⃣ AI Agent 使用能力：Hermes Agent 教學（核心教材）
 
 **檔案**：
 - 📄 安裝與基礎操作講義：[Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)
@@ -177,7 +177,7 @@ conda activate PY310
 - **Windows 安裝與模型供應商設定**：
   - 桌面引導式安裝程式（`Hermes-Setup.exe`）與 PowerShell 命令列安裝步驟
   - Windows 資料儲存架構（`%LOCALAPPDATA%\hermes\` 下的 `config.yaml`、`.env`、`skills\` 與 `sessions\`）
-  - 連接課程實驗室的地端模型服務（Custom Endpoint）完成模型與工具設定，不需購買商業模型；雲端工具依課程規定預設不啟用
+  - 連接課程實驗室的地端模型服務（Custom Endpoint）完成模型與工具設定，不需購買商業模型；技能與 MCP 以本機佈置為主，會把內容送到第三方的雲端工具只在教師指定的練習中使用
 
 - **四大類常用指令詳解與化工實戰應用**：
   - **對話管理**：`hermes`、`hermes --tui --in <路徑>`、`hermes --continue (-c)`、`hermes -r "<標題>"`、`hermes sessions list`
@@ -291,10 +291,11 @@ dependencies:
 2. **熟練日常操作指令**：練習啟動/退出環境、查詢套件版本、切換 GPU 硬體加速器，以及使用快捷鍵高效操作儲存格
 3. **建立故障排除能力**：瀏覽講義中的 Troubleshooting Top 10，了解遇到 `ModuleNotFoundError`、路徑錯誤或顯存不足時的標準解法
 
-### 🎯 第三階段：探索 AI Agent 輔助工具（延伸選讀，建議時間：1 小時）
+### 🎯 第三階段：建立 AI Agent 使用能力（核心教材，第 1 週完成安裝與連線，之後各單元持續練習）
 
-1. 閱讀 [Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)，了解自主型 AI 代理如何結合終端機與持久記憶協助程式學習
+1. 閱讀 [Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)，完成安裝並連接課程實驗室端點，詳讀 4.5 節的課程使用規定
 2. 參考 [Unit00_Hermes_Agent_Command.md](Unit00_Hermes_Agent_Command.md)，嘗試使用 `hermes --tui` 輔助整理數據或檢查程式碼
+3. 依 [Unit00_Hermes_Agent_Skills&Plugins.md](Unit00_Hermes_Agent_Skills&Plugins.md) 安裝課程工具清單中的技能與本機 MCP，並在之後各單元的 Homework 中持續擴充
 
 ---
 
@@ -397,7 +398,7 @@ jupyter lab --port 8889
 # 4. 安全停止服務：在 Anaconda Prompt 視窗連按兩次 Ctrl + C
 ```
 
-### Hermes Agent 常用指令（延伸選讀）
+### Hermes Agent 常用指令
 
 ```powershell
 # 1. 設定模型供應商：選 Custom Endpoint，填入教師提供的實驗室端點

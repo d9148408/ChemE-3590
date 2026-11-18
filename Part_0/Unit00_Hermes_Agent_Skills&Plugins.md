@@ -717,7 +717,7 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 | **`memory-review`** | `community`<br/>`desktop` | `hermes plugins install memory-review` | **記憶寫入勾選審核視窗**：當代理準備將新學到的事項寫入持久記憶時，在桌面應用跳出核取方塊對話框，讓你逐條勾選核准或拒絕，避免代理記住某次測試時用錯的物性常數或暫時性假設。 |
 | **`usage-guard`** | `community`<br/>`automation` | `hermes plugins install usage-guard` | **訂閱額度防超支守門員**：讀取 Hermes 已顯示的用量資訊，當訂閱方案的配額視窗耗盡時自動攔截後續請求，防止開啟付費超額計費（overage）的帳號在跑長迴圈時不小心燒掉大筆費用。 |
 
-### 4.4 必裝官方核准 MCP 伺服器（`hermes mcp`）
+### 4.4 官方遠端 MCP 伺服器（`hermes mcp`，本課程於指定練習使用）
 
 > **本課程說明**：本節介紹的是遠端 MCP，查詢內容會送到第三方服務。本課程的 MCP 以本機佈置為主（見 4.6 節）；遠端 MCP 只在教師指定的練習中安裝，需要共用的計算或資料服務，將由實驗室主機架設。
 
@@ -725,7 +725,7 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 
 | MCP 名稱 | 認證方式 | 一鍵安裝指令 | 化工系必裝理由與應用情境 |
 | :--- | :--- | :--- | :--- |
-| **`wolfram`** | **免認證**（匿名即用） | `hermes mcp install wolfram` | **Wolfram Alpha 工程數學與科學知識引擎（強烈推薦必裝！）**：直接呼叫 Wolfram Alpha 進行符號微積分、常微分方程（ODE）解析解驗證、複雜單位換算（如 $\mathrm{Btu/(hr \cdot ft^2 \cdot {}^\circ F)}$ 轉 $\mathrm{W/(m^2 \cdot K)}$ ）、化學反應平衡與純物質基本熱物性查詢，彌補大型語言模型心算容易出錯的弱點。 |
+| **`wolfram`** | **免認證**（匿名即用） | `hermes mcp install wolfram` | **Wolfram Alpha 工程數學與科學知識引擎（推薦；本課程於指定練習使用）**：直接呼叫 Wolfram Alpha 進行符號微積分、常微分方程（ODE）解析解驗證、複雜單位換算（如 $\mathrm{Btu/(hr \cdot ft^2 \cdot {}^\circ F)}$ 轉 $\mathrm{W/(m^2 \cdot K)}$ ）、化學反應平衡與純物質基本熱物性查詢，彌補大型語言模型心算容易出錯的弱點。 |
 | **`context7`** | **免認證**（匿名即用） | `hermes mcp install context7` | **最新套件官方文件與程式碼範例即時查詢（必裝！）**：當代理撰寫 Scikit-learn、PyTorch、Pandas、SciPy 或 Plotly 程式碼時，自動向 Context7 拉取**對應版本的最新官方 API 文件**，不再寫出早已被棄用（deprecated）的舊版語法。 |
 | **`deepwiki`** | **免認證**（匿名即用） | `hermes mcp install deepwiki` | **任何公開 GitHub 專案的互動式百科（Devin DeepWiki）**：在做專題研究需要看懂某篇論文附帶的 GitHub 倉庫（例如某個化工 PINNs 或分子圖神經網路 GNN 專案）時，直接透過 DeepWiki 詢問該倉庫的架構、入口函數與資料格式。 |
 | **`hugging_face`** | OAuth 2.1（瀏覽器登入） | `hermes mcp install hugging_face` | **Hugging Face 官方遠端 MCP**：直接在對話中搜尋 Hugging Face Hub 上的科學模型、化學資料集、Spaces 互動應用與最新 AI 論文。 |
@@ -840,7 +840,9 @@ hermes mcp configure zotero
 
 > **與本課程規範的搭配**：無論走哪條路線，文獻引用都應同時啟用 `grounded-citations` 技能，確保代理回報的 DOI、年份、期刊名與頁碼都可回溯到真實來源，避免它把 Zotero 回傳的中介資料「順手美化」。另可搭配 `markitdown` 把 Zotero 附件中的 PDF 轉成 Markdown，再餵給 `llm-wiki` 建知識庫。
 
-### 4.6 本機自架開源 MCP 伺服器（完全離線、資料不出機器）
+### 4.6 本機自架開源 MCP 伺服器（不經第三方服務）
+
+> **資料流向說明**：本機 MCP 在你的電腦上執行，不經第三方服務；但它讀到的內容會隨對話送到課程實驗室端點做模型推理，請把可存取範圍限定在課程資料夾。少數本機工具（如 `arxiv-mcp-server`）雖在本機執行，檢索時仍會連到外部網站。
 
 4.4 節介紹的 `wolfram`、`context7`、`deepwiki` 等屬於**遠端 MCP**（Hermes 連線到外部託管服務，資料會離開你的電腦）。若你的研究資料不能外流（未發表實驗數據、產學合作內容、藥品配方），就應該改用**本機 MCP**：由 Hermes 在你自己的機器上以 stdio 啟動一支開源程式，所有計算與檔案存取都在本地完成。
 
@@ -850,7 +852,7 @@ hermes mcp configure zotero
 | :--- | :--- | :--- |
 | 連線方式 | HTTP / SSE 連到外部端點 | Hermes 以 **stdio** 啟動本地子程序 |
 | 安裝指令 | `hermes mcp install <目錄名稱>` | `hermes mcp add <自訂名稱> --command ... --args ...` |
-| 資料流向 | 查詢內容會送到第三方伺服器 | **完全不離開本機** |
+| 資料流向 | 查詢內容會送到第三方伺服器 | **工具在本機執行，不經第三方**（讀到的內容隨對話送到課程實驗室端點推理） |
 | 需要 API 金鑰 | 部分需要（OAuth） | 多數不需要 |
 | 來源 | Nous 官方審核目錄 | 任意開源套件（PyPI / npm / GitHub） |
 | 信任等級 | 官方已審核 | **自行承擔**（務必先讀原始碼或官方文件） |
@@ -981,6 +983,8 @@ hermes mcp configure fs-lab
 
 ### 5.1 🎓 大學部基礎必裝包（修課作業、程式除錯、結報與簡報）
 
+> **本課程說明**：本課程（研究所選修）的同學也從本包開始，並以開課前公布的課程工具清單為準；包內會連到第三方的項目已改為註解，只在教師指定的練習中安裝。
+
 **適用對象**：正在修習本課程（ChemE 3590）、化工計算、單元操作實驗、程序控制或化工熱力學的大學部同學。
 
 ```powershell
@@ -1002,7 +1006,8 @@ foreach ($s in @('pdf','docx','xlsx','powerpoint','arxiv',
 # 2. 安裝官方選用庫（official/*）中的大學部高頻技能
 # ============================================================
 hermes skills install official/data-science/jupyter-notebook --yes
-hermes skills install official/research/duckduckgo-search --yes
+# 網頁搜尋技能會把查詢送到第三方，本課程只在教師指定的練習中才安裝：
+# hermes skills install official/research/duckduckgo-search --yes
 hermes skills install official/creative/concept-diagrams --yes
 hermes skills install official/creative/excalidraw --yes
 hermes skills install official/finance/pptx-author --yes
@@ -1044,7 +1049,7 @@ hermes tools                        # → 選「🖱️ Computer Use」啟用
 # hermes mcp install deepwiki
 
 # ============================================================
-# 3b. 本機自架開源 MCP（完全離線、資料不出機器；詳見 4.6 節）
+# 3b. 本機自架開源 MCP（不經第三方；讀到的內容送到課程實驗室端點推理；詳見 4.6 節）
 #     Hermes 已內建 uvx 與 npx，不需另外安裝套件
 # ============================================================
 uvx --version
