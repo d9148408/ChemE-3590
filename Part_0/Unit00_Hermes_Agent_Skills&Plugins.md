@@ -1,6 +1,6 @@
 # Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南
 
-> **本課程說明**：本文介紹的外掛與遠端 MCP 伺服器，多數需要連到雲端服務，屬課外參考。課程作業與共同任務依 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5 的規定，只使用實驗室端點，雲端工具與外掛預設不啟用；只在本機執行、不連網的技能，可依教師說明使用。
+> **本課程說明**：本講義是本課程 Agent 能力訓練的核心教材，技能（Skills）、外掛（Plugins）與 MCP 工具都會在課堂中練習，目的是讓同學逐步擴充並調整自己的 Agent。使用時請依 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5 的規定：在本機執行的技能與本機自架的 MCP 伺服器（4.6 節）可直接用於課程作業；會把內容送到第三方服務的遠端 MCP、雲端外掛與工具閘道，只在教師指定的練習中使用，共同任務等觀察點任務期間不使用。
 
 ## 課程目標
 
@@ -719,6 +719,8 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 
 ### 4.4 必裝官方核准 MCP 伺服器（`hermes mcp`）
 
+> **本課程說明**：本節介紹的是遠端 MCP，查詢內容會送到第三方服務。本課程的 MCP 以本機佈置為主（見 4.6 節）；遠端 MCP 只在教師指定的練習中安裝，需要共用的計算或資料服務，將由實驗室主機架設。
+
 除了外掛，Hermes 官方 MCP 目錄（`hermes mcp catalog`，實測 v0.22.5 共 66 項）中有幾個對理工與化工學生極為實用的遠端 MCP 伺服器，**其中前四項完全免費且免設 API 金鑰**：
 
 | MCP 名稱 | 認證方式 | 一鍵安裝指令 | 化工系必裝理由與應用情境 |
@@ -1035,10 +1037,11 @@ hermes tools                        # → 選「🖱️ Computer Use」啟用
 # ============================================================
 # 3. 安裝免認證的三大核心 MCP 伺服器（工程數學、最新套件文件、GitHub 解讀）
 #    注意：這些是遠端 MCP，查詢內容會送到第三方服務
+#    本課程：以本機 MCP（3b）為主，以下三項只在教師指定的練習中才安裝
 # ============================================================
-hermes mcp install wolfram
-hermes mcp install context7
-hermes mcp install deepwiki
+# hermes mcp install wolfram
+# hermes mcp install context7
+# hermes mcp install deepwiki
 
 # ============================================================
 # 3b. 本機自架開源 MCP（完全離線、資料不出機器；詳見 4.6 節）
@@ -1050,7 +1053,7 @@ npx --version
 # 限定資料夾的檔案存取（最推薦先裝這個，路徑請改成你自己的）
 hermes mcp add fs-lab --command npx --args -y @modelcontextprotocol/server-filesystem D:\MyGit\ChemE-3590\Part_2
 
-# arXiv 論文檢索（預印本）
+# arXiv 論文檢索（預印本；伺服器在本機執行，但檢索查詢會送到 arXiv）
 hermes mcp add arxiv --command uvx --args arxiv-mcp-server
 
 # 驗證是否正常啟動
