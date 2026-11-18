@@ -169,6 +169,87 @@
 
 ---
 
+### [Unit18: 圖神經網路 (Graph Neural Networks, GNN)](Unit18/)
+
+**主題**：專為圖結構數據設計的深度學習架構（分子、製程感測器網路）
+
+**單元概述**：
+- [Unit18_GNN_Overview.md](Unit18/Unit18_GNN_Overview.md)
+- [Unit18_GNN_Overview.ipynb](Unit18/Unit18_GNN_Overview.ipynb)
+
+**實際案例**：
+- [分子水溶解度預測 (Molecular Solubility)](Unit18/Unit18_Example_Molecular_Solubility.md) ([Notebook](Unit18/Unit18_Example_Molecular_Solubility.ipynb))
+- [分子毒性分類 (Molecular Toxicity)](Unit18/Unit18_Example_Molecular_Toxicity.md) ([Notebook](Unit18/Unit18_Example_Molecular_Toxicity.ipynb))
+- [製程故障診斷 (Process Fault Diagnosis)](Unit18/Unit18_Example_Process_Fault_Diagnosis.md) ([Notebook](Unit18/Unit18_Example_Process_Fault_Diagnosis.ipynb))
+
+**單元導覽**：[Unit18/README.md](Unit18/README.md)
+
+**核心概念**：
+- 圖的數學表示（鄰接矩陣、度矩陣、特徵矩陣、拉普拉斯矩陣）
+- 訊息傳遞 (Message Passing)：聚合 + 更新
+- 排列不變性 (Permutation Invariance)
+- 讀出 (Readout) 池化與圖層級任務
+
+**經典架構**：
+- GCN（圖卷積網路）
+- GraphSAGE（鄰居採樣 + 聚合）
+- GAT（圖注意力網路）
+- MPNN（訊息傳遞統一框架）
+
+**TensorFlow/Keras 技能**：
+- 從零實作圖卷積層
+- 以 RDKit 將 SMILES 轉換為分子圖
+- padding + 節點遮罩批次化
+- 類別不平衡處理（class weight、ROC-AUC/PR-AUC）
+
+**應用場景**：
+- **分子性質預測 (QSPR)**：溶解度、沸點、毒性直接從結構預測
+- **製程故障診斷**：感測器網路建模、多類別故障分類
+- **反應網路分析**：反應路徑、製程流程圖拓撲分析
+
+---
+
+### [Unit19: 物理資訊神經網路 (Physics-Informed Neural Networks, PINN)](Unit19/)
+
+**主題**：將物理方程嵌入神經網路學習目標，求解微分方程與參數辨識
+
+**單元概述**：
+- [Unit19_PINN_Overview.md](Unit19/Unit19_PINN_Overview.md)
+- [Unit19_PINN_Overview.ipynb](Unit19/Unit19_PINN_Overview.ipynb)
+
+**實際案例**：
+- [觸媒顆粒內擴散-反應 (Catalyst Diffusion-Reaction)](Unit19/Unit19_Example_Catalyst_Diffusion_Reaction.md) ([Notebook](Unit19/Unit19_Example_Catalyst_Diffusion_Reaction.ipynb))
+- [薄膜內暫態擴散 (Transient Diffusion)](Unit19/Unit19_Example_Transient_Diffusion.md) ([Notebook](Unit19/Unit19_Example_Transient_Diffusion.ipynb))
+- [非等溫反應器與活化能辨識 (Reactor Kinetics)](Unit19/Unit19_Example_Reactor_Kinetics.md) ([Notebook](Unit19/Unit19_Example_Reactor_Kinetics.ipynb))
+
+**單元導覽**：[Unit19/README.md](Unit19/README.md)
+
+**核心概念**：
+- 用神經網路表示微分方程的解
+- 自動微分 (Automatic Differentiation) 與巢狀 GradientTape
+- 複合損失：物理殘差 + 初始/邊界條件 + 觀測資料
+- 正問題（求解方程）vs 反問題（參數辨識）
+- 無網格 (Mesh-free) 配點法
+
+**四個遞進案例**：
+- 一階 ODE（反應動力學，辨識速率常數 $k$ ）
+- 二階 BVP（觸媒擴散，辨識 Thiele 模數 $\phi$ ）
+- 拋物線 PDE（暫態擴散，辨識擴散係數 $D$ ）
+- 耦合非線性系統（非等溫反應器，辨識活化能 $\gamma$ ）
+
+**TensorFlow/Keras 技能**：
+- 巢狀 GradientTape 計算各階導數
+- 單網路雙輸出求解耦合系統
+- `tf.Variable` 作為待辨識參數
+- 學習率分段衰減、TF checkpoint 模型儲存
+
+**應用場景**：
+- **反應動力學與參數辨識**：速率常數、活化能、反應級數估計
+- **傳遞現象建模**：熱傳、質傳、薄膜滲透的 PDE 求解
+- **製程數位分身 (Digital Twin)**：資料稀少時仍保證物理一致性
+
+---
+
 ## 🗂️ 數據集
 
 本 Part 使用的數據集涵蓋多種化工與工業場景：
@@ -190,6 +271,15 @@
 - **脫丁烷塔數據**：動態操作數據
 - **NASA C-MAPSS**：渦輪風扇退化數據
 - **製程時間序列**：溫度、壓力、流量隨時間變化
+
+### Unit18 (GNN) 數據
+- **ESOL (Delaney) 水溶解度**：1128 個有機小分子的 SMILES 與 $\log S$
+- **Tox21 毒理學資料**：約 7800 個化合物的 NR-AhR 活化標記
+- **田納西-伊士曼製程 (TEP)**：52 個製程變數、正常 + 21 種故障 (IDV)
+
+### Unit19 (PINN) 數據
+- **合成配點資料**：物理殘差配點與稀疏觀測雜訊數據
+- **數值基準**：解析解（ODE/BVP/PDE）與 `solve_ivp` 高精度數值解
 
 ---
 
@@ -229,6 +319,11 @@ imgaug>=0.4.0  # 影像增強
 h5py>=3.1.0  # 模型儲存
 pydot>=1.4.0  # 模型視覺化
 graphviz>=0.16  # 模型視覺化
+
+# 圖神經網路（Unit18）
+rdkit>=2022.9  # 分子處理（SMILES → 分子圖）
+networkx>=2.8  # 圖視覺化與分析
+# 物理資訊神經網路（Unit19）依賴 TensorFlow 自動微分與 scipy（solve_ivp，已列於上方）
 ```
 
 ### 安裝指令
@@ -282,7 +377,15 @@ pip install opencv-python Pillow scikit-image plotly albumentations imgaug h5py 
 3. **Unit17 RNN**：學習時間序列建模
    - 理解記憶機制、LSTM、GRU
    - 掌握序列預測與異常檢測
-   - 完成 4 個時間序列案例
+   - 完成時間序列案例
+4. **Unit18 GNN**（進階專題）：學習圖結構建模
+   - 理解訊息傳遞、GCN/GraphSAGE/GAT
+   - 掌握分子圖與感測器圖建模
+   - 完成分子性質與故障診斷案例
+5. **Unit19 PINN**（進階專題）：學習物理資訊建模
+   - 理解自動微分、複合損失、正/反問題
+   - 掌握以神經網路求解微分方程
+   - 完成反應動力學與傳遞現象案例
 
 ### 2. 快速應用路徑（針對特定需求）
 
@@ -291,7 +394,9 @@ pip install opencv-python Pillow scikit-image plotly albumentations imgaug h5py 
 - **需要軟感測器/製程預測**：Unit15 (DNN)
 - **需要影像分析/缺陷檢測**：Unit15 (基礎) → Unit16 (CNN)
 - **需要時間序列預測/異常檢測**：Unit15 (基礎) → Unit17 (RNN)
-- **需要全面掌握**：Unit15 → Unit16 → Unit17
+- **需要分子性質預測/製程故障診斷**：Unit15 (基礎) → Unit18 (GNN)
+- **需要求解微分方程/參數辨識**：Unit15 (基礎) → Unit19 (PINN)
+- **需要全面掌握**：Unit15 → Unit16 → Unit17 → Unit18 → Unit19
 
 ### 3. 進階研究路徑
 
@@ -421,15 +526,14 @@ pip install opencv-python Pillow scikit-image plotly albumentations imgaug h5py 
 
 ## 🚀 進階主題（未來擴展）
 
-本 Part 涵蓋深度學習的基礎與三大主流架構，未來可能擴展的主題包括：
+本 Part 涵蓋深度學習的三大基礎架構（DNN/CNN/RNN）與兩個進階專題（GNN/PINN）。未來可能擴展的主題包括：
 
-- **Unit18: Transformer 與注意力機制**
-- **Unit19: 自編碼器與降維 (Autoencoder, VAE)**
-- **Unit20: 生成對抗網路 (GAN)**
-- **Unit21: 圖神經網路 (GNN) 在分子性質預測的應用**
-- **Unit22: 強化學習 (RL) 在製程控制的應用**
-- **Unit23: 聯邦學習與隱私保護**
-- **Unit24: 模型部署與邊緣計算**
+- **Transformer 與自注意力機制**（序列與時空預測的新主流）
+- **自編碼器與生成模型 (Autoencoder, VAE, GAN)**
+- **深度強化學習 (Deep RL) 在製程控制的應用**（見 Part_5）
+- **生成式 AI 與大語言模型 (LLM) 在化工的應用**（見 Part_5）
+- **模型部署與邊緣計算 (TensorFlow Serving / Lite)**
+- **聯邦學習與隱私保護**
 
 ---
 
@@ -461,11 +565,11 @@ pip install opencv-python Pillow scikit-image plotly albumentations imgaug h5py 
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Part 4 深度學習 (Deep Learning)
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
-- 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 授課教師：莊曜桽 助理教授
+- 更新日期：2026-11-18
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
