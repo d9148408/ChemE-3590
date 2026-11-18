@@ -1,0 +1,2 @@
+model_checkpoint_path: "graphsage_tep_fault"
+all_model_checkpoint_paths: "graphsage_tep_fault"

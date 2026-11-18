@@ -177,15 +177,18 @@ hermes model
 
 **互動流程**：
 
-1. 列出所有支援的供應商（Nous Portal、Anthropic、OpenAI、OpenRouter 等）
+1. 列出所有支援的供應商（Custom Endpoint、Nous Portal、Anthropic、OpenAI、OpenRouter 等）
 2. 選擇供應商後，若需要認證會引導登入或輸入 API 金鑰
 3. 列出該供應商可用的模型清單，選擇一個設為預設
+
+> **本課程**：選 **Custom Endpoint**，填入教師提供的實驗室服務網址（base URL）、課程 API 金鑰與模型名稱（詳見 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.1 與 4.5）。其他供應商僅供課外參考。
 
 **常見情境對照**：
 
 | 情境 | 操作 |
 |------|------|
-| 第一次設定，想用 Nous Portal | 執行 `hermes setup --portal`（更快） |
+| 第一次設定（本課程） | 執行 `hermes model`，選 Custom Endpoint，填入實驗室端點 |
+| 課外想用 Nous Portal | 執行 `hermes setup --portal`（不用於課程作業） |
 | 想從 Claude 換成 GPT | 執行 `hermes model`，選 OpenAI 供應商 |
 | API 金鑰過期，對話報錯 | 執行 `hermes model` 重新認證 |
 
@@ -258,19 +261,19 @@ hermes tools
 
 | 模式 | 指令 | 適用對象 |
 |------|------|---------|
-| Quick Setup | `hermes setup --portal` | 有 Nous Portal 帳號（**推薦**） |
-| Full Setup | `hermes setup` | 想逐一自訂所有項目 |
-| Blank Slate | 精靈中選擇 | 進階使用者，只開最低限度 |
+| Full Setup | `hermes setup` | 逐一設定；供應商選 Custom Endpoint，雲端工具先略過（**本課程建議**） |
+| Blank Slate | 精靈中選擇 | 只開最低限度，同樣適合本課程 |
+| Quick Setup | `hermes setup --portal` | 有 Nous Portal 帳號（課外參考，本課程不使用） |
 
 > **補充**：已安裝過的環境執行 `hermes setup` 會以現有值為預設重新跑完整精靈；加上 `--quick` 則只詢問缺漏或未設定的項目；`--reset` 會把設定重置為預設值（請謹慎）。
 
 **範例**：
 
 ```powershell
-hermes setup --portal
+hermes setup
 ```
 
-執行後會開啟瀏覽器進行 OAuth 登入，完成後自動設定模型供應商與工具閘道（網頁搜尋、影像生成、TTS、雲端瀏覽器）。
+選擇 **Full Setup**：供應商選 Custom Endpoint 並填入教師提供的實驗室端點；遇到網頁搜尋、影像生成、TTS、雲端瀏覽器等需連到雲端的工具時先略過不啟用（本課程規定見 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5）。
 
 ---
 
@@ -314,6 +317,8 @@ hermes skills install openai/skills/k8s
 ### 3.2 `hermes gateway`：訊息閘道設定
 
 **用途**：將 Hermes 連接到通訊平台（Telegram、Discord、Slack、WhatsApp、Signal、Email、Microsoft Teams 等），讓代理變成隨時可用的機器人助理。
+
+> **本課程說明**：訊息閘道會把對話送到第三方通訊平台，屬課外參考；課程作業與共同任務不使用（見 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5）。
 
 **語法**：
 
@@ -585,7 +590,7 @@ sequenceDiagram
 | ★★★ | `hermes -r "<標題或ID>"` | 依標題或 ID 接續對話 |
 | ★★☆ | `hermes model` | 選擇供應商與模型 |
 | ★★☆ | `hermes doctor` | 診斷問題（萬用） |
-| ★★☆ | `hermes setup --portal` | Nous Portal 快速設定 |
+| ★☆☆ | `hermes setup --portal` | Nous Portal 快速設定（課外參考） |
 | ★★☆ | `hermes config set/get` | 讀寫設定值 |
 | ★★☆ | `hermes desktop` | 啟動桌面應用（可加 `--cwd <路徑>`） |
 | ★☆☆ | `hermes sessions list` | 列出對話清單 |

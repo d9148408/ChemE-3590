@@ -11,10 +11,14 @@
 
 **深度學習 (Deep Learning)** 透過多層神經網路的堆疊，能夠自動學習數據的階層式特徵表示，從簡單到複雜，層層抽象。在化工領域，深度學習正在革新傳統的建模、控制、優化與診斷方法。
 
-本 Part 涵蓋三種核心深度學習架構：
+本 Part 涵蓋五個核心深度學習主題，從三大基礎架構到兩個進階專題：
 1. **深度神經網路 (DNN/MLP, Unit15)**：處理結構化表格數據，適合軟感測器、製程預測
 2. **卷積神經網路 (CNN, Unit16)**：處理影像數據，適合缺陷檢測、顯微影像分析
 3. **循環神經網路 (RNN/LSTM/GRU, Unit17)**：處理時間序列數據，適合製程動態建模、故障預測
+4. **圖神經網路 (GNN, Unit18)**：處理圖結構數據，適合分子性質預測、製程故障診斷
+5. **物理資訊神經網路 (PINN, Unit19)**：將物理方程嵌入學習，適合求解微分方程與參數辨識
+
+基礎三架構 (Unit15-17) 為大學部核心內容；GNN 與 PINN (Unit18-19) 為進階專題，適合研究所選修或對深度學習有進一步興趣的學員。
 
 ---
 
@@ -23,10 +27,10 @@
 完成 Part 4 後，您將能夠：
 
 1. **理解深度學習的核心概念**：神經元、前向傳播、反向傳播、激活函數、損失函數
-2. **掌握三大主流架構**：DNN（表格數據）、CNN（影像數據）、RNN（序列數據）
-3. **熟練使用 TensorFlow/Keras**：模型建立、訓練、評估、調參、部署
-4. **解決實際化工問題**：軟感測器設計、缺陷檢測、製程預測、異常診斷
-5. **優化模型性能**：Early Stopping、Dropout、Batch Normalization、數據增強
+2. **掌握五大深度學習主題**：DNN（表格數據）、CNN（影像數據）、RNN（序列數據）、GNN（圖數據）、PINN（物理方程）
+3. **熟練使用 TensorFlow/Keras**：模型建立、訓練、評估、調參、部署、自動微分
+4. **解決實際化工問題**：軟感測器設計、缺陷檢測、製程預測、異常診斷、分子性質預測、微分方程求解
+5. **優化模型性能**：Early Stopping、Dropout、Batch Normalization、數據增強、複合損失設計
 
 ---
 
@@ -131,7 +135,8 @@
 - [鍋爐 NOx 排放預測 (Boiler)](Unit17/Unit17_Example_Boiler.md) ([Notebook](Unit17/Unit17_Example_Boiler.ipynb))
 - [脫丁烷塔控制 (Debutanizer Column)](Unit17/Unit17_Example_debutanizer_column.md) ([Notebook](Unit17/Unit17_Example_debutanizer_column.ipynb))
 - [NASA 渦輪風扇 RUL 預測](Unit17/Unit17_Example_RUL_NASA_Turbofan.md) ([Notebook](Unit17/Unit17_Example_RUL_NASA_Turbofan.ipynb))
-- [製程異常檢測（時間序列）](Unit17/Unit17_Example_Process_Anomaly_Detection.md) ([Notebook](Unit17/Unit17_Example_Process_Anomaly_Detection.ipynb))
+
+**進階專題**：[Unit17_RNN_Advanced.md](Unit17/Unit17_RNN_Advanced.md)（雙向 RNN、Seq2Seq、Attention）
 
 **作業練習**：[Unit17_RNN_Homework.ipynb](Unit17/Unit17_RNN_Homework.ipynb)
 

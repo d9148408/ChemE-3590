@@ -20,6 +20,8 @@
 
 一類支持向量機 (One-Class SVM) 是由 Schölkopf 等人於 1999 年提出的一種基於支持向量機的異常檢測演算法。其核心理念是：**在特徵空間中找到一個最小的超球面或超平面，將大部分正常數據包含在內**。
 
+> **補充**：Schölkopf 等人提出的是「超平面」形式（scikit-learn 的 `OneClassSVM` 即採用此形式）；「超球面」形式稱為 SVDD (Support Vector Data Description)，由 Tax 與 Duin 提出。使用 RBF 核時，兩者在數學上等價。
+
 與傳統 SVM 需要兩類數據不同，One-Class SVM 只需要正常數據即可訓練，因此特別適合於：
 - 正常數據充足但異常數據稀少的場景
 - 需要精確決策邊界的應用
@@ -103,7 +105,7 @@ $$
 - $R$ ：超球面半徑
 - $\mathbf{a}$ ：超球面中心
 - $\xi_i$ ：鬆弛變數 (Slack Variable)，允許部分點落在球外
-- $C$ ：懲罰參數，控制球的大小與允許的離群點數量
+- $C$ ：懲罰參數，控制球的大小與允許的離群點數量（與 $\nu$ 的關係為 $C = \frac{1}{\nu n}$ ）
 
 #### 2.1.2 超平面方法 (Hyperplane Approach)
 
@@ -135,8 +137,8 @@ $$
 f(\mathbf{x}) = \text{sgn}(\mathbf{w}^T \phi(\mathbf{x}) - \rho)
 $$
 
-- 若 $f(\mathbf{x}) \geq 0$ ，則判定為正常
-- 若 $f(\mathbf{x}) < 0$ ，則判定為異常
+- 若 $f(\mathbf{x}) > 0$ ，則判定為正常（scikit-learn 的 `predict` 回傳 +1）
+- 若 $f(\mathbf{x}) \leq 0$ ，則判定為異常（回傳 -1；恰在邊界上者亦視為異常）
 
 ### 2.2 核函數 (Kernel Function)
 
@@ -207,7 +209,7 @@ $$
 支持向量是 One-Class SVM 模型的關鍵：
 - **決策邊界完全由支持向量決定**
 - 其他訓練樣本對模型沒有影響
-- 支持向量的數量通常遠小於訓練樣本總數
+- 支持向量比例至少為 $\nu$ ；數據結構簡單且 $\nu$ 、 $\gamma$ 較小時，支持向量通常遠少於訓練樣本總數
 
 **數學特徵**：
 
@@ -260,8 +262,8 @@ $$
    f(x) = Σ αᵢ K(xᵢ, x) - ρ  (僅對支持向量求和)
    
 2. 判斷異常
-   - 若 f(x) ≥ 0：判定為正常
-   - 若 f(x) < 0：判定為異常
+   - 若 f(x) > 0：判定為正常
+   - 若 f(x) ≤ 0：判定為異常
    
 3. 計算決策分數
    - 決策分數 = f(x)
@@ -360,12 +362,12 @@ $$
 
 $\nu \in (0, 1]$ 是 One-Class SVM 最重要的參數，它同時控制兩個方面：
 
-1. **支持向量比例的上界**：訓練數據中支持向量的比例不會超過 $\nu$
-2. **訓練誤差的下界**：落在決策邊界外的訓練樣本比例不會低於 $\nu$
+1. **訓練誤差（邊界外樣本）比例的上界**：落在決策邊界外的訓練樣本比例不會超過 $\nu$
+2. **支持向量比例的下界**：訓練數據中支持向量的比例不會低於 $\nu$
 
 **直觀理解**：
-- $\nu = 0.05$ ：允許約 5% 的訓練樣本被視為異常（或邊界點）
-- $\nu = 0.1$ ：允許約 10% 的訓練樣本被視為異常
+- $\nu = 0.05$ ：至多約 5% 的訓練樣本會落在邊界外（被視為異常），且至少 5% 為支持向量
+- $\nu = 0.1$ ：至多約 10% 的訓練樣本會落在邊界外，且至少 10% 為支持向量
 - $\nu$ 越小，決策邊界越寬鬆（包含更多樣本）
 - $\nu$ 越大，決策邊界越嚴格（更多樣本被視為異常）
 
@@ -387,27 +389,31 @@ model = OneClassSVM(nu=0.05)
 - **新製程**： $\nu = 0.05 \sim 0.1$ （異常率 5-10%）
 - **複雜製程**： $\nu = 0.1 \sim 0.2$ （異常率 10-20%）
 
-**方法 3：交叉驗證**
+**方法 3：以含少量標籤的驗證集搜尋**
 
-使用 GridSearchCV 搜尋最佳 $\nu$ 值：
+One-Class SVM 的 `fit` 只應使用正常數據，因此不建議直接用 `GridSearchCV` 搭配含異常的訓練折（`fit` 會忽略標籤 `y`，異常樣本會被當成正常數據學習）。較合理的做法是：僅以正常數據訓練，並用另外保留、含少量已知異常的驗證集評估：
 
 ```python
-from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import f1_score
 
-param_grid = {'nu': [0.01, 0.05, 0.1, 0.15, 0.2]}
-model = OneClassSVM(kernel='rbf', gamma='scale')
-grid_search = GridSearchCV(model, param_grid, cv=5, scoring='accuracy')
-grid_search.fit(X_train, y_train)
-best_nu = grid_search.best_params_['nu']
+best_f1, best_nu = -1, None
+for nu in [0.01, 0.05, 0.1, 0.15, 0.2]:
+    model = OneClassSVM(kernel='rbf', gamma='scale', nu=nu)
+    model.fit(X_train_normal_scaled)          # 僅使用正常數據訓練
+    y_val_pred = model.predict(X_val_scaled)  # 驗證集含正常與少量已知異常
+    f1 = f1_score(y_val, y_val_pred, pos_label=-1)
+    if f1 > best_f1:
+        best_f1, best_nu = f1, nu
+print(f"best nu = {best_nu}, F1 = {best_f1:.3f}")
 ```
 
 #### 4.1.3 $\nu$ 的影響
 
 | $\nu$ 值 | 決策邊界 | 支持向量數量 | 誤報率 | 漏報率 | 適用場景 |
 |----------|----------|--------------|--------|--------|----------|
-| **小 (0.01-0.05)** | 寬鬆，包含更多樣本 | 少 | 低 | 高 | 異常成本高，要避免誤報 |
+| **小 (0.01-0.05)** | 寬鬆，包含更多樣本 | 少 | 低 | 高 | 誤報成本高，需避免頻繁告警 |
 | **中 (0.05-0.15)** | 平衡 | 中 | 中 | 中 | 一般應用 |
-| **大 (0.15-0.3)** | 嚴格，排除更多樣本 | 多 | 高 | 低 | 異常比例高，要避免漏報 |
+| **大 (0.15-0.3)** | 嚴格，排除更多樣本 | 多 | 高 | 低 | 漏報成本高（如安全相關），或異常比例高 |
 
 ### 4.2 核函數參數 $\gamma$ (gamma)
 
@@ -432,6 +438,8 @@ $$
 ```python
 model = OneClassSVM(kernel='rbf', gamma='scale')  # 推薦
 ```
+
+> 例如：8 個特徵經標準化後（每個特徵變異數為 1，整體 $\text{Var}(X) \approx 1$ ）， $\gamma = 1/(8 \times 1) = 0.125$ ，與第 8 節實作結果一致。
 
 **方法 2：使用 'auto'**
 
@@ -573,6 +581,8 @@ One-Class SVM 的評估方式取決於是否有標籤數據：
 | **實際正常** | True Negative (TN) | False Positive (FP) |
 | **實際異常** | False Negative (FN) | True Positive (TP) |
 
+> 本講義以「異常」為正類 (positive)，因此 TP 代表正確偵測到的異常。
+
 **化工術語對應**：
 - **TN**：正確識別的正常操作
 - **FP**：誤報（False Alarm）- 正常操作被誤判為異常
@@ -677,7 +687,8 @@ print(f"F1-Score: {f1:.4f}")
 
 # 3. Classification Report (完整報告)
 print("\nClassification Report:")
-print(classification_report(y_true, y_pred, target_names=['Normal', 'Anomaly']))
+# 標籤依數值排序為 [-1, 1]，因此名稱順序為 Anomaly、Normal
+print(classification_report(y_true, y_pred, target_names=['Anomaly', 'Normal']))
 
 # 4. ROC 曲線與 AUC
 fpr, tpr, thresholds = roc_curve(y_true_binary, -y_scores)  # 注意負號
@@ -900,8 +911,11 @@ print(f"連續 3 點告警數量: {len(alerts)}")
 ```python
 def time_window_alerts(y_pred, timestamps, window_minutes=10, threshold=0.5):
     """在時間窗口內，異常比例超過閾值才告警"""
-    # 實作略
-    pass
+    import pandas as pd
+    flags = pd.Series((np.asarray(y_pred) == -1).astype(float),
+                      index=pd.to_datetime(timestamps))
+    ratio = flags.rolling(f'{window_minutes}min').mean()  # 窗口內異常比例
+    return ratio[ratio > threshold].index  # 超過閾值的告警時間點
 ```
 
 #### 5.4.3 A/B Testing 上線前後比較
@@ -915,6 +929,8 @@ def time_window_alerts(y_pred, timestamps, window_minutes=10, threshold=0.5):
 ---
 
 ## 6. 化工領域應用實例
+
+> 以下三個案例為教學用的**示意情境**，數據與成效為假設值，用以說明參數選擇與評估思路，並非真實量測結果。
 
 ### 6.1 案例 1：精細化工產品品質監控
 
@@ -932,7 +948,7 @@ def time_window_alerts(y_pred, timestamps, window_minutes=10, threshold=0.5):
 1. 使用 One-Class SVM (RBF 核) 建立品質監控模型
 2. 僅使用 300 批正常產品訓練
 3. 設定 $\nu = 0.05$ （允許 5% 誤差）
-4. 使用 GridSearchCV 最佳化 $\gamma$ 參數
+4. 以保留的少量標籤驗證集最佳化 $\gamma$ 參數
 
 **結果**：
 - 成功檢測出 9 個異常批次（Recall = 90%）
@@ -955,7 +971,7 @@ def time_window_alerts(y_pred, timestamps, window_minutes=10, threshold=0.5):
 **解決方案**：
 1. 使用滑動窗口抽樣（每 10000 筆數據抽樣 1000 筆訓練）
 2. One-Class SVM (RBF 核) 建模
-3. 設定 $\nu = 0.02$ （嚴格邊界，降低誤報）
+3. 設定 $\nu = 0.02$ （小 $\nu$ ，邊界較寬鬆，降低誤報）
 4. 實施「連續 5 點告警」策略
 
 **結果**：
@@ -977,7 +993,7 @@ def time_window_alerts(y_pred, timestamps, window_minutes=10, threshold=0.5):
 
 **解決方案**：
 1. 僅使用正常運轉數據訓練 One-Class SVM
-2. 設定 $\nu = 0.1$ （較寬鬆，提高 Recall）
+2. 設定 $\nu = 0.1$ （相對較大的 $\nu$ ，邊界較嚴格，提高 Recall）
 3. 持續監控決策分數的趨勢變化
 
 **結果**：
@@ -1028,7 +1044,7 @@ X_imputed = imputer.fit_transform(X)
 # 方法 2：使用前向填補（時間序列數據）
 import pandas as pd
 df = pd.DataFrame(X, columns=feature_names)
-df_filled = df.fillna(method='ffill')  # 前向填補
+df_filled = df.ffill()  # 前向填補 (fillna(method='ffill') 已於 pandas 2.x 棄用)
 X_imputed = df_filled.values
 ```
 
@@ -1039,7 +1055,7 @@ X_imputed = df_filled.values
 ```python
 from sklearn.preprocessing import OneHotEncoder
 
-encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')  # scikit-learn >= 1.2
 X_categorical_encoded = encoder.fit_transform(X_categorical)
 
 # 與數值特徵合併
@@ -1073,11 +1089,11 @@ model.fit(X_train_clean)
 
 #### 7.2.2 超參數調整
 
-使用 GridSearchCV 或手動調整：
+僅以正常數據訓練，並以含少量已知異常的驗證集評估 F1（避免訓練折混入異常樣本）：
 
 ```python
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer, f1_score
+from sklearn.model_selection import ParameterGrid
+from sklearn.metrics import f1_score
 
 # 定義參數網格
 param_grid = {
@@ -1086,29 +1102,23 @@ param_grid = {
     'kernel': ['rbf', 'linear']
 }
 
-# 定義評分函數（需要有標籤數據）
-def ocsvm_f1_score(estimator, X, y):
-    y_pred = estimator.predict(X)
-    y_true_binary = (y == -1).astype(int)
-    y_pred_binary = (y_pred == -1).astype(int)
-    return f1_score(y_true_binary, y_pred_binary)
+best_f1, best_params = -1, None
+for params in ParameterGrid(param_grid):
+    model = OneClassSVM(**params)
+    model.fit(X_train_scaled)               # 僅正常數據
+    y_val_pred = model.predict(X_val_scaled)  # 驗證集含正常與少量異常
+    f1 = f1_score(y_val, y_val_pred, pos_label=-1)
+    if f1 > best_f1:
+        best_f1, best_params = f1, params
 
-scorer = make_scorer(ocsvm_f1_score)
-
-# GridSearchCV
-model = OneClassSVM()
-grid_search = GridSearchCV(
-    model, param_grid, cv=5, scoring=scorer, n_jobs=-1, verbose=1
-)
-grid_search.fit(X_train, y_train)
-
-print("Best parameters:")
-print(grid_search.best_params_)
-print(f"Best F1-Score: {grid_search.best_score_:.4f}")
+print("Best parameters:", best_params)
+print(f"Best F1-Score: {best_f1:.4f}")
 
 # 使用最佳參數訓練最終模型
-best_model = grid_search.best_estimator_
+best_model = OneClassSVM(**best_params).fit(X_train_scaled)
 ```
+
+> 驗證集異常樣本很少時，F1 波動大，建議同時參考 AUC 並以領域知識確認。
 
 #### 7.2.3 處理不平衡數據
 
@@ -1291,7 +1301,7 @@ model = OneClassSVM(kernel='linear', nu=0.05)
 # 3. 增加快取大小
 model = OneClassSVM(kernel='rbf', nu=0.05, gamma='scale', cache_size=1000)
 
-# 4. 考慮使用 SGDOneClassSVM（更快但準確度可能稍降）
+# 4. 考慮使用 SGDOneClassSVM（線性模型，更快但準確度可能稍降；需先標準化，非線性需搭配核近似如 Nystroem）
 from sklearn.linear_model import SGDOneClassSVM
 model = SGDOneClassSVM(nu=0.05, max_iter=1000)
 ```
@@ -1341,7 +1351,7 @@ def sliding_window_training(X_stream, window_size=10000):
 
 #### 8.2.1 生成模擬數據
 
-我們生成 8 個品質指標的化工產品數據,包含 300 批正常批次和 30 批異常批次:
+我們生成 8 個品質指標的化工產品數據,包含 300 批正常批次和 30 批異常批次。正常批次各特徵彼此獨立：純度採高斯分布，水分與雜質採對數常態分布（右偏、濃度恆為正，避免高斯分布產生負濃度）。以下為精簡版程式碼（中度、嚴重異常的生成程式碼已省略，完整版請見 Notebook）:
 
 ```python
 def generate_product_quality_data(n_normal=300, n_anomaly=30, random_state=42):
@@ -1360,10 +1370,20 @@ def generate_product_quality_data(n_normal=300, n_anomaly=30, random_state=42):
     """
     np.random.seed(random_state)
     
-    # 正常批次數據 (多變數高斯分布)
-    mean_normal = [98.5, 0.5, 0.2, 0.15, 0.1, 0.08, 0.05, 0.03]
-    cov_normal = np.diag([0.3, 0.1, 0.05, 0.04, 0.03, 0.02, 0.01, 0.01])
-    X_normal = np.random.multivariate_normal(mean_normal, cov_normal, n_normal)
+    # 正常批次數據：純度為高斯分布；水分與雜質為對數常態分布 (確保濃度非負)
+    mean_normal = np.array([98.5, 0.5, 0.2, 0.15, 0.1, 0.08, 0.05, 0.03])
+    var_normal = np.array([0.3, 0.1, 0.05, 0.04, 0.03, 0.02, 0.01, 0.01])
+    
+    def sample_normal_batches(n):
+        """生成 n 批正常品質數據 (均值與變異數同上，特徵彼此獨立)"""
+        out = np.empty((n, 8))
+        out[:, 0] = np.random.normal(mean_normal[0], np.sqrt(var_normal[0]), n)
+        sigma2 = np.log(1 + var_normal[1:] / mean_normal[1:] ** 2)
+        mu = np.log(mean_normal[1:]) - sigma2 / 2
+        out[:, 1:] = np.exp(np.random.normal(mu, np.sqrt(sigma2), (n, 7)))
+        return out
+    
+    X_normal = sample_normal_batches(n_normal)
     
     # 異常批次數據 (三層異常嚴重度設計)
     X_anomaly = []
@@ -1374,7 +1394,7 @@ def generate_product_quality_data(n_normal=300, n_anomaly=30, random_state=42):
     # 1. 輕微異常（邊界案例）
     for _ in range(n_mild):
         anomaly_type = np.random.choice(['low_purity', 'high_moisture', 'high_impurity'])
-        sample = np.random.multivariate_normal(mean_normal, cov_normal, 1)[0]
+        sample = sample_normal_batches(1)[0]
         
         if anomaly_type == 'low_purity':
             sample[0] -= np.random.uniform(1.0, 1.8)  # 純度小幅下降
@@ -1426,12 +1446,15 @@ X, y, feature_names = generate_product_quality_data(n_normal=300, n_anomaly=30)
 # 計算馬氏距離
 from scipy.spatial.distance import mahalanobis
 
-mean_normal = X_normal.mean(axis=0)
-cov_normal = np.cov(X_normal.T)
+X_normal_check = X[y == 1]
+X_anomaly_check = X[y == -1]
+
+mean_normal = X_normal_check.mean(axis=0)
+cov_normal = np.cov(X_normal_check.T)
 cov_inv = np.linalg.inv(cov_normal)
 
-distances_normal = [mahalanobis(x, mean_normal, cov_inv) for x in X_normal]
-distances_anomaly = [mahalanobis(x, mean_normal, cov_inv) for x in X_anomaly]
+distances_normal = [mahalanobis(x, mean_normal, cov_inv) for x in X_normal_check]
+distances_anomaly = [mahalanobis(x, mean_normal, cov_inv) for x in X_anomaly_check]
 
 # 繪製距離分布
 fig, ax = plt.subplots(1, 1, figsize=(10, 6))
@@ -1452,9 +1475,9 @@ plt.show()
 
 ```
 ✓ 異常數據偏離程度分析:
-  - 正常批次平均距離: 2.827 ± 1.149
-  - 異常批次平均距離: 5.171 ± 2.162
-  - 距離比值: 1.83x
+  - 正常批次平均距離: 2.345 ± 1.572
+  - 異常批次平均距離: 4.584 ± 1.727
+  - 距離比值: 1.95x
 
 ✓ 異常難度分布（理論值）:
   - 輕微異常 (邊界案例): ~40%
@@ -1463,8 +1486,9 @@ plt.show()
 ```
 
 **分析說明**：
-- 異常批次的馬氏距離約為正常批次的 **1.83 倍**,表示異常數據確實偏離正常群集
-- 異常距離分布呈現較大的標準差 (2.162),反映了輕微、中度、嚴重三種異常層級
+- 異常批次的馬氏距離約為正常批次的 **1.95 倍**,表示異常數據確實偏離正常群集
+- 正常批次的距離標準差 (1.572) 偏大，來自水分與雜質對數常態分布的右偏尾端 (少數正常批次的雜質偏高，馬氏距離也偏大)
+- 異常批次距離標準差 (1.727) 同樣偏大，反映了輕微、中度、嚴重三種異常層級
 - 部分輕微異常的距離與正常批次有重疊,增加了檢測難度,更貼近真實場景
 
 #### 8.2.3 數據探索與視覺化
@@ -1508,19 +1532,18 @@ plt.show()
 
 **觀察重點**：
 1. **對角線直方圖**：
-   - 純度 (Purity)：正常批次集中在 98-99%,異常批次偏低
-   - 水分 (Moisture)：正常批次約 0.3-0.7%,異常批次偏高
-   - 雜質 A, B：正常批次含量低,異常批次含量較高
+   - 純度 (Purity)：正常批次約 97.7-99.4% (5-95 百分位)，異常批次分布較寬 (約 94.4-100.3%)，多數偏低，少數也可能偏高
+   - 水分 (Moisture)：正常批次約 0.17-1.15% (5-95 百分位)，右偏；異常批次偏高 (最高約 2.7%)
+   - 雜質 A, B：異常批次與正常批次分布大幅重疊，單一特徵幾乎無法區分
 
 2. **非對角線散點圖**：
-   - 藍點 (正常批次) 形成緊密群集
-   - 紅點 (異常批次) 分散在群集周圍或遠離群集
-   - 部分紅點接近藍點群集邊緣 (輕微異常),難以區分
+   - 藍點 (正常批次) 形成緊密群集，水分與雜質因右偏而在高值側有少數離群點
+   - 紅點 (異常批次) 多數位於群集邊緣或外側，部分仍落在群集內部 (輕微異常或異常出現在未顯示的其他特徵)
+   - 僅憑前 4 個特徵的二維投影難以完全分離異常，需要多變數模型
 
 3. **特徵相關性**：
-   - 純度與水分呈負相關 (水分高時純度降低)
-   - 純度與雜質呈負相關 (雜質多時純度降低)
-   - 各雜質間有弱正相關 (可能共同來源)
+   - 本模擬數據的正常批次各特徵彼此獨立 (任兩特徵相關係數絕對值最大約 0.09)
+   - 因此散點圖中無明顯的線性相關趨勢；真實製程數據的特徵通常具有相關性，這時 RBF 核與標準化更為重要
 
 ### 8.3 模型建立與訓練
 
@@ -1566,12 +1589,14 @@ X_test_scaled = scaler.transform(X_test)
 **執行結果**：
 ```
 === 標準化完成 ===
-訓練集標準化後均值: [-0.  0.  0.  0.  0. -0. -0. -0.]
+訓練集標準化後均值: [-0. -0.  0.  0. -0. -0. -0.  0.]
 訓練集標準化後標準差: [1. 1. 1. 1. 1. 1. 1. 1.]
 
-測試集標準化後均值: [-0.0179  0.0874  0.0485  0.0417  0.0311  0.0299  0.0233  0.0194]
-測試集標準化後標準差: [1.1106 1.3082 1.2237 1.226  1.2048 1.1793 1.2044 1.2185]
+測試集標準化後均值: [-0.2129  0.525   0.1866  0.017   0.2133  0.0418  0.0778  0.061 ]
+測試集標準化後標準差: [1.3435 1.5162 1.302   0.8153 2.1536 1.0112 1.0604 0.7478]
 ```
+
+> 測試集包含 30 筆異常批次，因此均值偏離 0、標準差偏離 1（尤其是 Purity、Moisture，以及右偏的 Impurity C），這是預期現象。
 
 #### 8.3.2 模型訓練
 
@@ -1594,15 +1619,16 @@ model_ocsvm.fit(X_train_scaled)
 === 模型訓練完成 ===
 核函數類型: rbf
 Nu 參數: 0.1
-Gamma 值: auto
-支持向量數量: 21
-支持向量比例: 10.00%
+Gamma 值: 0.12499999999999997
+支持向量數量: 44
+支持向量比例: 20.95%
 ```
 
 **關鍵觀察**：
-- 支持向量數量為 21 個 (佔訓練樣本 10%),符合 nu=0.1 的設定
-- 這 21 個支持向量位於正常數據群集的邊界,定義了決策邊界
-- 其餘 189 個訓練樣本不影響模型決策
+- Gamma = 0.125，即 $1/(8 \times 1)$ ，與 `gamma='scale'` 的公式一致
+- 支持向量數量為 44 個 (佔訓練樣本 20.95%),高於 nu=0.1 所保證的下界 (至少 10%)
+- 這 44 個支持向量位於正常數據群集的邊界附近,定義了決策邊界
+- 其餘 166 個訓練樣本不影響模型決策
 
 #### 8.3.3 模型預測
 
@@ -1619,12 +1645,12 @@ decision_scores = model_ocsvm.decision_function(X_test_scaled)
 **執行結果**：
 ```
 === 預測結果統計 ===
-預測為正常: 97 批次
-預測為異常: 23 批次
+預測為正常: 81 批次
+預測為異常: 39 批次
 
-決策分數範圍: [-1.088, 0.585]
-決策分數均值: 0.205
-決策分數標準差: 0.323
+決策分數範圍: [-1.314, 0.675]
+決策分數均值: 0.007
+決策分數標準差: 0.516
 ```
 
 **決策分數解釋**：
@@ -1663,30 +1689,30 @@ f1 = f1_score(y_test, y_pred, pos_label=-1)
 
 ```
 === 分類指標 (異常檢測) ===
-Precision (精確率): 0.565
-Recall (召回率): 0.867
-F1-Score: 0.686
+Precision (精確率): 0.564
+Recall (召回率): 0.733
+F1-Score: 0.638
 
-TP (正確檢出異常): 26
-FP (誤報為異常): 20
-FN (漏檢異常): 4
-TN (正確識別正常): 70
+TP (正確檢出異常): 22
+FP (誤報為異常): 17
+FN (漏檢異常): 8
+TN (正確識別正常): 73
 ```
 
 **指標解讀**：
-1. **Precision = 0.565**：
-   - 在 46 個被預測為異常的批次中,有 26 個真的是異常
-   - 誤報率較高 (20/46 = 43.5%)
-   - 可能原因：部分輕微異常與正常批次邊界重疊
+1. **Precision = 0.564**：
+   - 在 39 個被預測為異常的批次中,有 22 個真的是異常
+   - 其餘 17 個為誤報,佔預測異常的 43.6% (17/39)；若以正常批次為分母,誤報率 (FPR) 為 17/90 = 18.9%
+   - 可能原因：部分輕微異常與正常批次邊界重疊,且 nu=0.1 即使對正常數據也會把部分外圍樣本 (含右偏尾端的正常批次) 排除在邊界外
 
-2. **Recall = 0.867**：
-   - 在 30 個真實異常批次中,成功檢測出 26 個
-   - 漏檢率低 (4/30 = 13.3%)
-   - 模型對異常的敏感度高
+2. **Recall = 0.733**：
+   - 在 30 個真實異常批次中,成功檢測出 22 個
+   - 漏檢率 8/30 = 26.7%
+   - 依嚴重度檢視：輕微異常檢出 6/12、中度 10/12、嚴重 6/6，漏檢集中在輕微與部分中度異常
 
-3. **F1-Score = 0.686**：
+3. **F1-Score = 0.638**：
    - 綜合指標,平衡 Precision 與 Recall
-   - 對於三層異常嚴重度設計,此性能屬於合理範圍
+   - 對於三層異常嚴重度設計(含難以偵測的輕微異常),此性能屬於合理範圍，但仍有明顯改善空間
 
 #### 8.4.2 ROC 曲線與 AUC
 
@@ -1716,14 +1742,14 @@ plt.show()
 ![ROC 曲線](outputs/P2_Unit07_OneClass_SVM/figs/roc_curve.png)
 
 ```
-✓ AUC Score: 0.915
+✓ AUC Score: 0.819
 ```
 
 **AUC 評級**：
-- **AUC = 0.915**：屬於「優秀」等級 (0.9-1.0)
-- 模型具有很強的異常判別能力
+- **AUC = 0.819**：屬於「良好」等級 (0.8-0.9)
+- 模型具有良好的異常判別能力，但輕微異常與正常批次的決策分數仍有重疊
 - 顯著優於隨機分類器 (AUC = 0.5)
-- 在實際化工應用中,此 AUC 值可提供可靠的異常檢測
+- 實際化工應用中，此 AUC 值可作為初步篩檢工具，仍建議搭配領域知識與告警抑制策略
 
 ### 8.5 決策邊界視覺化
 
@@ -1732,7 +1758,7 @@ plt.show()
 使用前兩個特徵 (純度、水分) 繪製決策邊界：
 
 ```python
-# 使用前兩個特徵訓練二維 One-Class SVM
+# 使用前兩個特徵訓練二維 One-Class SVM (gamma='scale' 在 2 維標準化數據下為 0.5)
 X_train_2d = X_train_scaled[:, :2]
 model_2d = OneClassSVM(kernel='rbf', gamma='scale', nu=0.1)
 model_2d.fit(X_train_2d)
@@ -1763,18 +1789,18 @@ plt.show()
 ![決策邊界二維投影](outputs/P2_Unit07_OneClass_SVM/figs/decision_boundary_2d.png)
 
 **視覺化解讀**：
-1. **藍色區域** (決策分數 > 0)：正常批次的高密度區域
+1. **白色區域** (決策分數 > 0)：邊界內側，即模型判定的正常區域（程式僅對分數 < 0 的區域填色）
 2. **黑色虛線**：決策邊界 (決策分數 = 0)
-3. **紅色/黃色區域** (決策分數 < 0)：異常區域
-4. **綠色圈**：支持向量,位於決策邊界上或附近
-5. **藍色點**：測試集的正常批次,大部分位於決策邊界內
-6. **紅色叉**：測試集的異常批次,大部分位於決策邊界外
+3. **有顏色的區域** (決策分數 < 0)：異常區域，由內向外依序為紅、橘、黃、淺藍、深藍，色階越往外分數越低（最低約 -3.2）
+4. **綠色圈**：支持向量 (2D 模型共 29 個)，位於決策邊界上或附近
+5. **藍色點**：測試集的正常批次,大部分位於決策邊界內 (7/90 落在邊界外)
+6. **紅色叉**：測試集的異常批次,18/30 位於決策邊界外
 
 **重要觀察**：
-- RBF 核函數能夠捕捉非線性決策邊界
-- 部分異常批次 (紅叉) 非常接近正常群集,是輕微異常案例
+- RBF 核函數能夠捕捉非線性、不規則的決策邊界
+- 部分異常批次 (紅叉) 落在邊界內,可能是輕微異常，或其異常主要出現在 2D 圖未呈現的其他特徵（如雜質）
 - 支持向量定義了正常群集的外圍邊界
-- 決策邊界的形狀反映了正常數據的分布特性
+- 此 2D 模型僅使用 2 個特徵，檢出能力 (18/30) 低於完整 8 特徵模型 (22/30)，說明多變數資訊的重要性
 
 #### 8.5.2 決策分數分布
 
@@ -1804,20 +1830,20 @@ plt.show()
 ![決策分數分布](outputs/P2_Unit07_OneClass_SVM/figs/decision_score_distribution.png)
 
 **分布特徵**：
-1. **正常批次** (藍色):
-   - 決策分數集中在 0.1 ~ 0.5 之間
-   - 大部分樣本位於決策邊界內部 (分數 > 0)
-   - 少數樣本接近邊界 (分數接近 0)
+1. **正常批次** (藍色，n=90):
+   - 分數中位數約 0.28、平均 0.152，四分位距約 0.08 ~ 0.41
+   - 73 個樣本位於決策邊界內部 (分數 > 0)
+   - 17 個樣本分數 < 0 (被誤判為異常)，最低約 -1.31 (為右偏尾端的極端正常批次)
 
-2. **異常批次** (紅色):
-   - 決策分數集中在 -0.8 ~ 0.2 之間
-   - 大部分樣本位於決策邊界外部 (分數 < 0)
-   - 部分輕微異常的分數接近或略高於 0 (導致漏檢)
+2. **異常批次** (紅色，n=30):
+   - 分數平均 -0.427、中位數 -0.374，分布範圍約 -1.26 ~ 0.42
+   - 22 個樣本位於決策邊界外部 (分數 < 0)，其中 11 個低於 -0.5
+   - 8 個異常分數 > 0 (導致漏檢)，最高約 0.42
 
 3. **重疊區域**:
-   - 在 -0.2 ~ 0.2 範圍內,正常與異常分布有重疊
+   - 在 -0.2 ~ 0.2 範圍內有 23 個正常與 6 個異常樣本
    - 這些是難以區分的邊界案例
-   - 可透過調整 nu 參數或後處理策略改善
+   - 可透過調整 nu 參數、決策閾值或後處理策略（如連續告警）取捨誤報與漏報
 
 ### 8.6 超參數調校分析
 
@@ -1861,47 +1887,45 @@ df_results = pd.DataFrame(results)
 
 ```
 === Nu 參數調校結果 ===
-    nu  precision  recall  f1_score     auc  n_support  support_ratio
-  0.01      0.520   0.867     0.650   0.914          3       0.014286
-  0.05      0.560   0.933     0.700   0.927          11      0.052381
-  0.10      0.565   0.867     0.686   0.915          21      0.100000
-  0.15      0.650   0.867     0.742   0.922          31      0.147619
-  0.20      0.679   0.633     0.655   0.920          42      0.200000
-  0.30      0.722   0.433     0.542   0.916          63      0.300000
+  nu  precision   recall  f1_score      auc  n_support  support_ratio
+0.01   0.564103 0.733333  0.637681 0.820000         43       0.204762
+0.05   0.564103 0.733333  0.637681 0.820741         44       0.209524
+0.10   0.564103 0.733333  0.637681 0.818889         44       0.209524
+0.15   0.547619 0.766667  0.638889 0.830741         48       0.228571
+0.20   0.510638 0.800000  0.623377 0.837407         54       0.257143
+0.30   0.500000 0.900000  0.642857 0.857037         67       0.319048
 ```
 
 **分析結論**：
 
 1. **Precision vs Nu**：
-   - Nu 增加時,Precision 提升 (0.520 → 0.722)
-   - 原因：更嚴格的決策邊界,減少誤報
-   - Nu = 0.3 時 Precision 最高 (0.722)
+   - Nu ≤ 0.10 時 Precision 約 0.564，之後隨 nu 增加而下降 (0.564 → 0.500)
+   - 原因：nu 越大，邊界越嚴格，更多正常批次被排除在邊界外，誤報增加
+   - Nu = 0.01 ~ 0.10 時預測結果相同，因為此範圍內邊界變化不足以改變任何測試樣本的預測
 
 2. **Recall vs Nu**：
-   - Nu 增加時,Recall 先升後降 (0.867 → 0.933 → 0.433)
-   - Nu = 0.05 時 Recall 最高 (0.933),幾乎檢出所有異常
-   - Nu 過大 (0.3) 時 Recall 大幅下降 (0.433),漏檢增加
+   - Nu 增加時 Recall 單調上升 (0.733 → 0.900)
+   - Nu = 0.30 時 Recall 最高 (0.900)，30 個異常中檢出 27 個
+   - 代價是 Precision 下降，誤報增加
 
 3. **F1-Score vs Nu**：
-   - Nu = 0.15 時 F1-Score 最高 (0.742)
-   - 此時 Precision 與 Recall 達到最佳平衡
-   - 推薦使用 nu = 0.1 ~ 0.15
+   - F1 介於 0.623 ~ 0.643，幾乎持平 (Nu = 0.30 最高 0.643，Nu = 0.15 為 0.639)
+   - 在本數據下 F1 對 nu 不敏感，Precision 與 Recall 呈現明顯取捨
 
 4. **AUC vs Nu**：
-   - AUC 在 0.914 ~ 0.927 之間,變化不大
-   - Nu = 0.05 時 AUC 最高 (0.927)
-   - AUC 對 nu 參數不敏感
+   - AUC 在 0.819 ~ 0.857 之間，nu 較大時略有上升 (Nu = 0.30 最高 0.857)
+   - AUC 變化幅度小於 Recall 的變化，表示 nu 主要影響決策閾值位置，對分數排序的影響較小
 
 5. **支持向量數量 vs Nu**：
-   - 支持向量數量隨 nu 線性增加
-   - Nu = 0.01：3 個 (1.4%)
-   - Nu = 0.3：63 個 (30%)
-   - 驗證了理論：支持向量比例約等於 nu
+   - 支持向量數量依序為 43、44、44、48、54、67 (20.5%、21.0%、21.0%、22.9%、25.7%、31.9%)
+   - 支持向量比例始終**不低於** nu，符合理論下界；但不一定等於 nu，在 nu 較小時由數據幾何與 gamma 決定
+   - 此現象說明 nu 是支持向量比例的「下界」，而非精確值
 
 **實務建議**：
-- **需要高 Recall** (避免漏檢) → nu = 0.05 ~ 0.10
-- **需要高 Precision** (避免誤報) → nu = 0.20 ~ 0.30
-- **平衡性能** → nu = 0.10 ~ 0.15
+- **需要高 Recall** (避免漏檢) → nu = 0.20 ~ 0.30 (Recall 0.80 ~ 0.90，但 Precision 約 0.50 ~ 0.51)
+- **需要較高 Precision** (避免誤報) → nu ≤ 0.10 (Precision 約 0.564)
+- **平衡性能** → nu = 0.10 ~ 0.15 (F1 約 0.64)
+- 實務上應結合驗證集與業務成本決定 nu，而非單純追求 F1
 
 ### 8.7 模型儲存與載入
 
@@ -1946,17 +1970,17 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 ✓ 模型載入成功
 
 測試樣本特徵值:
-  Purity (%): 98.123
-  Moisture (%): 0.567
-  Impurity A (%): 0.234
-  Impurity B (%): 0.178
-  Impurity C (%): 0.112
-  Impurity D (%): 0.089
-  Impurity E (%): 0.056
-  Impurity F (%): 0.034
+  Purity (%): 99.077
+  Moisture (%): 0.364
+  Impurity A (%): 0.259
+  Impurity B (%): 0.168
+  Impurity C (%): 0.017
+  Impurity D (%): 0.143
+  Impurity E (%): 0.011
+  Impurity F (%): 0.031
 
 預測結果: 正常批次
-決策分數: 0.342
+決策分數: 0.444
 實際標籤: 正常批次
 ```
 
@@ -1967,7 +1991,7 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 1. **數據準備** (Section 8.2):
    - 生成模擬數據：8 個特徵, 300 正常 + 30 異常
    - 異常分層設計：輕微 40% + 中度 40% + 嚴重 20%
-   - 馬氏距離驗證：異常偏離度為正常的 1.83 倍
+   - 馬氏距離驗證：異常偏離度為正常的 1.95 倍
 
 2. **數據預處理** (Section 8.3.1):
    - 訓練集分割：僅使用 210 個正常批次訓練
@@ -1977,13 +2001,13 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 3. **模型訓練** (Section 8.3.2):
    - 核函數：RBF (適合非線性邊界)
    - Nu 參數：0.1 (預期異常上限 10%)
-   - 支持向量：21 個 (10%),定義決策邊界
+   - 支持向量：44 個 (20.95%),不低於 nu=0.1 的理論下界
 
 4. **模型評估** (Section 8.4):
-   - Precision: 0.565 (誤報率 43.5%)
-   - Recall: 0.867 (漏檢率 13.3%)
-   - F1-Score: 0.686
-   - AUC: 0.915 (優秀等級)
+   - Precision: 0.564 (預測異常中 43.6% 為誤報)
+   - Recall: 0.733 (漏檢率 26.7%)
+   - F1-Score: 0.638
+   - AUC: 0.819 (良好等級)
 
 5. **視覺化分析** (Section 8.5):
    - 二維決策邊界：RBF 核捕捉非線性邊界
@@ -1991,9 +2015,9 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
    - 支持向量位置：定義正常群集的外圍邊界
 
 6. **超參數調校** (Section 8.6):
-   - Nu = 0.01 ~ 0.05：高 Recall (0.93), 低 Precision (0.56)
-   - Nu = 0.15：最佳 F1-Score (0.742)
-   - Nu = 0.20 ~ 0.30：高 Precision (0.72), 低 Recall (0.43)
+   - Nu = 0.01 ~ 0.10：Precision 0.564、Recall 0.733 (結果相同)
+   - Nu = 0.15：F1-Score 0.639，Precision 與 Recall 較平衡
+   - Nu = 0.20 ~ 0.30：Recall 提高至 0.80 ~ 0.90，Precision 降至 0.51 ~ 0.50 (F1 約持平)
 
 7. **模型部署** (Section 8.7):
    - 使用 joblib 儲存模型與標準化器
@@ -2039,8 +2063,8 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 **輸出檔案清單**：
 ```
 ✓ 輸出檔案:
-  - 模型檔案: ocsvm_model.pkl (1.2 MB)
-  - 標準化器: scaler.pkl (0.5 KB)
+  - 模型檔案: ocsvm_model.pkl (約 5.0 KB)
+  - 標準化器: scaler.pkl (約 0.8 KB)
   - 異常嚴重度分布: anomaly_severity_distribution.png
   - 散點圖矩陣: data_scatter_matrix.png
   - 混淆矩陣: confusion_matrix.png
@@ -2056,13 +2080,13 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 訓練樣本: 210 批正常批次
 測試樣本: 120 批 (正常 90 + 異常 30)
 特徵數量: 8
-支持向量: 21 (10.00%)
+支持向量: 44 (20.95%)
 
 檢測性能:
-  - Precision: 0.565
-  - Recall: 0.867
-  - F1-Score: 0.686
-  - AUC: 0.915
+  - Precision: 0.564
+  - Recall: 0.733
+  - F1-Score: 0.638
+  - AUC: 0.819
 ```
 
 ---
@@ -2094,9 +2118,9 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
    - 實務：數據預處理、超參數調整、告警策略、模型更新
 
 6. **實作經驗** (來自 Section 8 演練)：
-   - 異常分層設計提升模型魯棒性
+   - 異常分層設計使評估更貼近真實（輕微異常最難檢出）
    - Nu 參數調校需平衡 Precision 與 Recall
-   - AUC = 0.915 驗證模型的優秀判別能力
+   - AUC = 0.819 顯示模型具良好判別能力，但輕微異常仍難以檢出
    - 決策分數可用於異常嚴重度排序
 
 ### 9.2 與其他異常檢測方法的對比
@@ -2165,16 +2189,16 @@ decision_score = loaded_model.decision_function(test_sample_scaled)
 - ✅ 應用 One-Class SVM 於化工領域的異常檢測任務
 - ✅ 了解何時選擇 One-Class SVM 而非其他方法
 
-**下一步**：完成配套的 Jupyter Notebook 程式演練，實際操作化工反應器數據的異常檢測任務，加深對 One-Class SVM 的理解與應用能力。
+**下一步**：完成配套的 Jupyter Notebook 程式演練，實際操作化工產品品質批次數據的異常檢測任務，加深對 One-Class SVM 的理解與應用能力。
 
 ---
 
 **課程資訊**
-- 課程名稱：AI在化工上之應用
+- 課程名稱：AI在化工上之應用 (ChemE 3590)
 - 課程單元：Unit07 One-Class SVM 單類支持向量機異常檢測
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-13
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

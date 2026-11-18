@@ -177,11 +177,11 @@ conda activate PY310
 - **Windows 安裝與模型供應商設定**：
   - 桌面引導式安裝程式（`Hermes-Setup.exe`）與 PowerShell 命令列安裝步驟
   - Windows 資料儲存架構（`%LOCALAPPDATA%\hermes\` 下的 `config.yaml`、`.env`、`skills\` 與 `sessions\`）
-  - 使用 Nous Portal 或自備 API 金鑰（OpenAI、Anthropic、Gemini、OpenRouter 等）完成模型與工具設定
+  - 連接課程實驗室的地端模型服務（Custom Endpoint）完成模型與工具設定，不需購買商業模型；雲端工具依課程規定預設不啟用
 
 - **四大類常用指令詳解與化工實戰應用**：
   - **對話管理**：`hermes`、`hermes --tui --in <路徑>`、`hermes --continue (-c)`、`hermes -r "<標題>"`、`hermes sessions list`
-  - **設定管理**：`hermes setup --portal`、`hermes model`、`hermes config`、`hermes tools`
+  - **設定管理**：`hermes model`（選 Custom Endpoint）、`hermes setup`、`hermes config`、`hermes tools`
   - **功能擴充**：`hermes skills`（瀏覽、搜尋與安裝程序性技能）、`hermes gateway`、`hermes pm`、`hermes desktop`
   - **維護診斷與斜線指令**：`hermes doctor`（萬用環境健康診斷）、`hermes update`、`hermes uninstall`，以及對話內斜線指令（`/title`、`/compress`、`/usage`、`/model`、`/tools` 等）與反應器溫度數據分析實戰工作流
 
@@ -400,8 +400,7 @@ jupyter lab --port 8889
 ### Hermes Agent 常用指令（延伸選讀）
 
 ```powershell
-# 1. 快速設定 Nous Portal 或選擇模型供應商
-hermes setup --portal
+# 1. 設定模型供應商：選 Custom Endpoint，填入教師提供的實驗室端點
 hermes model
 
 # 2. 萬用環境健康診斷（遇到問題時優先執行）

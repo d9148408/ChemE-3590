@@ -1,0 +1,8 @@
+{
+  "phi_true": 2.0,
+  "phi_pred": 2.0027143955230713,
+  "eta_exact": 0.48201379003790845,
+  "eta_pinn_integral": 0.4820157827144891,
+  "eta_from_identified_phi": 0.48145599568733655,
+  "forward_rel_L2": 0.00046992658983666726
+}

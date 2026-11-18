@@ -1,0 +1,12 @@
+{
+  "gamma_true": 3.0,
+  "gamma_pred": 2.955944299697876,
+  "forward_rel_L2_c": 0.0003717334253628126,
+  "forward_rel_L2_theta": 0.000988581809770524,
+  "gamma_rel_error_pct": 1.4685233434041343,
+  "params": {
+    "Da": 2.0,
+    "B": 1.0,
+    "beta": 6.0
+  }
+}

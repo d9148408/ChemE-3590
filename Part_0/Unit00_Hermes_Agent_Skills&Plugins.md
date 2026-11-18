@@ -1,5 +1,7 @@
 # Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南
 
+> **本課程說明**：本文介紹的外掛與遠端 MCP 伺服器，多數需要連到雲端服務，屬課外參考。課程作業與共同任務依 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5 的規定，只使用實驗室端點，雲端工具與外掛預設不啟用；只在本機執行、不連網的技能，可依教師說明使用。
+
 ## 課程目標
 
 本單元是 [Unit00 Hermes Agent 安裝與使用教學](Unit00_Hermes_Agent_Setup.md) 與 [Unit00 Hermes Agent 常用指令詳細教學](Unit00_Hermes_Agent_Command.md) 的進階延伸。當同學完成 Hermes Agent 的基礎安裝並能正常對話後，下一步就是透過 **技能（Skills）**、**外掛（Plugins）** 與 **MCP 伺服器（Model Context Protocol Servers）** 為代理裝備專業能力。

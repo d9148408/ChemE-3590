@@ -871,20 +871,20 @@ print(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
 ```text
 數據集摘要：500 筆交易 × 22 個化工項目
 主要項目出現頻率：
-  Optimal_Temp   50.2%    High_Purity   44.0%
+  Optimal_Temp   50.2%    High_Purity    44.0%
   Cat_A          42.4%    Excellent_Yield  42.2%
-  Solvent_X      38.6%    High_Temp     36.8%
-  Cat_B          33.6%    Solvent_Y     32.2%
-  High_Press     29.0%    Good_Yield    27.6%
+  Med_Press      39.8%    Solvent_X      39.4%
+  Cat_B          38.8%    Med_Purity     36.4%
+  Good_Yield     36.0%    Solvent_Y      34.0%
 
 ===== 演算法效能比較 =====
-Apriori   執行時間: 0.0196s  頻繁項目集: 400 個  關聯規則: 88 條
-FP-Growth 執行時間: 0.0365s  頻繁項目集: 400 個  關聯規則: 88 條
+Apriori   執行時間: 0.0187s  頻繁項目集: 400 個  關聯規則: 88 條
+FP-Growth 執行時間: 0.0422s  頻繁項目集: 400 個  關聯規則: 88 條
 
 ✓ 兩種演算法結果完全一致：True
 ```
 
-> **結果分析**：對於此規模的數據（500 筆 × 22 項目），兩種演算法均在 50ms 以內完成，速度都極快。值得注意的是，在此小規模數據下 **Apriori 反而略快**（0.020s vs 0.037s），這符合 FP-Growth 在小數據集時因 FP-Tree 建構開銷而略慢的特性。兩者產生相同的 400 個頻繁項目集和 88 條規則，驗證了演算法的正確性。在實際大規模生產數據（> 10 萬筆）的場景下，FP-Growth 的速度優勢將顯著體現。
+> **結果分析**：對於此規模的數據（500 筆 × 22 項目），兩種演算法均在 50ms 以內完成，速度都極快。值得注意的是，在此小規模數據下 **Apriori 反而略快**（約 0.019s vs 0.042s），這符合 FP-Growth 在小數據集時因 FP-Tree 建構開銷而略慢的特性。兩者產生相同的 400 個頻繁項目集和 88 條規則，驗證了演算法的正確性。在實際大規模生產數據（> 10 萬筆）的場景下，FP-Growth 的速度優勢將顯著體現。
 
 ---
 
@@ -970,22 +970,22 @@ $$
 #1   {Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}
      conf=0.909  lift=2.154  conviction=6.358  leverage=0.032  zhang=0.082  kulc=0.526
 
-#2   {High_Press, Optimal_Temp} ⇒ {Excellent_Yield}
-     conf=0.839  lift=1.988  conviction=3.601  leverage=0.076  zhang=0.228  kulc=0.591
+#2   {Cat_A, High_Purity, Optimal_Temp} ⇒ {Excellent_Yield}
+     conf=0.867  lift=2.054  conviction=4.335  leverage=0.040  zhang=0.104  kulc=0.526
 
-#3   {Cat_A, Solvent_X, Optimal_Temp} ⇒ {Excellent_Yield}
-     conf=0.832  lift=1.971  conviction=3.444  leverage=0.069  zhang=0.205  kulc=0.582
+#3   {Cat_A, Optimal_Temp, Solvent_Y} ⇒ {Excellent_Yield}
+     conf=0.860  lift=2.039  conviction=4.142  leverage=0.038  zhang=0.098  kulc=0.518
 
-#4   {Cat_A, Optimal_Temp} ⇒ {Excellent_Yield}
-     conf=0.829  lift=1.963  conviction=3.372  leverage=0.085  zhang=0.256  kulc=0.620
+#4   {Cat_A, Optimal_Temp, Solvent_X} ⇒ {Excellent_Yield}
+     conf=0.857  lift=2.031  conviction=4.046  leverage=0.030  zhang=0.078  kulc=0.500
 
 ...（第 5~9 名省略）
 
-#10  {Cat_B, Low_Temp} ⇒ {Poor_Yield}
-     conf=0.600  lift=2.750  conviction=2.500  leverage=0.034  zhang=0.208  kulc=0.465
+#10  {Solvent_X, High_Press} ⇒ {High_Purity}
+     conf=0.794  lift=1.805  conviction=2.720  leverage=0.048  zhang=0.127  kulc=0.520
 ```
 
-> **結果分析**：Conviction 最高（6.358）的規則 `{Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}` 表示在此三因素組合下，「沒有達到高品質產率」幾乎是不可能發生的事。而 `{Cat_B, Low_Temp} ⇒ {Poor_Yield}` 雖然 Lift = 2.75 是全集最高（最強正關聯），但 Conviction 僅 2.5，說明這個規則仍有 40% 的例外情形。四種進階指標的排序差異顯著，充分說明**單一指標不足以全面評估規則品質**，需要多指標綜合考量才能做出正確的製程決策。
+> **結果分析**：Conviction 最高（6.358）的規則 `{Cat_A, High_Press, Optimal_Temp} ⇒ {Excellent_Yield}` 表示在此三因素組合下，「沒有達到高品質產率」幾乎是不可能發生的事。相對地，全集中 Lift 最高（2.75）的規則 `{Cat_B, Low_Temp} ⇒ {Poor_Yield}`（最強正關聯）其 Conviction 僅 1.96，甚至未進入 Conviction 前 10 名，說明這個規則雖然關聯方向明確，卻仍有 40% 的例外情形。這種排序差異充分說明**單一指標不足以全面評估規則品質**，需要多指標綜合考量才能做出正確的製程決策。
 
 ### 4.3 設定合理的閾值
 

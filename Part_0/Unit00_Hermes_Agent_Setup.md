@@ -10,7 +10,7 @@
 
 - 理解 AI Agent 的基本概念，以及 Hermes Agent 與一般聊天機器人的差異
 - 完成 Windows 平台上 Hermes Agent 的安裝（桌面安裝程式與命令列兩種方式）
-- 使用 Nous Portal 完成模型（Provider/Model）與工具的初次設定
+- 連接課程實驗室的地端模型服務（Custom Endpoint），完成模型（Provider/Model）與工具的初次設定，並了解本課程的資料與工具使用規定
 - 熟悉 Hermes 桌面應用的介面與基本操作流程
 - 認識記憶系統、技能系統、子代理、排程與訊息閘道等核心功能
 - 掌握常用 CLI 指令，並能處理常見的安裝與設定問題
@@ -56,7 +56,7 @@ flowchart TD
     A["桌面應用 Desktop"] --> D
     B["命令列 CLI / TUI"] --> D
     C["訊息平台 Telegram / Discord / Slack"] --> D
-    D --> E["模型供應商<br/>Nous Portal / Anthropic / OpenAI ..."]
+    D --> E["模型供應商<br/>本課程：實驗室地端 vLLM（Custom Endpoint）"]
     D --> F["工具 Tools<br/>終端機 / 檔案 / 網頁 / 瀏覽器 ..."]
     D --> G["記憶與技能<br/>Memory / Skills"]
 ```
@@ -72,11 +72,14 @@ flowchart TD
 
 ### 2.2 事前準備
 
-1. **穩定的網路連線**：安裝過程與模型推理皆需連網。
-2. **Nous Portal 帳號（建議）**：最快的上手方式是使用 Nous Portal，一次訂閱即可存取數百種模型（涵蓋 Claude、GPT、Gemini 等，共 300 種以上）與內建的工具閘道（Tool Gateway，包含網頁搜尋、影像生成、TTS、雲端瀏覽器）。
-   - 前往 [Nous Portal](https://portal.nousresearch.com/) 建立帳號。
-   - Portal 提供免費方案（價格為 0、僅限免費模型、標準速率限制，且不含託管工具）與多種付費方案（Plus／Super／Ultra）；只有付費方案才包含工具閘道（網頁搜尋、影像生成、TTS、雲端瀏覽器）。
-3. **（選用）自備 API 金鑰**：若不使用 Nous Portal，Hermes 也支援 OpenAI、Anthropic、OpenRouter、Google AI Studio、GitHub Copilot 等多家供應商，屆時需準備對應的 API 金鑰。
+1. **網路連線**：安裝過程需連網；使用時須能連到課程的實驗室模型服務（校外使用方式依教師公告）。
+2. **課程的實驗室端點資訊（必要）**：本課程使用智慧程序系統工程實驗室架設的地端模型服務（vLLM，OpenAI 相容 API），整學期課內外不限個人額度。授課教師會在課堂提供：
+   - 服務網址（base URL）
+   - 模型名稱
+   - 個人的課程 API 金鑰（請勿分享給他人）
+
+   **本課程不要求購買或訂閱任何商業模型。**
+3. **（課外參考）其他供應商**：Hermes 也支援 Nous Portal、OpenAI、Anthropic、OpenRouter、Google AI Studio、GitHub Copilot 等雲端供應商（多數需付費或另備 API 金鑰）。這些供應商**不屬於本課程範圍**：課程作業與共同任務一律使用實驗室端點；若你在課外自行使用雲端供應商，對話內容會傳送到第三方服務。
 
 > **模型最低需求：至少 64K tokens 上下文**
 > Hermes Agent 需要上下文視窗至少 64,000 tokens 的模型，才能維持多步驟工具呼叫所需的工作記憶。大多數雲端模型（Claude、GPT、Gemini、Qwen、DeepSeek）都能輕鬆滿足此需求。
@@ -159,7 +162,7 @@ hermes desktop
 
 命令列安裝程式會複製原始碼、啟動 uv，並透過內建套件管理器（PM）準備相依套件。PM 會提供釘選版本的 Python、Node.js、npm、pnpm、ripgrep 與 FFmpeg，並預設安裝瀏覽器工具（`agent-browser` 與其內附的 Chromium）與電腦操作驅動（`cua-driver`）。
 
-若不需要瀏覽器工具或電腦操作驅動，可在安裝時傳入對應旗標 `-SkipBrowser`／`-SkipComputerUse`。由於指令碼是透過網路下載執行，需以 scriptblock 形式傳入參數，例如：
+本課程不需要瀏覽器工具（見 4.5），建議安裝時加上 `-SkipBrowser`。若不需要瀏覽器工具或電腦操作驅動，可在安裝時傳入對應旗標 `-SkipBrowser`／`-SkipComputerUse`。由於指令碼是透過網路下載執行，需以 scriptblock 形式傳入參數，例如：
 
 ```powershell
 & ([scriptblock]::Create((irm https://hermes-agent.nousresearch.com/install.ps1))) -SkipBrowser
@@ -185,9 +188,11 @@ hermes desktop
 
 1. **啟動應用**：從「開始」功能表點擊 **Hermes** 圖示。
 2. **進入首次設定精靈（onboarding）**：首次啟動會顯示歡迎與設定畫面（onboarding 精靈）。你可以直接在精靈中設定供應商，或點選 **I'll choose a provider later**（稍後再選供應商）先進入應用主畫面、之後再到設定面板完成。
-3. **登入 Nous Portal（推薦）**：可直接在精靈中操作；若已略過精靈，請開啟 **設定面板**——點擊左側邊欄下方的齒輪圖示（Settings）或按 `Ctrl+,`，再選擇 **Providers（供應商）**：
-   - 在 Providers 面板，Nous Portal 等 OAuth 供應商可點選 **Sign in with Nous Research** 以瀏覽器登入；登入後憑證會自動儲存。
-   - 若使用其他供應商，可在 **Accounts / API keys** 區輸入對應的 API 金鑰。
+3. **連接課程實驗室端點**：可直接在精靈中操作；若已略過精靈，請開啟 **設定面板**（點擊左側邊欄下方的齒輪圖示 Settings，或按 `Ctrl+,`），再選擇 **Providers（供應商）**：
+   - 選擇 **Custom Endpoint（自訂端點，OpenAI 相容）**。
+   - 依教師提供的資訊填入服務網址（base URL）、課程 API 金鑰與模型名稱。
+   - 不需要登入 Nous Portal 或其他雲端供應商帳號。
+   - 精靈若詢問是否啟用網頁搜尋、瀏覽器、影像生成、TTS 等工具，請先略過（本課程規定見 4.5）。
 4. **選擇預設模型**：開啟 **Settings → Model** 設定新對話的「主要模型（main model）」；也可用對話輸入框的模型選擇器即時切換（詳見 5.6）。
 5. **確認完成**：回到對話區，輸入一句簡單的提示（例如「你好，請自我介紹」），若收到正常回覆即代表設定成功。
 
@@ -195,37 +200,30 @@ hermes desktop
 
 ### 4.2 命令列首次設定（進階／替代路徑）
 
-若你偏好命令列，可在安裝後執行設定精靈。最快的方式是使用 Nous Portal：
-
-```powershell
-hermes setup --portal
-```
-
-這個指令會：登入你的 Nous 帳號、將 Nous 設為模型供應商，並選擇啟用工具閘道（Tool Gateway，涵蓋網頁搜尋、影像生成、TTS、雲端瀏覽器）。
-
-> **前提**：工具閘道僅包含在 Nous Portal 的**付費方案**中；免費方案只能使用免費模型，不含託管工具（但你仍可自行設定各家工具的 API 金鑰）。
-
-**首次安裝**執行 `hermes setup` 時，會提供三種設定模式（既有安裝則預設進入重新設定流程）：
-
-- **Quick Setup（Nous Portal）**：OAuth 登入、免管理 API 金鑰，一次設定好模型與工具閘道（對應指令 `hermes setup --portal`）。**建議的快速路徑**。
-- **Full Setup**：自行逐一設定每個供應商、工具與選項（自備金鑰）。
-- **Blank Slate**：除了執行代理所需的最低限度（供應商與模型、檔案操作工具集、終端機工具集）外，其餘全部關閉。適合想要完全掌控的進階使用者。
-
-桌面應用與命令列共用同一份設定，因此在任一邊完成設定，另一邊都會沿用。
-
-### 4.3 選擇其他供應商
-
-若不使用 Nous Portal，可用以下指令以互動方式選擇供應商與模型：
+若你偏好命令列，可在安裝後以互動方式設定供應商與模型：
 
 ```powershell
 hermes model
 ```
 
-Hermes 支援眾多供應商，常見選擇包括：
+在供應商清單中選擇 **Custom Endpoint**，再依教師提供的資訊輸入服務網址（base URL）、課程 API 金鑰與模型名稱。以互動方式輸入金鑰，可避免金鑰留在命令列歷史紀錄中（見 4.4）。
+
+**首次安裝**執行 `hermes setup` 時，會提供三種設定模式（既有安裝則預設進入重新設定流程）：
+
+- **Full Setup（本課程建議）**：逐一設定供應商、工具與選項。供應商選 **Custom Endpoint** 並填入實驗室端點；遇到網頁搜尋、雲端瀏覽器、影像生成、TTS 等需連到雲端的工具時，請先**略過不啟用**（見 4.5）。
+- **Blank Slate**：只保留執行代理所需的最低限度（供應商與模型、檔案操作工具集、終端機工具集），其餘全部關閉。同樣適合本課程。
+- **Quick Setup（Nous Portal，課外參考）**：以 Nous 帳號 OAuth 登入，並可啟用 Nous 的工具閘道（Tool Gateway，付費方案才有）。**本課程不使用此模式**。
+
+桌面應用與命令列共用同一份設定，因此在任一邊完成設定，另一邊都會沿用。
+
+### 4.3 供應商一覽
+
+本課程使用表格第一列的實驗室端點；其餘供應商僅供課外參考，不用於課程作業與共同任務。
 
 | 供應商 | 說明 | 設定方式 |
 |--------|------|---------|
-| Nous Portal | 訂閱制、零設定 | 透過 `hermes model` 進行 OAuth 登入 |
+| **課程實驗室端點（本課程使用）** | 實驗室地端 vLLM 服務，整學期不限個人額度 | `hermes model` 或 Settings → Providers 選 Custom Endpoint，填入教師提供的 base URL、課程金鑰與模型名稱 |
+| Nous Portal | 訂閱制、零設定（課外參考） | 透過 `hermes model` 進行 OAuth 登入 |
 | Anthropic | 直接使用 Claude 模型 | OAuth 登入，或提供 Anthropic API 金鑰 |
 | OpenAI Codex | ChatGPT / Codex 訂閱 | 透過 `hermes model` 進行裝置碼認證 |
 | OpenRouter | 跨多家供應商路由 | 輸入 API 金鑰 |
@@ -251,6 +249,14 @@ hermes config set model <provider/model>
 > **避免把金鑰打在命令列**：若執行 `hermes config set OPENROUTER_API_KEY sk-or-...`，金鑰會以明文留在 PowerShell 歷史紀錄（`ConsoleHost_history.txt`）中。建議改用桌面 GUI 的 **Settings → Providers**，或 `hermes model` 的互動式輸入；若已誤用，請立即至供應商後台更換（revoke）該金鑰，並清除歷史紀錄。
 
 可用 `hermes config path` 與 `hermes config env-path` 查詢 `config.yaml` 與 `.env` 的實際位置。
+
+### 4.5 本課程的模型與工具使用規定
+
+1. **模型**：課程作業、課堂練習與共同任務一律使用實驗室端點，不需購買或訂閱商業模型。
+2. **雲端工具**：網頁搜尋、雲端瀏覽器、影像生成、TTS 等工具閘道，以及需連網的外掛與訊息閘道（Telegram、Discord 等），本課程**預設不啟用**。共同任務期間不得使用；若某單元的教學需要啟用，教師會事先公告並說明資料會傳到哪裡。
+3. **紀錄的存放與研究使用**：Hermes 的設定、對話與記憶存放在你自己電腦的 `HERMES_HOME`（見 4.4）；模型推理則在實驗室服務上進行。請為本課程建立專用的設定檔（profile），課程任務都在這個設定檔中進行，避免與其他課程或私人對話混在一起。若你同意研究使用對話紀錄，請在各觀察點任務完成後，依自己在同意表單勾選的項目，用 `hermes sessions export` 匯出本課程在實驗室端點上的任務對話（不含記憶檔），匯出前可以刪除與任務無關的內容，再上傳到保管者（非本課程評分的教師）建立的表單；授課教師看不到這份表單。不同意研究不影響成績與 AI 資源。
+4. **不放入敏感資料**：不要把他人的個人資料、未公開的研究資料或其他課程的內容貼進對話。
+5. **課外使用**：若你在課外自行連接雲端供應商，請自行留意該服務的資料政策；課程作業仍須改回實驗室端點完成。
 
 ---
 
@@ -471,6 +477,8 @@ hermes skills install openai/skills/k8s # 安裝技能（安裝前會先做安�
 Hermes 可產生獨立的子代理（Subagents）進行平行工作，每個子代理擁有各自的對話與終端機。在桌面應用中，當有委派的工作進行時，對話上方會出現 Subagents 框，顯示數量、任務名稱、經過時間與最新活動，並提供 Steer（引導）與 Stop（停止）控制。
 
 ### 7.4 訊息閘道（Messaging Gateway）
+
+> **本課程說明**：訊息閘道會把對話送到第三方通訊平台，屬課外參考；課程作業與共同任務不使用（見 4.5）。
 
 可將 Hermes 連接到通訊平台，讓它成為機器人或共用助理：
 
@@ -868,7 +876,7 @@ Hermes Agent 的自主執行、工具串接與持久記憶能力，可應用於�
 
 - **資料前處理與探索**：請代理讀取實驗數據 CSV、進行清理、繪製趨勢圖，並用 `execute_code` 撰寫並執行 Python 腳本完成批次處理（例如「將這個資料夾內所有感測器 CSV 合併，移除異常值後輸出摘要統計」）。
 - **程序模擬腳本輔助**：協助撰寫、除錯與說明程序模擬或數值計算的 Python 程式碼（如質能平衡、反應動力學、蒸餾塔計算）。
-- **文獻與資料整理**：利用網頁搜尋與瀏覽器工具蒐集特定主題的資料，整理成結構化摘要。
+- **文獻與資料整理**：利用網頁搜尋與瀏覽器工具蒐集特定主題的資料，整理成結構化摘要（需連到雲端，屬課外參考；課程作業依 4.5 預設不啟用）。
 - **重複性工作自動化**：將常做的多步驟流程（如產生實驗報告、整理數據、繪製標準圖表）存成技能（Skill），日後用一個斜線指令重複執行。
 - **專案知識累積**：透過 `AGENTS.md` 記錄專題的資料位置、命名慣例與分析流程，讓代理在整個專題期間都能延續一致的做法。
 
@@ -895,7 +903,7 @@ Hermes Agent 的自主執行、工具串接與持久記憶能力，可應用於�
 | `hermes model` | 選擇 LLM 供應商與模型 |
 | `hermes tools` | 設定要啟用哪些工具 |
 | `hermes setup` | 完整設定精靈（一次設定所有項目） |
-| `hermes setup --portal` | 以 Nous Portal 快速設定模型與工具閘道 |
+| `hermes setup --portal` | 以 Nous Portal 快速設定模型與工具閘道（課外參考，本課程不使用） |
 | `hermes doctor` | 診斷問題 |
 | `hermes update` | 更新到最新版本 |
 | `hermes gateway setup` / `run` / `status` | 設定、前景執行、查看訊息閘道（Windows 另有 `install` / `start` / `stop` / `restart` / `uninstall`） |
@@ -961,7 +969,7 @@ Hermes Agent 的自主執行、工具串接與持久記憶能力，可應用於�
 ## 12. 最佳實務建議
 
 1. **先讓一次對話正常運作**：若 Hermes 無法完成一次正常對話，先不要加入閘道、cron、技能、語音或路由等功能。
-2. **善用 Nous Portal 快速上手**：`hermes setup --portal` 是最省事的路徑，一次搞定模型與（付費方案下的）工具。
+2. **使用課程實驗室端點**：以 `hermes model` 或 Settings → Providers 選 Custom Endpoint，填入教師提供的資訊即可，不需訂閱商業模型；雲端工具依 4.5 預設不啟用。
 3. **保護你的機密**：`.env` 內含 API 金鑰，切勿上傳至 Git 或公開分享。
 4. **謹慎使用 YOLO 模式**：YOLO 會略過危險指令的核准提示，務必了解風險後再開啟。
 5. **考慮沙箱隔離**：讓代理在 Docker 或遠端伺服器中執行，可降低誤操作本機的風險。
@@ -976,7 +984,7 @@ Hermes Agent 的自主執行、工具串接與持久記憶能力，可應用於�
 
 ## 13. 小結
 
-本單元介紹了 Hermes Agent 的核心概念、在 Windows 平台上的安裝方式（桌面安裝程式與命令列）、使用 Nous Portal 的初次設定流程，以及桌面應用的介面導覽與基本操作。同時也認識了記憶、技能、子代理、訊息閘道、排程與 MCP 等核心功能。
+本單元介紹了 Hermes Agent 的核心概念、在 Windows 平台上的安裝方式（桌面安裝程式與命令列）、連接課程實驗室端點的初次設定流程與本課程的使用規定，以及桌面應用的介面導覽與基本操作。同時也認識了記憶、技能、子代理、訊息閘道、排程與 MCP 等核心功能。
 
 Hermes Agent 最大的價值在於它是一個「會隨著使用而成長」的自主代理——透過持久記憶與自動累積的技能，它會越用越了解你的專案與工作習慣。建議同學先從基本對話開始，確認一切正常運作後，再逐步探索更進階的功能，將其應用於化工領域的資料處理、程式輔助與研究工作中。
 
@@ -992,7 +1000,7 @@ Hermes Agent 最大的價值在於它是一個「會隨著使用而成長」的�
 - 課程單元：Hermes Agent 安裝與使用教學
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-11-12
+- 更新日期：2026-11-18
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

@@ -1,0 +1,2 @@
+model_checkpoint_path: "gcn_node_classifier"
+all_model_checkpoint_paths: "gcn_node_classifier"

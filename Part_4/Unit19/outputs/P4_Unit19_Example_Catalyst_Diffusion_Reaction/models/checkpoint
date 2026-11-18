@@ -1,0 +1,2 @@
+model_checkpoint_path: "pinn_catalyst_inverse"
+all_model_checkpoint_paths: "pinn_catalyst_inverse"

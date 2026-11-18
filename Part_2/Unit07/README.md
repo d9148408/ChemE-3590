@@ -23,6 +23,7 @@
 ### 1️⃣ 總覽篇：異常檢測基礎
 
 **投影片檔案**：[Unit07_Anomaly_Detection_Overview.pdf](Unit07_Anomaly_Detection_Overview.pdf)
+**詳解投影片**：[Unit07_Anomaly_Detection_Overview_Detail.pdf](Unit07_Anomaly_Detection_Overview_Detail.pdf)
 **講義檔案**：[Unit07_Anomaly_Detection_Overview.md](Unit07_Anomaly_Detection_Overview.md)
 
 **內容重點**：
@@ -47,6 +48,7 @@
 
 **檔案**：
 - 投影片檔案：[Unit07_Isolation_Forest.pdf](Unit07_Isolation_Forest.pdf)
+- 詳解投影片：[Unit07_Isolation_Forest_Detail.pdf](Unit07_Isolation_Forest_Detail.pdf)
 - 講義檔案：[Unit07_Isolation_Forest.md](Unit07_Isolation_Forest.md)
 - 程式範例：[Unit07_Isolation_Forest.ipynb](Unit07_Isolation_Forest.ipynb)
 
@@ -75,6 +77,29 @@
   - ❌ 缺點：對參數敏感、難以解釋、不適合局部異常
 
 **適合場景**：大規模數據、高維數據、即時監控、通用異常檢測
+
+---
+
+### 🏭 工業案例：半導體晶圓缺陷異常檢測 (Isolation Forest 應用)
+
+**檔案**：
+- 講義檔案：[Unit07_Isolation_Forest_Wafer.md](Unit07_Isolation_Forest_Wafer.md)
+- 程式範例：[Unit07_Isolation_Forest_Wafer.ipynb](Unit07_Isolation_Forest_Wafer.ipynb)
+- 詳解投影片：[Unit07_Isolation_Forest_Wafer_Detail.pdf](Unit07_Isolation_Forest_Wafer_Detail.pdf)
+
+**內容重點**：
+- **真實工業數據應用**：Kaggle 半導體晶圓缺陷資料集（5,000 筆、6 個感測器特徵）
+- **完整異常檢測流程**：
+  - 混合型數據處理（數值特徵 + 類別特徵）
+  - 極度類別不平衡情境（缺陷佔比約 0.14%）
+  - 在**有標籤**情境下客觀評估非監督模型
+- **評估與解讀**：
+  - 精確率、召回率、ROC-AUC 在晶圓品質控制的實務意義
+  - 不同 `contamination` 設定對檢測結果的影響
+  - 分割頻率式特徵重要性的限制，並以缺陷偏移分析與單一特徵基準線檢驗模型
+- **化工 / 製程工程連結**：製程腔室感測器（溫度、壓力、氣體流量、蝕刻率、電壓、電流）即時監控
+
+**適合場景**：想了解異常檢測在真實工業數據上完整落地流程的學員
 
 ---
 
@@ -201,11 +226,32 @@
 
 ### 1. 反應器操作數據 (`data/reactor_operation/`)
 - 包含正常與異常操作條件的時間序列數據
+- 供 Isolation Forest、One-Class SVM 範例使用（Notebook 內自動生成，資料夾內無預置檔案）
 - 用於製程監控與異常檢測
 
 ### 2. 批次反應器數據 (`data/batch_reactor/`)
 - 批次製程的操作軌跡數據
+- 檔案：`batch_reactor_quality.csv`（溫度、壓力），供 LOF、Elliptic Envelope 範例使用
 - 用於批次品質監控與異常批次識別
+
+### 3. 半導體晶圓缺陷數據 (`data/wafer_defect/`)
+- 來源：Kaggle — Semiconductor Wafer Defect Classification Dataset
+- 5,000 筆晶圓感測器數據，含正常與缺陷標籤
+- 檔案：`semiconductor_wafer_defect_dataset.csv`（原始壓縮檔 `archive.zip`）
+- 用於工業案例的異常檢測實作與評估
+
+### 4. 作業數據 (`data/HW/`)
+- 作業 Notebook 執行時自動生成 `reactor_monitoring.csv`（反應器監控數據）
+
+> 各 Notebook 的輸出（模型、圖檔）儲存於 `outputs/P2_Unit07_*/`（含 `figs/`、`models/`）。
+
+---
+
+## 🌐 互動式教學網頁 (`Tutorial_HTML/`)
+
+提供可於瀏覽器開啟的互動式教學網頁，方便快速瀏覽演算法原理與範例：
+- [Isolation_Forest_Tutorial.html](Tutorial_HTML/Isolation_Forest_Tutorial.html)
+- [OneClass_SVM_Tutorial.html](Tutorial_HTML/OneClass_SVM_Tutorial.html)
 
 ---
 
@@ -251,16 +297,17 @@ pyod >= 1.0.0  # Python Outlier Detection 工具箱
 
 ### 第一階段：基礎概念建立
 1. 閱讀 
-   - 投影片 [Unit07_Anomaly_Detection_Overview.pdf](Unit07_Anomaly_Detection_Overview.pdf)
+   - 投影片 [Unit07_Anomaly_Detection_Overview.pdf](Unit07_Anomaly_Detection_Overview.pdf) / [詳解版](Unit07_Anomaly_Detection_Overview_Detail.pdf)
    - 講義 [Unit07_Anomaly_Detection_Overview.md](Unit07_Anomaly_Detection_Overview.md)
 2. 理解異常檢測的核心概念與應用場景
 3. 區分離群值檢測與新奇點檢測
 
 ### 第二階段：演算法學習與實作
 1. **Isolation Forest**（建議最先學習，最實用）
-   - 投影片：[Unit07_Isolation_Forest.pdf](Unit07_Isolation_Forest.pdf)
+   - 投影片：[Unit07_Isolation_Forest.pdf](Unit07_Isolation_Forest.pdf) / [詳解版](Unit07_Isolation_Forest_Detail.pdf)
    - 講義 [Unit07_Isolation_Forest.md](Unit07_Isolation_Forest.md)
    - 執行 [Unit07_Isolation_Forest.ipynb](Unit07_Isolation_Forest.ipynb)
+   - 工業案例：[講義](Unit07_Isolation_Forest_Wafer.md) / [Notebook](Unit07_Isolation_Forest_Wafer.ipynb) / [詳解投影片](Unit07_Isolation_Forest_Wafer_Detail.pdf)
    
 2. **LOF**
    - 投影片：[Unit07_LOF.pdf](Unit07_LOF.pdf)
@@ -398,7 +445,7 @@ pyod >= 1.0.0  # Python Outlier Detection 工具箱
 - 課程單元：Unit07 異常檢測 (Anomaly Detection)
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-13
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。
