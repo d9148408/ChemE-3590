@@ -1,4 +1,4 @@
-# Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南
+# Unit00 Hermes Agent 技能（Skills）與外掛（Plugins）推薦指南
 
 > **本課程說明**：本講義是本課程 Agent 能力訓練的核心教材，技能（Skills）、外掛（Plugins）與 MCP 工具都會在課堂中練習，目的是讓同學逐步擴充並調整自己的 Agent。使用時請依 [Unit00 安裝教學](Unit00_Hermes_Agent_Setup.md) 4.5 的規定：在本機執行的技能與本機自架的 MCP 伺服器（4.6 節）可直接用於課程作業；會把內容送到第三方服務的遠端 MCP、雲端外掛與工具閘道，只在教師指定的練習中使用，共同任務等觀察點任務期間不使用。
 
@@ -6,7 +6,7 @@
 
 本單元是 [Unit00 Hermes Agent 安裝與使用教學](Unit00_Hermes_Agent_Setup.md) 與 [Unit00 Hermes Agent 常用指令詳細教學](Unit00_Hermes_Agent_Command.md) 的進階延伸。當同學完成 Hermes Agent 的基礎安裝並能正常對話後，下一步就是透過 **技能（Skills）**、**外掛（Plugins）** 與 **MCP 伺服器（Model Context Protocol Servers）** 為代理裝備專業能力。
 
-對化學工程與材料工程領域的**大學部學生**與**研究所碩博士生**而言，日常工作高度依賴：實驗數據清理、Jupyter Notebook 互動式建模、工程文書（PDF / Word / Excel / PowerPoint）自動化、化學分子與熱力學計算、學術文獻與專利檢索、以及長篇學位論文與知識庫管理。本講義從 Hermes 官方內建庫、官方選用庫（`official/*`）、受信任機構庫（Anthropic / OpenAI / Hugging Face / NVIDIA）與經過驗證的社群目錄中，嚴選出**化工系學生務必安裝與啟用的核心清單**，並提供實機驗證過的安裝指令與化工實戰工作流。
+對化學工程與材料工程領域的**大學部學生**與**研究所碩博士生**而言，日常工作高度依賴：實驗數據清理、Jupyter Notebook 互動式建模、工程文書（PDF / Word / Excel / PowerPoint）自動化、化學分子與熱力學計算、學術文獻與專利檢索、以及長篇學位論文與知識庫管理。本講義從 Hermes 官方內建庫、官方選用庫（`official/*`）、受信任機構庫（Anthropic / OpenAI / Hugging Face / NVIDIA）與經過驗證的社群目錄中，嚴選出**化工系學生優先評估安裝與啟用的核心清單**（修課同學以開課前公布的課程工具清單為基準），並提供實機驗證過的安裝指令與化工實戰工作流。
 
 ### 學習目標
 
@@ -455,7 +455,7 @@ hermes computer-use doctor
 | **`grounded-citations`** | `builtin`（隨附） | 隨附於 `research/grounded-citations` | 🎓 大學部<br/>🔬 研究生 | **有據可查的引用約束（防幻覺必備！）**：強制代理在撰寫文獻回顧或回答專業問題時，每一項數據與論點都必須附上可驗證的真實來源，杜絕 AI 捏造假文獻或假物性常數。 |
 | **`llm-wiki`** | `builtin`（隨附） | 隨附於 `research/llm-wiki` | 🔬 研究生 | **Karpathy 式知識庫建置**：將讀過的數十篇催化劑、分離程序或電池材料論文，整理成互相連結（interlinked）的本地 Markdown 知識庫，隨問隨查。 |
 | **`obsidian`** | `builtin`（隨附） | 隨附於 `note-taking/obsidian` | 🎓 大學部<br/>🔬 研究生 | **Obsidian 研究筆記整合**：直接在你的 Obsidian Vault 中搜尋、建立與編輯課程筆記與實驗紀錄。 |
-| **`duckduckgo-search`** | `official` | `hermes skills install official/research/duckduckgo-search` | 🎓 大學部<br/>🔬 研究生 | **免 API 金鑰免費網頁搜尋**：當你使用本地模型或未開啟付費搜尋閘道時，透過 `ddgs` 提供免費、免金鑰的網頁、新聞與圖片檢索能力。 |
+| **`duckduckgo-search`** | `official` | `hermes skills install official/research/duckduckgo-search` | 🎓 大學部<br/>🔬 研究生 | **免 API 金鑰免費網頁搜尋（查詢會送到第三方；本課程只在指定練習使用）**：當你使用本地模型或未開啟付費搜尋閘道時，透過 `ddgs` 提供免費、免金鑰的網頁、新聞與圖片檢索能力。 |
 | **`rss-feeds`** | `official` | `hermes skills install official/research/rss-feeds` | 🔬 研究生 | **期刊最新文章追蹤**：訂閱 *AIChE Journal*、*I&EC Research*、*Chemical Engineering Science*、*Computers & Chemical Engineering* 等頂刊的 RSS Feed，請代理每週自動摘要最新論文。 |
 | **`humanizer`** | `builtin`（隨附） | 隨附於 `creative/humanizer` | 🎓 大學部<br/>🔬 研究生 | **消除 AI 腔調**：潤飾中英文報告與論文段落，移除生硬的 AI 慣用套話，讓文字更自然流暢。 |
 | **`simple-english`** | `official` | `hermes skills install official/creative/simple-english` | 🔬 研究生 | **簡化工程技術英文（ASD-STE100）**：撰寫標準操作程序（SOP）、儀器操作手冊或英文摘要時，將拗口長句改寫為清晰、無歧義的技術英文。 |
@@ -676,7 +676,7 @@ npx github:microsoft/ResearchStudio
 
 ---
 
-## 4. 化工系推薦必裝外掛（Plugins）與 MCP 伺服器
+## 4. 化工系推薦外掛（Plugins）與 MCP 伺服器
 
 Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP Servers** 則為 Hermes 補上底層的新工具、資料庫連線與桌面應用視覺化介面。
 
@@ -691,7 +691,7 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 | **`hermes-memory-wiki`** | `official`<br/>`desktop` | `hermes plugins install hermes-memory-wiki` | 無 | **研究記憶 Wiki 面板（必裝！）**：在 Hermes Desktop 與網頁儀表板新增「Memory Wiki」分頁，自動將你的本地對話歷史整理成可瀏覽的「主題頁面（Subject Pages）」與「每日研究日誌（Daily Logs）」，並提供唯讀的持久記憶（`MEMORY.md` / `USER.md`）檢視面板。非常適合追蹤長達一學期的課程學習或兩年的碩士論文軌跡。 |
 | **`hermes-security`** | `official`<br/>`tools` | `hermes plugins install hermes-security` | 無 | **程式碼與相依套件資安審查**：提供 9 個 `security_scan_*` 工具、`/security` 斜線指令、`hermes security-review` CLI 與桌面應用專屬 Security 分頁。當你從 GitHub 下載開源科學計算套件或整理實驗室倉庫準備開源時，它會建立威脅模型、派出平行子代理逐段檢查程式碼，並搭配 `osv-scanner`（首次掃描會下載約 55 MB 並驗證 SHA-256）檢查套件漏洞，報告可匯出 Markdown / JSON / CSV / SARIF。需要 Hermes `>=0.21.5`。 |
 | **`advanced-delegation`** | `official`<br/>`tools` | `hermes plugins install advanced-delegation` | 無 | **進階子代理模型與設定檔路由**：為子代理委派（`delegate_task`）新增兩種模式：`model_map`（讓代理依任務難易度自動把子任務分派給快速便宜模型或深度推理模型）與 `profile_routes`（讓不同子代理以不同專業設定檔執行，各自套用該 profile 的模型、憑證、技能與 `SOUL.md`），大幅節省長研究任務的 token 成本。另提供 `hermes delegation config` 與 `/delegation` 斜線指令。**需 Hermes `>=0.22.5`**（0.22.0–0.22.4 會拒絕安裝，更舊版本安裝後僅印警告而不生效）。 |
-| **`tavily-plugin`** | `verified`<br/>`web` | `hermes plugins install tavily-plugin` | `TAVILY_API_KEY`（或透過 OAuth 登入） | **AI 專用深度網頁檢索與爬取**：連接 Tavily 官方 MCP 伺服器，提供比一般搜尋更適合研究代理的網頁搜尋、全文擷取、網站結構爬取與多步驟研究功能。 |
+| **`tavily-plugin`** | `verified`<br/>`web` | `hermes plugins install tavily-plugin` | `TAVILY_API_KEY`（或透過 OAuth 登入） | **AI 專用深度網頁檢索與爬取（查詢會送到第三方；本課程只在指定練習使用）**：連接 Tavily 官方 MCP 伺服器，提供比一般搜尋更適合研究代理的網頁搜尋、全文擷取、網站結構爬取與多步驟研究功能。 |
 
 ### 4.2 學術文獻、專利與本地檔案深度處理外掛
 
@@ -723,10 +723,10 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 
 除了外掛，Hermes 官方 MCP 目錄（`hermes mcp catalog`，實測 v0.22.5 共 66 項）中有幾個對理工與化工學生極為實用的遠端 MCP 伺服器，**其中前四項完全免費且免設 API 金鑰**：
 
-| MCP 名稱 | 認證方式 | 一鍵安裝指令 | 化工系必裝理由與應用情境 |
+| MCP 名稱 | 認證方式 | 一鍵安裝指令 | 推薦理由與應用情境 |
 | :--- | :--- | :--- | :--- |
 | **`wolfram`** | **免認證**（匿名即用） | `hermes mcp install wolfram` | **Wolfram Alpha 工程數學與科學知識引擎（推薦；本課程於指定練習使用）**：直接呼叫 Wolfram Alpha 進行符號微積分、常微分方程（ODE）解析解驗證、複雜單位換算（如 $\mathrm{Btu/(hr \cdot ft^2 \cdot {}^\circ F)}$ 轉 $\mathrm{W/(m^2 \cdot K)}$ ）、化學反應平衡與純物質基本熱物性查詢，彌補大型語言模型心算容易出錯的弱點。 |
-| **`context7`** | **免認證**（匿名即用） | `hermes mcp install context7` | **最新套件官方文件與程式碼範例即時查詢（必裝！）**：當代理撰寫 Scikit-learn、PyTorch、Pandas、SciPy 或 Plotly 程式碼時，自動向 Context7 拉取**對應版本的最新官方 API 文件**，不再寫出早已被棄用（deprecated）的舊版語法。 |
+| **`context7`** | **免認證**（匿名即用） | `hermes mcp install context7` | **最新套件官方文件與程式碼範例即時查詢（推薦；本課程於指定練習使用）**：當代理撰寫 Scikit-learn、PyTorch、Pandas、SciPy 或 Plotly 程式碼時，自動向 Context7 拉取**對應版本的最新官方 API 文件**，不再寫出早已被棄用（deprecated）的舊版語法。 |
 | **`deepwiki`** | **免認證**（匿名即用） | `hermes mcp install deepwiki` | **任何公開 GitHub 專案的互動式百科（Devin DeepWiki）**：在做專題研究需要看懂某篇論文附帶的 GitHub 倉庫（例如某個化工 PINNs 或分子圖神經網路 GNN 專案）時，直接透過 DeepWiki 詢問該倉庫的架構、入口函數與資料格式。 |
 | **`hugging_face`** | OAuth 2.1（瀏覽器登入） | `hermes mcp install hugging_face` | **Hugging Face 官方遠端 MCP**：直接在對話中搜尋 Hugging Face Hub 上的科學模型、化學資料集、Spaces 互動應用與最新 AI 論文。 |
 | **`notion`** | OAuth 2.1（瀏覽器登入） | `hermes mcp install notion` | **Notion 實驗室筆記與資料庫同步**：若你的實驗室使用 Notion 管理藥品庫存、儀器預約或文獻閱讀清單，可讓代理直接查詢與更新 Notion 頁面與資料庫。 |
@@ -742,7 +742,7 @@ Skills 解決了「工作流程與 SOP」的問題，而 **Plugins** 與 **MCP S
 
 > **MCP 選擇原則**：MCP 註冊的工具會佔用每次請求的系統提示空間（見 FAQ Q4），因此**不要一次裝滿**。建議只挑當前研究階段真正會用的 2–4 個，其餘用 `hermes mcp configure <名稱>` 關閉不需要的子工具，或需要時再 `hermes mcp install`。
 
-> **若資料不能外流，請改看 4.6 節**：本節的 MCP 全部是**遠端服務**（查詢內容會送到第三方）。若你處理的是未發表實驗數據或產學合作內容，請改用 4.6 節介紹的**本機自架開源 MCP**（以 stdio 在本機執行，資料不出機器）。
+> **若資料不能外流，請改看 4.6 節**：本節的 MCP 全部是**遠端服務**（查詢內容會送到第三方）。若你處理的是未發表實驗數據或產學合作內容，請改用 4.6 節介紹的**本機自架開源 MCP**（以 stdio 在本機執行，不經第三方；讀到的內容會隨對話送到課程實驗室端點）。
 
 > **進階延伸：化工流程模擬軟體自訂 MCP（以 Aspen Plus 為例）**
 > 對於高年級專題生與程序系統工程（PSE）研究生，MCP 協定最大的潛力在於**將傳統化工模擬器（如 Aspen Plus、HYSYS、DWSIM、GAMS）封裝成本地 MCP 伺服器**。例如本實驗室開發的 `aspen-plus` MCP Server，透過 `hermes mcp add` 註冊本地 Python 虛擬環境啟動腳本後，Hermes 代理就能直接讀取 `.bkp` / `.apw` 模擬檔、修改進料溫度／回流比、觸發模擬收斂並讀取塔頂純度與再沸器熱負荷，實現「自然語言驅動的程序模擬與優化」。
@@ -983,21 +983,22 @@ hermes mcp configure fs-lab
 
 ### 5.1 🎓 大學部基礎必裝包（修課作業、程式除錯、結報與簡報）
 
-> **本課程說明**：本課程（研究所選修）的同學也從本包開始，並以開課前公布的課程工具清單為準；包內會連到第三方的項目已改為註解，只在教師指定的練習中安裝。
+> **本課程說明**：本課程（研究所選修）的同學也從本包開始，並以開課前公布的課程工具清單為基準；包內會連到第三方的項目已改為註解，只在教師指定的練習中安裝。
 
-**適用對象**：正在修習本課程（ChemE 3590）、化工計算、單元操作實驗、程序控制或化工熱力學的大學部同學。
+**適用對象**：正在修習本課程（ChemE 3590）、化工計算、單元操作實驗、程序控制或化工熱力學的同學。
 
 ```powershell
 # ============================================================
-# 1. 確保官方隨附技能（pdf, docx, xlsx, powerpoint, arxiv,
+# 1. 確保官方隨附技能（pdf, docx, xlsx, powerpoint,
 #    grounded-citations, systematic-debugging, github 等）已完整植入
+#    arxiv 技能檢索時會連到 arXiv，本課程列為研究生選用，不在此預設救回
 # ============================================================
 hermes skills list                     # 先確認這些技能是否已啟用
 hermes curator list-archived           # 若缺少，檢查是否被 Curator 封存
 hermes config get curator.prune_builtins   # 需為 true 才能 restore 內建技能
 
 # 逐一救回被封存的隨附技能（未封存者會回報 not found in archive，無害）
-foreach ($s in @('pdf','docx','xlsx','powerpoint','arxiv',
+foreach ($s in @('pdf','docx','xlsx','powerpoint',
                  'grounded-citations','systematic-debugging','github')) {
     hermes curator restore $s
 }
@@ -1058,12 +1059,12 @@ npx --version
 # 限定資料夾的檔案存取（最推薦先裝這個，路徑請改成你自己的）
 hermes mcp add fs-lab --command npx --args -y @modelcontextprotocol/server-filesystem D:\MyGit\ChemE-3590\Part_2
 
-# arXiv 論文檢索（預印本；伺服器在本機執行，但檢索查詢會送到 arXiv）
-hermes mcp add arxiv --command uvx --args arxiv-mcp-server
+# arXiv 論文檢索（伺服器在本機執行，但檢索查詢會送到 arXiv；研究生選用，需要時再取消註解）
+# hermes mcp add arxiv --command uvx --args arxiv-mcp-server
 
 # 驗證是否正常啟動
 hermes mcp test fs-lab
-hermes mcp test arxiv
+# hermes mcp test arxiv
 
 # ============================================================
 # 4. 安裝官方記憶 Wiki 桌面面板外掛
@@ -1374,7 +1375,7 @@ platforms: [windows, linux, macos]
 | **Q7：`hermes skills install` 回報「identifier not found」，但講義明明寫了這個識別碼？** | 官方選用技能與 Skills Hub 索引會隨版本增減、改名或下架；社群來源（GitHub 分支、`skills.sh`）也可能改名。 | 先執行 `hermes skills search <關鍵字> --json` 取得目前有效的完整識別碼，再安裝。同一功能的技能常有多個來源（例如 `pubchem-database` 同時存在於 `skills.sh`、`github`、`clawhub`），優先選 `trusted`／`official` 版本，其次選描述最完整者。 |
 | **Q8：Zotero 有官方 MCP 或官方外掛嗎？找不到 `hermes mcp install zotero`？** | **沒有。** 實測 v0.22.5：`hermes mcp catalog`（66 項）無 Zotero、`hermes plugins search zotero` 無結果、`hermes skills search zotero --source official` 無結果。Zotero 相關資源全在 Skills Hub，且皆為 `community` 等級。 | 三條路線：(a) 唯讀且免憑證 → 安裝 `zotero-local` 技能（需先在 Zotero 開啟本機 API 授權）；(b) 需完整讀寫 → 安裝 `clawhub/zotero` 技能並設定 `ZOTERO_API_KEY` / `ZOTERO_USER_ID`；(c) 要當原生工具用 → `uv tool install zotero-mcp-server` 後執行 `hermes mcp add zotero --command uvx --args zotero-mcp-server`。完整比較見 **4.5 節**。 |
 | **Q9：`hermes mcp add` 加了 Zotero MCP 之後，每次對話都變慢、token 暴增？** | Zotero MCP 這類伺服器工具數量龐大：社群版 `zotero-mcp-server` 預設 profile 約 38 個工具、schema 約 7,900 tokens，全開約 50 個工具、11,000 tokens，且**每次請求都會送出**（與 FAQ Q4 同一原理）。 | 執行 `hermes mcp configure zotero` 關閉不需要的工具群組（例如只保留搜尋與讀取，關掉寫入、標註、語意搜尋）；或改用技能路線（`zotero-local` / `clawhub/zotero`），技能平時只佔約一行描述，隨需載入幾乎不耗平時 token。 |
-| **Q10：有沒有完全在本機執行、資料不外流的開源 MCP？要怎麼裝？** | Hermes 官方 MCP 目錄（`hermes mcp catalog`）收錄的全是**遠端**託管服務，查詢內容會離開你的電腦。本機 MCP 需自行以 `hermes mcp add` 註冊開源套件；`hermes mcp add` 不會代為安裝，但用 `uvx` / `npx` 啟動時會自動下載並快取套件。 | 用 `hermes mcp add <名稱> --command uvx --args <PyPI套件>`（Python）或 `--command npx --args -y <npm套件>`（Node）。Hermes 已內建 `uvx` 與 `npx`。實測可用的套件如 `@modelcontextprotocol/server-filesystem`（限定資料夾讀寫）、`mcp-server-sqlite`、`mcp-server-duckdb`、`arxiv-mcp-server`、`jupyter-mcp-server`、`chroma-mcp`。完整清單與安全守則見 **4.6 節**。 |
+| **Q10：有沒有在本機執行、不經第三方的開源 MCP？要怎麼裝？** | Hermes 官方 MCP 目錄（`hermes mcp catalog`）收錄的全是**遠端**託管服務，查詢內容會離開你的電腦。本機 MCP 需自行以 `hermes mcp add` 註冊開源套件；`hermes mcp add` 不會代為安裝，但用 `uvx` / `npx` 啟動時會自動下載並快取套件。 | 用 `hermes mcp add <名稱> --command uvx --args <PyPI套件>`（Python）或 `--command npx --args -y <npm套件>`（Node）。Hermes 已內建 `uvx` 與 `npx`。實測可用的套件如 `@modelcontextprotocol/server-filesystem`（限定資料夾讀寫）、`mcp-server-sqlite`、`mcp-server-duckdb`、`arxiv-mcp-server`、`jupyter-mcp-server`、`chroma-mcp`。本機 MCP 讀到的內容仍會隨對話送到課程實驗室端點推理，`arxiv-mcp-server` 檢索時會連外；本課程以本機 MCP 為主。完整清單與安全守則見 **4.6 節**。 |
 | **Q11：`hermes mcp add ... --env KEY=VALUE` 為什麼報錯，說 `--env` 不是有效參數？** | `--args` 會把**後面所有 token** 都當成該伺服器的啟動參數，因此放在 `--args` 之後的 `--env` 會被誤認為套件參數。 | 把 `--env` 移到 `--args` **之前**：`hermes mcp add <名稱> --command uvx --env KEY=VALUE --args <套件名>`。切記 `--args` 必須是最後一個選項。 |
 | **Q12：Windows 上註冊 npm 型本機 MCP 後，`hermes mcp test` 顯示 `spawn npx ENOENT`？** | Windows 的 `npx` 實際上是 `npx.cmd` 包裝檔，部分啟動方式無法直接 spawn 它。 | 改用 shell 包裝形式：`hermes mcp add <名稱> --command cmd --args /c npx -y <套件名>`；或改裝對應的 PyPI 版本，以 `uvx` 啟動。詳見 4.6 節 (E)。 |
 | **Q13：安裝了 `ppt-master` 技能，但生成簡報時報 `ModuleNotFoundError`？** | `hermes skills install` 只複製 `SKILL.md` 與附屬檔案，**不會**代裝 Python 相依（見 3.0 節 (F)）。`ppt-master` 需要 Python 3.10–3.14，且必須在技能目錄執行 `pip install -r requirements.txt`。 | 用絕對路徑的目標環境解譯器安裝相依：`<你的python.exe> -m pip install -r <技能目錄>/requirements.txt`。建議先建專屬環境（例如 `conda create -n ppt python=3.12`）避免污染既有科學計算環境；若只處理 DOCX / HTML / `.ipynb` 等格式，不需要 PyMuPDF。 |
@@ -1391,10 +1392,10 @@ platforms: [windows, linux, macos]
 本單元為化工系大學部與研究所同學整理了 Hermes Agent 最核心的擴充生態系：
 
 1. **觀念區分**：**Skills** 是隨需載入的 SOP 講義（省 token、最常用）；**Plugins** 是系統層級的工具、Hooks 與桌面面板；**MCP Servers** 則是連接 Wolfram Alpha、最新套件文件庫與化工流程模擬器的標準橋樑。
-2. **大學部核心配置**：確保隨附的 `pdf` / `docx` / `xlsx` / `powerpoint` / `systematic-debugging` 啟用，加裝 `official/data-science/jupyter-notebook`、`concept-diagrams`、`grill-me`，並連上免認證的 `wolfram`、`context7` 與 `deepwiki` MCP，即可大幅加速課程作業、程式除錯與實驗結報。若要交出一份「誤差算得對」的結報，再加裝 `uncertainty-and-units` 與 `scientific-visualization`；若要交出「可繼續在 PowerPoint 編修」的專題簡報，加裝 `ppt-master`（記得自行補裝其 Python 相依）。
+2. **大學部核心配置**：確保隨附的 `pdf` / `docx` / `xlsx` / `powerpoint` / `systematic-debugging` 啟用，加裝 `official/data-science/jupyter-notebook`、`concept-diagrams`、`grill-me`，並在教師指定的練習中連上免認證的 `wolfram`、`context7` 與 `deepwiki` 遠端 MCP（平時以 4.6 節的本機 MCP 為主），即可大幅加速課程作業、程式除錯與實驗結報。若要交出一份「誤差算得對」的結報，再加裝 `uncertainty-and-units` 與 `scientific-visualization`；若要交出「可繼續在 PowerPoint 編修」的專題簡報，加裝 `ppt-master`（記得自行補裝其 Python 相依）。
 3. **研究生進階配置**：結合 `arxiv`、`grounded-citations`、`llm-wiki` 技能與 `openalex`、`patsnap`、`mediarag`、`hermes-memory-wiki` 外掛，再搭配 `rdkit`、`cantera`、`pubchem-database` 與 `weights-and-biases`，即可建立從「文獻專利檢索 → 分子與程序模擬 → 機器學習實驗追蹤 → 論文圖表與初稿撰寫」的全自動化研究工作流。
 4. **Zotero 沒有官方支援，但有完整替代方案（4.5 節）**：Hermes 官方 MCP 目錄、精選外掛目錄與官方選用技能庫**都沒有 Zotero**；實測可用資源全在 Skills Hub 的社群技能。建議依需求三選一：`zotero-local`（本機唯讀、免 API key、最安全）、`clawhub/zotero`（Web API v3、可讀可寫、功能最完整）、或自行以 `hermes mcp add` 註冊 `zotero-mcp-server` 成為原生工具（須注意工具 schema 佔用每次請求的 token）。
-5. **資料敏感就用本機 MCP（4.6 節）**：4.4 節的 `wolfram` / `context7` / `deepwiki` 都是遠端服務，查詢內容會離開本機。若處理未發表數據，改用 `hermes mcp add --command uvx/npx` 註冊開源套件：`filesystem`（限定資料夾）、`sqlite` / `duckdb`（本機資料庫）、`arxiv`、`jupyter`、`chroma` / `qdrant`（本機向量檢索）。Hermes 已內建 `uvx` 與 `npx`，首次啟動會自動下載套件；但仍務必先讀原始碼並給最小權限。
+5. **資料敏感就用本機 MCP（4.6 節）**：4.4 節的 `wolfram` / `context7` / `deepwiki` 都是遠端服務，查詢內容會離開本機。若處理未發表數據，改用 `hermes mcp add --command uvx/npx` 註冊開源套件：`filesystem`（限定資料夾）、`sqlite` / `duckdb`（本機資料庫）、`arxiv`（檢索時會連到 arXiv）、`jupyter`、`chroma` / `qdrant`（本機向量檢索）。Hermes 已內建 `uvx` 與 `npx`，首次啟動會自動下載套件；但仍務必先讀原始碼並給最小權限。
 6. **論文產線配置（本次新增）**：以 `experimental-design` + `statistical-power` + `statistical-analysis` + `uncertainty-and-units` 補強方法章節與數據分析，以 `pyzotero` + `citation-management` + `markitdown` 建構參考文獻與知識庫，以 `scientific-writing` + `venue-templates` + `scientific-visualization` + `latex-posters` + `scientific-slides` + `peer-review` 完成從草稿到投稿與口試的整條產線。這組技能對碩博士論文的口試委員提問最有防禦力，因為每個數字都能交代「怎麼設計、怎麼檢定、誤差多大」。
 7. **工程模擬補強**：`pymoo`（多目標最佳化）、`simpy`（離散事件模擬）、`sympy`（符號驗證）、`fluidsim` / `openpiv`（CFD 與 PIV）、`pybamm`（電池電化學）、`pycalphad`（相平衡）補足本課程較少觸及的數值模擬面向。
 8. **環境版本是關鍵前提**：K-Dense 技能庫約半數需要 Python 3.11/3.12+。請為這些技能另建一個符合需求的獨立環境，並在提示中明確指定解譯器絕對路徑；未指定時代理會回退到 Hermes 自己的 Python（詳見 3.0 節），該環境通常缺少科學計算套件。
@@ -1411,7 +1412,7 @@ platforms: [windows, linux, macos]
 
 **課程資訊**
 - 課程名稱：AI在化工上之應用 (ChemE 3590)
-- 課程單元：Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南
+- 課程單元：Unit00 Hermes Agent 技能（Skills）與外掛（Plugins）推薦指南
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
 - 更新日期：2026-11-12

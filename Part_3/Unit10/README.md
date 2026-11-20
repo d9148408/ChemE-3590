@@ -9,7 +9,7 @@
 - **計算效率高**：訓練速度快，適合大規模資料集
 - **泛化能力好**：在資料符合線性假設時，模型穩定可靠
 
-本單元涵蓋從最基礎的普通最小二乘法 (OLS) 到各種正則化技術 (Regularization)，包括 Ridge、Lasso、ElasticNet 以及適合大規模數據的隨機梯度下降法 (SGD)。透過系統性學習這些方法，學員將能夠根據數據特性選擇最適合的線性模型，並解決過擬合、特徵選擇等實務問題。
+本單元涵蓋從最基礎的普通最小二乘法 (OLS) 到各種正則化技術 (Regularization)，包括 Ridge、Lasso、ElasticNet、適合大規模數據的隨機梯度下降法 (SGD)，以及以逐步回歸 (Stepwise Regression) 進行包裹式特徵選擇。透過系統性學習這些方法，學員將能夠根據數據特性選擇最適合的線性模型，並解決過擬合、特徵選擇等實務問題。
 
 本單元是監督式學習的基礎，為後續的非線性模型 (Unit11)、分類模型 (Unit12) 和集成學習 (Unit13) 奠定堅實的理論與實作基礎。
 
@@ -215,7 +215,38 @@
 
 ---
 
-### 7️⃣ 實作練習
+### 7️⃣ 逐步回歸 (Stepwise Regression)
+
+**檔案**：
+- 講義檔案：[Unit10_Stepwise_Regression.md](Unit10_Stepwise_Regression.md)
+- 程式範例：[Unit10_Stepwise_Regression.ipynb](Unit10_Stepwise_Regression.ipynb)
+
+**內容重點**：
+- **演算法原理**：
+  - 包裹式 (Wrapper) 特徵選擇，以模型評分準則驅動特徵增刪
+  - 三種策略：前向選擇、後向消除、雙向逐步
+  - 四種準則：p-value、AIC、BIC、調整後 R²
+  - 與 Lasso (嵌入式) 的對比
+
+- **實作技術**：
+  - `statsmodels` 手動實作 AIC / p-value 逐步回歸
+  - scikit-learn `SequentialFeatureSelector` (交叉驗證式)
+  - 多方法特徵選擇結果對照
+
+- **化工應用案例**：
+  - **軟測量模型精簡**：從大量製程變數中選出關鍵變數
+  - **反應器產率建模**：剔除冗餘變數建立精簡模型
+  - **QSPR 物性建模**：高維分子描述符的特徵選擇
+
+- **演算法特性**：
+  - ✅ 優點：自動特徵選擇、模型精簡可解釋、相容標準 OLS 統計推論
+  - ❌ 缺點：選擇性推論偏誤、多重比較問題、結果不穩定、非全域最佳
+
+**適合場景**：需要精簡且可解釋的線性模型、以預測為目標的特徵篩選
+
+---
+
+### 8️⃣ 實作練習
 
 **檔案**：[Unit10_Linear_Models_Homework.ipynb](Unit10_Linear_Models_Homework.ipynb)
 
@@ -247,6 +278,7 @@
 | **Lasso** | L1 | ✅ | ⚠️ | 中 | 高 | 特徵多、需自動選擇 |
 | **ElasticNet** | L1+L2 | ✅ | ✅ | 中 | 高 | 特徵多且相關、穩健選擇 |
 | **SGD** | 可選 | 視正則化 | 視正則化 | 極高 | 中 | 大規模數據、線上學習 |
+| **Stepwise** | 無 (包裹式特徵選擇) | ✅ | ⚠️ | 中 | 極高 | 需精簡可解釋模型、以預測為目標的特徵篩選 |
 
 **選擇建議**：
 1. **特徵少且品質好** → Linear Regression
@@ -255,6 +287,7 @@
 4. **特徵多且相關，需穩健選擇** → ElasticNet Regression
 5. **資料量極大或需線上學習** → SGD Regression
 6. **不確定時的通用選擇** → ElasticNet (可退化為 Ridge 或 Lasso)
+7. **需精簡且可解釋、以預測為目標的特徵篩選** → Stepwise Regression
 
 ---
 
@@ -318,9 +351,14 @@ tqdm >= 4.62.0         # 進度條顯示
    - 執行 [Unit10_SGD_Regression.ipynb](Unit10_SGD_Regression.ipynb)
    - 重點掌握：線上學習、partial_fit、學習率調整
 
+6. **Stepwise Regression**（包裹式特徵選擇）
+   - 講義 [Unit10_Stepwise_Regression.md](Unit10_Stepwise_Regression.md)
+   - 執行 [Unit10_Stepwise_Regression.ipynb](Unit10_Stepwise_Regression.ipynb)
+   - 重點掌握：前向/後向/雙向策略、AIC/BIC/p-value 準則、與 Lasso 對比
+
 ### 第三階段：綜合應用與練習
 1. 完成 [Unit10_Linear_Models_Homework.ipynb](Unit10_Linear_Models_Homework.ipynb)
-2. 比較五種模型在相同數據集上的表現
+2. 比較各種線性模型在相同數據集上的表現
 3. 練習根據資料特性選擇最適合的模型
 4. 嘗試將線性模型應用於自己的化工數據
 
@@ -446,7 +484,7 @@ tqdm >= 4.62.0         # 進度條顯示
 - 課程單元：Unit10 線性模型回歸 (Linear Models Regression)
 - 課程製作：逢甲大學 化工系 智慧程序系統工程實驗室
 - 授課教師：莊曜禎 助理教授
-- 更新日期：2026-01-28
+- 更新日期：2026-11-19
 
 **課程授權 [CC BY-NC-SA 4.0]**
  - 本教材遵循 [創用CC 姓名標示-非商業性-相同方式分享 4.0 國際 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 授權。

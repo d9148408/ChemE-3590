@@ -1,0 +1,26 @@
+{
+  "model_type": "Stepwise OLS (Forward Selection, AIC)",
+  "selected_features": [
+    "Temperature_C",
+    "Pressure_bar",
+    "Catalyst_wt%",
+    "Time_min",
+    "pH"
+  ],
+  "n_selected": 5,
+  "all_features": [
+    "Temperature_C",
+    "Pressure_bar",
+    "Catalyst_wt%",
+    "Time_min",
+    "Stirring_Speed_rpm",
+    "Feed_Rate_Lh",
+    "pH",
+    "Solvent_Ratio"
+  ],
+  "R2_test": 0.8703,
+  "RMSE_test": 2.976,
+  "MAE_test": 2.34,
+  "cv_r2_mean": 0.8547,
+  "cv_r2_std": 0.0066
+}

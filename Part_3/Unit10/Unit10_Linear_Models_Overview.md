@@ -409,8 +409,9 @@ import numpy as np
 from sklearn.metrics import mean_squared_error
 
 rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-# 或 sklearn >= 1.4：
-# rmse = mean_squared_error(y_true, y_pred, squared=False)
+# 或 sklearn >= 1.4 使用專用函式：
+# from sklearn.metrics import root_mean_squared_error
+# rmse = root_mean_squared_error(y_true, y_pred)
 ```
 
 #### 4.1.3 平均絕對誤差 (Mean Absolute Error, MAE)
@@ -456,15 +457,15 @@ $$
 
 **直觀解釋**： $R^2$ 代表模型能「解釋」目標變數總變異的比例。
 
-- $R^2$ 範圍：$(-\infty, 1]$
+- $R^2$ 範圍： $(-\infty, 1]$
 - $R^2 = 1$ ：完美預測（殘差為零）
 - $R^2 = 0$ ：模型預測能力等同於直接使用均值 $\bar{y}$
 - $R^2 < 0$ ：模型表現比均值預測還差（通常代表模型設定錯誤）
 
 **特性**：
-- **無量綱**，可跨不同資料集或目標變數比較（例如：溫度模型 $R^2 = 0.92$ vs 壓力模型 $R^2 = 0.88$）
+- **無量綱**，可跨不同資料集或目標變數比較（例如：溫度模型 $R^2 = 0.92$ vs 壓力模型 $R^2 = 0.88$ ）
 - 多加一個特徵 $R^2$ 永遠不會下降（即使特徵無意義），故需留意特徵選擇
-- **不適合**比較特徵數量不同的模型（應使用調整後 $R^2$）
+- **不適合**比較特徵數量不同的模型（應使用調整後 $R^2$ ）
 
 **適用情境**：
 - 跨模型、跨資料集的整體性能比較
@@ -493,9 +494,9 @@ r2 = r2_score(y_true, y_pred)
 
 1. **報告模型誤差大小** → 優先使用 **RMSE**（同目標單位，直觀）
 2. **資料含異常值** → 搭配 **MAE**（不被少數大誤差扭曲）
-3. **比較不同資料集的模型** → 使用 $R^2$（無量綱，可橫向比較）
+3. **比較不同資料集的模型** → 使用 $R^2$ （無量綱，可橫向比較）
 4. **RMSE ≫ MAE** → 警示：資料中存在少數**大誤差**樣本，需進一步排查
-5. **化工製程建議**：同時報告 RMSE 和 $R^2$，前者反映工程容許誤差，後者反映模型解釋力
+5. **化工製程建議**：同時報告 RMSE 和 $R^2$ ，前者反映工程容許誤差，後者反映模型解釋力
 
 **數值範例（化工情境）**：
 
@@ -555,13 +556,13 @@ $$
 
 **過擬合與泛化的數學直觀**：
 
-設模型在訓練集學到的函數為 $f$，訓練損失為 $L_{\text{train}}$，真實泛化損失為 $L_{\text{true}}$：
+設模型在訓練集學到的函數為 $f$ ，訓練損失為 $L_{\text{train}}$ ，真實泛化損失為 $L_{\text{true}}$ ：
 
 $$
 L_{\text{true}} = L_{\text{train}} + \underbrace{\text{Variance}}_{\text{模型複雜度帶來的不穩定性}} + \underbrace{\text{Bias}^2}_{\text{模型假設帶來的系統誤差}}
 $$
 
-交叉驗證直接估計 $L_{\text{true}}$，而不是只看 $L_{\text{train}}$。正則化（Ridge、Lasso、Elastic Net）的作用正是降低 Variance 項，以換取更好的泛化能力。
+交叉驗證直接估計 $L_{\text{true}}$ ，而不是只看 $L_{\text{train}}$ 。正則化（Ridge、Lasso、Elastic Net）的作用正是降低 Variance 項，以換取更好的泛化能力。
 
 ---
 

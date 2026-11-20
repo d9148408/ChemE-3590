@@ -167,7 +167,7 @@ conda activate PY310
 **檔案**：
 - 📄 安裝與基礎操作講義：[Unit00_Hermes_Agent_Setup.md](Unit00_Hermes_Agent_Setup.md)
 - 📄 常用指令與實戰講義：[Unit00_Hermes_Agent_Command.md](Unit00_Hermes_Agent_Command.md)
-- 📄 必裝技能與外掛推薦指南：[Unit00_Hermes_Agent_Skills&Plugins.md](Unit00_Hermes_Agent_Skills&Plugins.md)
+- 📄 技能與外掛推薦指南：[Unit00_Hermes_Agent_Skills&Plugins.md](Unit00_Hermes_Agent_Skills&Plugins.md)
 
 **內容重點**：
 - **認識自主型 AI 代理（Hermes Agent）**：

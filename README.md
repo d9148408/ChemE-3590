@@ -161,7 +161,7 @@
 ## 課程安排
 | 週次 | 主題與閱讀教材 | 教學與學習活動 | 面授(小時) |
 |---|---|---|---|
-| 1 | **Part 0: Google Colab**<br>[Unit00 Python學習環境設定教學](Part_0/README.md)<br><br>**Part 1: AI & ML Introduction**<br>[Unit01 AI與機器學習概論](Part_1/Unit01/README.md)<br>[Unit02 Python程式語言基礎](Part_1/Unit02/README.md) | 完成Google帳號申請<br>完成課程資料下載<br>完成Google Colab環境設定<br>完成課堂作業 | 3 |
+| 1 | **Part 0: Google Colab**<br>[Unit00 Python學習環境設定教學](Part_0/README.md)<br>[Unit00 Hermes Agent 安裝與設定](Part_0/Unit00_Hermes_Agent_Setup.md)<br><br>**Part 1: AI & ML Introduction**<br>[Unit01 AI與機器學習概論](Part_1/Unit01/README.md)<br>[Unit02 Python程式語言基礎](Part_1/Unit02/README.md) | 完成Google帳號申請<br>完成課程資料下載<br>完成Google Colab環境設定<br>完成Hermes Agent安裝與實驗室端點連線檢核<br>完成課堂作業 | 3 |
 | 2 | **Part 1: AI & ML Introduction**<br>[Unit03 Python模組 Numpy 與 Pandas](Part_1/Unit03/README.md)<br>[Unit04 Python模組 Matplotlib 與 Seaborn](Part_1/Unit04/README.md) | 完成課堂作業 | 3 |
 | 3 | **Part 2: 非監督式學習 Unsupervised Learning**<br>[Unit05 分群 (Clustering)](Part_2/Unit05/README.md) | 完成課堂作業 | 3 |
 | 4 | **Part 2: 非監督式學習 Unsupervised Learning**<br>[Unit06 降維 (Dimensionality Reduction)](Part_2/Unit06/README.md) | 完成課堂作業 | 3 |

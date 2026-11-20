@@ -152,9 +152,9 @@ $$
 \hat{\boldsymbol{\beta}}^{\text{EN}} = (1 + \lambda_2) \hat{\boldsymbol{\beta}}^{\text{naive}}
 $$
 
-其中 $\hat{\boldsymbol{\beta}}^{\text{naive}}$ 是"天真"的 Elastic Net 估計，原始論文中的 $\lambda_2$ 對應 sklearn 參數化下的 $\frac{\alpha(1-\rho)}{2}$（即 L2 懲罰係數）。
+其中 $\hat{\boldsymbol{\beta}}^{\text{naive}}$ 是"天真"的 Elastic Net 估計，原始論文中的 $\lambda_2$ 對應 sklearn 參數化下的 $\frac{\alpha(1-\rho)}{2}$ （即 L2 懲罰係數）。
 
-> **注意**：sklearn 的 `ElasticNet` 實現計算的是 $\hat{\boldsymbol{\beta}}^{\text{naive}}$，並未套用 $(1+\lambda_2)$ 校正因子。
+> **注意**：sklearn 的 `ElasticNet` 實現計算的是 $\hat{\boldsymbol{\beta}}^{\text{naive}}$ ，並未套用 $(1+\lambda_2)$ 校正因子。
 
 **實務意義**：
 - Elastic Net 對係數進行了雙重收縮
@@ -348,7 +348,7 @@ for i, (idx, name) in enumerate(zip(np.where(enet.coef_ != 0)[0],
 
 | 特性 | OLS | Ridge (L2) | Lasso (L1) | Elastic Net |
 |------|-----|-----------|-----------|-------------|
-| 懲罰項 | 無 | $\alpha \sum \beta_j^2$ | $\alpha \sum |\beta_j|$ | $\alpha[\rho\sum|\beta_j|+(1-\rho)\sum\beta_j^2/2]$ |
+| 懲罰項 | 無 | $\alpha \sum \beta_j^2$ | $\alpha \sum \lvert \beta_j \rvert$ | $\alpha[\rho\sum \lvert \beta_j \rvert +(1-\rho)\sum\beta_j^2/2]$ |
 | 解的形式 | 解析解 | 解析解 | 數值解 | 數值解 |
 | 係數特性 | 無偏但高方差 | 收縮但非零 | 稀疏（可為 0） | **稀疏且穩定** |
 | 特徵選擇 | ✗ | ✗ | ✓ | ✓ |
@@ -949,16 +949,16 @@ Stirring_Speed_rpm             20.0       20.0         0.0
 新操作條件預測結果
 ======================================================================
 條件      溫度(°C)  壓力(bar)   催化劑(wt%)  時間(min)   預測產率(%)
-條件 1    95.0      2.5         1.5          90          129.90
-條件 2    110.0     4.0         2.0          150         151.51
-條件 3    100.0     3.0         1.8          120         141.11
+條件 1    95.0      2.5         1.5          90          130.27
+條件 2    110.0     4.0         2.0          150         151.79
+條件 3    100.0     3.0         1.8          120         138.96
 ======================================================================
 ```
 
 **預測結果解讀**：
 - **條件 1（溫和）**：中低溫度和壓力，預測產率約 130%
-- **條件 2（高負荷）**：高溫度和壓力，預測產率約 151%
-- **條件 3（最佳）**：平衡參數，預測產率約 141%
+- **條件 2（高負荷）**：高溫度和壓力，預測產率約 152%
+- **條件 3（最佳）**：平衡參數，預測產率約 139%
 
 ---
 

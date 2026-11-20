@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：深入淺出 Ridge 回歸 (L2 正則化) | ChemE 3590</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 5px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        .step-btn.active {
+            background-color: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        }
+        .step-panel {
+            display: none;
+            animation: fadeIn 0.25s ease-in-out;
+        }
+        .step-panel.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+    <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+        
+        <!-- 頂部標題區塊 -->
+        <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white p-6 md:p-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <span class="inline-block bg-blue-500/40 text-blue-100 text-xs font-semibold px-3 py-1 rounded-full mb-2 border border-blue-400/30">
+                        ChemE 3590 | Unit 10 互動式學習實驗室
+                    </span>
+                    <h1 class="text-2xl md:text-4xl font-bold tracking-tight">Ridge 回歸 (嶺回歸 / L2 正則化)</h1>
+                    <p class="text-blue-100 text-base md:text-lg mt-1">
+                        透過 4 個循序漸進的互動實驗，直觀掌握 $\alpha$ 懲罰項、正則化路徑、L2 圓形幾何約束與特徵標準化
+                    </p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-xs md:text-sm shrink-0">
+                    <div class="font-semibold text-blue-100 mb-1">核心目標函數：</div>
+                    <div class="font-mono text-white text-sm md:text-base">
+                        $L(\boldsymbol{\beta}) = \| \mathbf{y} - \mathbf{X}\boldsymbol{\beta} \|_2^2 + \alpha \sum_{j=1}^{p} \beta_j^2$
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 逐步導覽列 (4 Steps Stepper) -->
+        <div class="bg-slate-100 px-4 py-3 border-b border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                <button onclick="switchStep(1)" id="stepBtn1" class="step-btn active flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white text-left transition-all hover:border-blue-400">
+                    <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0">1</span>
+                    <div>
+                        <div class="text-xs text-slate-800 font-bold opacity-80">STEP 1</div>
+                        <div class="text-sm font-bold">抑制過擬合與高方差</div>
+                    </div>
+                </button>
+                <button onclick="switchStep(2)" id="stepBtn2" class="step-btn flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white text-left transition-all hover:border-blue-400">
+                    <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0">2</span>
+                    <div>
+                        <div class="text-xs text-slate-800 font-bold opacity-80">STEP 2</div>
+                        <div class="text-sm font-bold">正則化路徑與係數收縮</div>
+                    </div>
+                </button>
+                <button onclick="switchStep(3)" id="stepBtn3" class="step-btn flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white text-left transition-all hover:border-blue-400">
+                    <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0">3</span>
+                    <div>
+                        <div class="text-xs text-slate-800 font-bold opacity-80">STEP 3</div>
+                        <div class="text-sm font-bold">L2 幾何圓與偏差-方差</div>
+                    </div>
+                </button>
+                <button onclick="switchStep(4)" id="stepBtn4" class="step-btn flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white text-left transition-all hover:border-blue-400">
+                    <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm shrink-0">4</span>
+                    <div>
+                        <div class="text-xs text-slate-800 font-bold opacity-80">STEP 4</div>
+                        <div class="text-sm font-bold">為什麼必須標準化？</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 1: 為什麼需要 Ridge？抑制過擬合與高方差 -->
+        <!-- ========================================== -->
+        <div id="stepPanel1" class="step-panel active p-6 md:p-8">
+            <div class="mb-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-xl">
+                <h2 class="text-xl font-bold text-blue-900 mb-1">Step 1：當普通最小平方法 (OLS) 失控時，Ridge 如何穩定模型？</h2>
+                <p class="text-sm text-blue-800">
+                    當特徵較多（例如高階多項式特徵）或樣本帶有雜訊時，普通線性回歸 ($\alpha = 0$) 為了完美穿過訓練點，會產生<strong>極大的回歸係數 $\beta_j$</strong>，導致曲線劇烈震盪（過擬合）。加上 L2 懲罰項 $\alpha \sum \beta_j^2$ 後，模型被迫壓小係數，換取平滑且泛化能力更好的預測曲線！
+                </p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- 左側：擬合曲線圖表 + 係數大小條形圖 -->
+                <div class="w-full lg:w-3/5 flex flex-col gap-4">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                        <div class="h-[340px] relative">
+                            <canvas id="step1FitChart"></canvas>
+                        </div>
+                        <div class="mt-2 flex flex-wrap justify-center gap-4 text-xs text-slate-500">
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-600 inline-block"></span>綠色虛線：真實物理關係 (True Function)</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-0.5 bg-slate-400 inline-block"></span>灰色虛線：OLS ($\alpha = 0$)</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-1 bg-blue-600 inline-block"></span>藍色實線：目前 Ridge 模型</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>藍點：訓練集</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>橘點：測試集</span>
+                        </div>
+                    </div>
+
+                    <!-- 底部小圖：各階特徵係數大小對比 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">多項式特徵係數對比 (OLS vs. Ridge)</span>
+                            <span id="step1NormText" class="text-xs font-mono font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">‖β‖₂² = 0.00</span>
+                        </div>
+                        <div class="h-[150px] relative">
+                            <canvas id="step1CoefChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：控制面板與即時指標 -->
+                <div class="w-full lg:w-2/5 flex flex-col gap-5">
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+                            <h3 class="text-lg font-bold text-slate-800">🎛️ 互動控制實驗台</h3>
+                            <span id="step1StatusBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">
+                                過擬合 (Overfitting)
+                            </span>
+                        </div>
+
+                        <!-- 四格統計卡片 -->
+                        <div class="grid grid-cols-2 gap-2.5 mb-5">
+                            <div class="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                                <div class="text-xs text-slate-400 font-medium">訓練集誤差 (Train MSE)</div>
+                                <div id="s1TrainMSE" class="text-base font-bold text-slate-700">0.000</div>
+                            </div>
+                            <div class="bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-center">
+                                <div class="text-xs text-amber-600 font-medium">測試集誤差 (Test MSE)</div>
+                                <div id="s1TestMSE" class="text-base font-bold text-amber-800">0.000</div>
+                            </div>
+                            <div class="bg-blue-50 p-2.5 rounded-lg border border-blue-200 text-center">
+                                <div class="text-xs text-blue-500 font-medium">係數平方和 $\|\boldsymbol{\beta}\|_2^2$</div>
+                                <div id="s1BetaNorm" class="text-base font-bold text-blue-700">0.00</div>
+                            </div>
+                            <div class="bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 text-center">
+                                <div class="text-xs text-indigo-500 font-medium">L2 懲罰項 $\alpha \|\boldsymbol{\beta}\|_2^2$</div>
+                                <div id="s1Penalty" class="text-base font-bold text-indigo-700">0.000</div>
+                            </div>
+                        </div>
+
+                        <!-- Alpha Slider -->
+                        <div class="mb-4">
+                            <label class="flex justify-between font-semibold text-slate-700 mb-1">
+                                <span>正則化強度 $\alpha$ :</span>
+                                <span id="s1AlphaDisplay" class="text-blue-600 font-mono font-bold bg-blue-100 px-2 py-0.5 rounded">0.000 (OLS)</span>
+                            </label>
+                            <p class="text-xs text-slate-500 mb-2">向右滑動增加 $\alpha$ ，觀察藍色曲線如何從劇烈震盪變得平滑穩定。</p>
+                            <input type="range" id="s1AlphaSlider" min="0" max="100" step="1" value="0">
+                            <div class="flex justify-between text-[11px] text-slate-400 mt-1 font-mono">
+                                <span>0 (OLS)</span>
+                                <span>0.01</span>
+                                <span>0.3 (適中)</span>
+                                <span>10</span>
+                                <span>500 (過強)</span>
+                            </div>
+                        </div>
+
+                        <!-- 快速情境按鈕 -->
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                            <button onclick="setStep1AlphaPreset(0)" class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                ⚠️ $\alpha = 0$ (OLS)
+                            </button>
+                            <button onclick="setStep1AlphaPreset(48)" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                ★ $\alpha \approx 0.25$ (最佳)
+                            </button>
+                            <button onclick="setStep1AlphaPreset(95)" class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                📉 $\alpha = 200$ (欠擬合)
+                            </button>
+                        </div>
+
+                        <button onclick="resampleStep1Data()" class="w-full bg-violet-100 hover:bg-violet-200 text-violet-800 font-semibold py-2 px-3 rounded-lg text-xs transition border border-violet-200">
+                            🎲 重新抽樣含雜訊數據 (觀察 OLS 與 Ridge 的穩定度差異)
+                        </button>
+                    </div>
+
+                    <!-- 教學解析卡片 -->
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs md:text-sm text-amber-900 space-y-2">
+                        <div class="font-bold text-amber-800 flex items-center gap-1.5">
+                            <span>💡 動手做實驗：認識 L2 正則化的三個區間</span>
+                        </div>
+                        <ol class="list-decimal pl-5 space-y-1.5 text-amber-800">
+                            <li><strong>點擊「$\alpha = 0$ (OLS)」</strong>：查看下方條形圖，OLS 的係數平方和 $\|\boldsymbol{\beta}\|_2^2$ 高達數百甚至數千！各階係數一正一負互相抵消，導致測試集誤差 (Test MSE) 很大。</li>
+                            <li><strong>點擊「★ $\alpha \approx 0.25$ (最佳)」</strong>：係數被大幅壓縮，高頻震盪消失，藍色曲線幾乎貼合綠色真實物理曲線，<strong>Test MSE 降到最低</strong>！</li>
+                            <li><strong>點擊「$\alpha = 200$ (欠擬合)」</strong>：懲罰過重，所有係數被迫趨近於 0，模型退化成接近水平線，訓練與測試誤差雙雙升高。</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 2: 正則化路徑與化工催化反應案例 -->
+        <!-- ========================================== -->
+        <div id="stepPanel2" class="step-panel p-6 md:p-8">
+            <div class="mb-6 bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-xl">
+                <h2 class="text-xl font-bold text-indigo-900 mb-1">Step 2：正則化路徑 (Regularization Path) — 化工催化反應產率案例</h2>
+                <p class="text-sm text-indigo-800">
+                    對應講義 <strong>Section 6A 化學催化反應產率預測</strong>：我們使用反應溫度 (`Temperature_C`)、反應壓力 (`Pressure_bar`)、催化劑濃度 (`Catalyst_wt%`) 與反應時間 (`Time_min`) 預測產率。當溫度與壓力存在<strong>多重共線性 (Multicollinearity)</strong> 時，觀察調整 $\alpha$ 與共線性強度如何影響這 4 個特徵的回歸係數！
+                </p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- 左側：正則化路徑圖 + 係數縮減表格 -->
+                <div class="w-full lg:w-3/5 flex flex-col gap-4">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                        <div class="h-[340px] relative">
+                            <canvas id="step2PathChart"></canvas>
+                        </div>
+                        <p class="text-xs text-slate-500 text-center mt-2">
+                            橫軸為 $\log_{10}(\alpha)$ （從 $10^{-3}$ 到 $10^{4}$），紅色垂直虛線代表目前選定的 $\alpha$ 位置。
+                        </p>
+                    </div>
+
+                    <!-- 即時係數比較表 -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div class="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-700 uppercase">特徵係數即時對照表 (標準化特徵空間)</span>
+                            <span id="s2AvgShrinkage" class="text-xs font-bold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">平均縮減幅度: 0.22%</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs md:text-sm text-left">
+                                <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-2 px-3">化工操作變數 (Feature)</th>
+                                        <th class="py-2 px-3 text-right">OLS 係數 ($\alpha=0$)</th>
+                                        <th class="py-2 px-3 text-right">Ridge 係數 ($\alpha$)</th>
+                                        <th class="py-2 px-3 text-right">縮減比例 (Shrinkage)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s2CoefTableBody" class="divide-y divide-slate-100 font-mono">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：控制面板與原理解析 -->
+                <div class="w-full lg:w-2/5 flex flex-col gap-5">
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                        <h3 class="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">🧪 催化反應器正則化控制台</h3>
+
+                        <!-- 滑桿 1: log10(alpha) -->
+                        <div class="mb-5">
+                            <label class="flex justify-between font-semibold text-slate-700 mb-1">
+                                <span>1. 調整 $\alpha$ (對數尺度 $\log_{10}\alpha$) :</span>
+                                <span id="s2AlphaVal" class="text-indigo-600 font-mono font-bold bg-indigo-100 px-2 py-0.5 rounded">α = 1.15</span>
+                            </label>
+                            <input type="range" id="s2AlphaSlider" min="-3" max="4" step="0.05" value="0.06">
+                            <div class="flex justify-between text-[11px] text-slate-400 mt-1 font-mono">
+                                <span>10⁻³ (0.001)</span>
+                                <span>10⁰ (1.0)</span>
+                                <span>10² (100)</span>
+                                <span>10⁴ (10000)</span>
+                            </div>
+                        </div>
+
+                        <!-- 滑桿 2: 溫度與壓力共線性程度 -->
+                        <div class="mb-4">
+                            <label class="flex justify-between font-semibold text-slate-700 mb-1">
+                                <span>2. 溫度與壓力共線性情境 :</span>
+                                <span id="s2CollinearLabel" class="text-blue-700 font-bold text-xs bg-blue-100 px-2 py-0.5 rounded">講義案例 (r = 0.47, VIF = 1.29)</span>
+                            </label>
+                            <p class="text-xs text-slate-500 mb-2">切換高度共線性情境，觀察 OLS 係數如何失真、而 Ridge 如何快速拉回穩定值！</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setStep2Scenario('mild')" id="s2BtnMild" class="bg-indigo-600 text-white text-xs font-semibold py-2 px-3 rounded-lg transition shadow-sm">
+                                    📘 講義輕度共線性 (r=0.47)
+                                </button>
+                                <button onclick="setStep2Scenario('severe')" id="s2BtnSevere" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-3 rounded-lg transition">
+                                    🔥 嚴重共線性 (r=0.98, VIF=25)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 快速定位按鈕 -->
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="setStep2Alpha(0.06)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                ★ 講義最佳 $\alpha = 1.1514$
+                            </button>
+                            <button onclick="setStep2Alpha(2.5)" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                觀察強收縮 ($\alpha \approx 316$)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 重點觀念解讀 -->
+                    <div class="space-y-3 text-xs md:text-sm text-slate-700">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <h4 class="font-bold text-indigo-700 mb-1.5">🔍 從正則化路徑必學的 3 個關鍵特性：</h4>
+                            <ul class="space-y-2 list-disc pl-4 text-slate-600">
+                                <li><strong>平滑收縮但絕不歸零</strong>：當 $\alpha \to \infty$ 時，所有係數漸進趨近於 0，但<strong>不會完全等於 0</strong>（保留所有化工操作變數的物理貢獻）。</li>
+                                <li><strong>大係數受懲罰最顯著</strong>：因為懲罰項是平方 $\beta_j^2$ ，像 `Temperature_C` ($\beta \approx 5.88$) 這種大係數受到的壓縮力道最強。</li>
+                                <li><strong>解決多重共線性震盪</strong>：請點擊上方<strong>「🔥 嚴重共線性 (r=0.98)」</strong>按鈕！在嚴重共線性下，OLS ($\alpha \to 0$) 會把溫度係數高估到 $+14.5$ 、壓力低估到 $-4.5$ （正負抵消）；但只要將 $\alpha$ 調到 $10 \sim 50$ ，溫度和壓力的係數就會迅速收斂並共同分攤正貢獻！</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ========================================== -->
+        <!-- STEP 3: L2 幾何解釋與偏差-方差權衡 -->
+        <!-- ========================================== -->
+        <div id="stepPanel3" class="step-panel p-6 md:p-8">
+            <div class="mb-6 bg-emerald-50 border-l-4 border-emerald-600 p-4 rounded-r-xl">
+                <h2 class="text-xl font-bold text-emerald-900 mb-1">Step 3：L2 正則化的幾何解釋 &amp; 偏差-方差權衡 (Bias-Variance Tradeoff)</h2>
+                <p class="text-sm text-emerald-800">
+                    為什麼 Ridge 回歸只會把係數縮小，卻<strong>不會像 Lasso (L1) 那樣把係數剛好變成 0</strong>？答案就在二維參數空間 $(\beta_1, \beta_2)$ 的幾何形狀中：Ridge 的約束區是一個光滑的<strong>圓形 ($\beta_1^2 + \beta_2^2 \le t$)</strong>！
+                </p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- 左側：雙圖並排 (2D 幾何約束 Canvas + Bias-Variance 曲線) -->
+                <div class="w-full lg:w-3/5 flex flex-col gap-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 圖 3A: 2D (beta1, beta2) 幾何圓形約束與損失等高線 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col items-center">
+                            <div class="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                                L2 Constraint Circle vs. RSS Contours
+                            </div>
+                            <div class="w-full aspect-square max-w-[310px] relative border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                                <canvas id="step3GeoCanvas" width="320" height="320" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-500 text-center space-y-0.5">
+                                <p>🔴 紅點：OLS 解 $\hat{\boldsymbol{\beta}}_{\text{OLS}}$ ｜ 🔵 藍圓：L2 約束區 $\beta_1^2+\beta_2^2 \le t$</p>
+                                <p>🟢 綠點：Ridge 切點解 $\hat{\boldsymbol{\beta}}_{\text{Ridge}}$ ｜ 虛線曲線：完整收縮軌跡</p>
+                            </div>
+                        </div>
+
+                        <!-- 圖 3B: Bias^2 - Variance - Total MSE Tradeoff -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col">
+                            <div class="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide text-center">
+                                Bias-Variance Tradeoff ($\text{MSE} = \text{Bias}^2 + \text{Var}$)
+                            </div>
+                            <div class="flex-1 min-h-[270px] relative">
+                                <canvas id="step3BVChart"></canvas>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-500 text-center">
+                                犧牲一點點<strong>偏差 (Bias²)</strong>，換取<strong>方差 (Variance)</strong> 大幅下降！
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 解析解矩陣對照區塊 -->
+                    <div class="bg-slate-800 text-slate-100 rounded-xl p-4 shadow-sm">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">矩陣解析解 (Closed-Form Solution) 的穩定魔法</div>
+                                <p class="text-xs text-slate-300">
+                                    當特徵高度共線時，$\mathbf{X}^T\mathbf{X}$ 接近奇異矩陣（不可逆，特徵值 $\lambda_{\min} \approx 0$）。Ridge 在對角線加上 $\alpha \mathbf{I}$ ，將所有特徵值平移為 $\lambda_j + \alpha > 0$ ，保證永遠可逆且數值穩定！
+                                </p>
+                            </div>
+                            <div class="bg-slate-900/90 px-4 py-2.5 rounded-lg border border-slate-700 shrink-0 text-center">
+                                <div class="text-xs text-slate-400 mb-1">OLS vs. Ridge 解析解</div>
+                                <div class="text-xs md:text-sm font-mono text-emerald-300">
+                                    $\hat{\boldsymbol{\beta}}_{\text{Ridge}} = (\mathbf{X}^T\mathbf{X} + \alpha \mathbf{I})^{-1}\mathbf{X}^T\mathbf{y}$
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：控制面板與幾何直覺說明 -->
+                <div class="w-full lg:w-2/5 flex flex-col gap-5">
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                        <h3 class="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">📐 幾何約束與權衡控制器</h3>
+
+                        <!-- 四格即時數據 -->
+                        <div class="grid grid-cols-2 gap-2.5 mb-4">
+                            <div class="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                                <div class="text-xs text-slate-400">目前 Ridge 解 $(\hat{\beta}_1, \hat{\beta}_2)$</div>
+                                <div id="s3BetaCoords" class="text-sm font-mono font-bold text-emerald-700">(2.10, 1.45)</div>
+                            </div>
+                            <div class="bg-blue-50 p-2.5 rounded-lg border border-blue-200 text-center">
+                                <div class="text-xs text-blue-500">約束圓半徑 $\sqrt{t}$</div>
+                                <div id="s3RadiusVal" class="text-sm font-mono font-bold text-blue-700">r = 2.55</div>
+                            </div>
+                            <div class="bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-center">
+                                <div class="text-xs text-amber-600">Bias² + Variance</div>
+                                <div id="s3BVBreakdown" class="text-xs font-mono font-bold text-amber-800">0.18 + 0.42</div>
+                            </div>
+                            <div class="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 text-center">
+                                <div class="text-xs text-emerald-600">總預測誤差 (Total MSE)</div>
+                                <div id="s3TotalMSE" class="text-sm font-mono font-bold text-emerald-800">0.600</div>
+                            </div>
+                        </div>
+
+                        <!-- Alpha Slider for Step 3 -->
+                        <div class="mb-4">
+                            <label class="flex justify-between font-semibold text-slate-700 mb-1">
+                                <span>正則化強度 $\alpha$ (控制約束圓大小 $t$) :</span>
+                                <span id="s3AlphaDisplay" class="text-emerald-700 font-mono font-bold bg-emerald-100 px-2 py-0.5 rounded">α = 1.20</span>
+                            </label>
+                            <p class="text-xs text-slate-500 mb-2">
+                                $\alpha$ 越大 $\Longleftrightarrow$ 允許的係數預算 $t$ 越小（藍色圓圈越往原點收縮）。
+                            </p>
+                            <input type="range" id="s3AlphaSlider" min="0" max="100" step="1" value="35">
+                        </div>
+
+                        <!-- 切換顯示 L1 菱形對照 -->
+                        <div class="bg-white p-3 rounded-lg border border-slate-200 mb-3 flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-bold text-slate-700">疊加顯示 Lasso (L1) 菱形約束區</div>
+                                <div class="text-[11px] text-slate-500">比較為何圓形不會切在座標軸上，而菱形尖角會！</div>
+                            </div>
+                            <input type="checkbox" id="s3ShowL1Toggle" onchange="updateStep3()" class="w-4 h-4 accent-emerald-600 cursor-pointer">
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button onclick="setStep3Preset(0)" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                $\alpha = 0$ (無約束 OLS)
+                            </button>
+                            <button onclick="setStep3Preset(38)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                ★ 最低 MSE 平衡點
+                            </button>
+                            <button onclick="setStep3Preset(85)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                高 $\alpha$ (小圓圈)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 幾何與統計直覺說明 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 text-xs md:text-sm space-y-2 shadow-sm">
+                        <h4 class="font-bold text-emerald-700">🎯 為什麼 L2 圓形不會產生稀疏解（係數不為 0）？</h4>
+                        <p class="text-slate-600">
+                            如左圖所示，紅色同心橢圓是殘差平方和 $\| \mathbf{y} - \mathbf{X}\boldsymbol{\beta} \|_2^2$ 的等高線，藍色圓形是 $\beta_1^2 + \beta_2^2 \le t$ 的可行域。
+                        </p>
+                        <p class="text-slate-600">
+                            因為<strong>圓形邊界沒有尖角</strong>，當紅色橢圓向外擴張碰到藍色圓形時，切點（綠點 $\hat{\boldsymbol{\beta}}_{\text{Ridge}}$ ）幾乎總是落在象限內部 ($\beta_1 \neq 0, \beta_2 \neq 0$)。勾選上方<strong>「疊加顯示 Lasso (L1) 菱形」</strong>，就能看到菱形在座標軸上有尖角，才容易直接撞在 $\beta_2 = 0$ 的軸上！
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 4: 為什麼必須進行特徵標準化？ -->
+        <!-- ========================================== -->
+        <div id="stepPanel4" class="step-panel p-6 md:p-8">
+            <div class="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                <h2 class="text-xl font-bold text-amber-900 mb-1">Step 4：實務鐵律 — 為什麼使用 Ridge 回歸前「必須進行特徵標準化」？</h2>
+                <p class="text-sm text-amber-800">
+                    在化工過程中，不同物理量的單位與數值尺度差異極大！例如：反應溫度 $T \in [300, 400]\text{ K}$ （數值大、原始係數小），而貴金屬催化劑濃度 $C_{\text{cat}} \in [0.005, 0.025]\text{ mol/L}$ （數值極小、原始係數高達數百）。如果<strong>不先做 `StandardScaler` 標準化</strong>，Ridge 的懲罰項 $\alpha \sum \beta_j^2$ 會發生什麼災難？
+                </p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- 左側：未標準化 vs 已標準化 對比圖表 -->
+                <div class="w-full lg:w-3/5 flex flex-col gap-4">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-slate-600 uppercase">
+                                各特徵對產率的「真實影響力保留度 (%)」對比
+                            </span>
+                            <span id="s4ModeTag" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700">
+                                ❌ 未標準化：催化劑特徵被不公平抹殺！
+                            </span>
+                        </div>
+                        <div class="h-[310px] relative">
+                            <canvas id="step4ScaleChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 單位換算真相卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-xs space-y-1.5">
+                            <div class="font-bold text-red-800 text-sm">❌ 未標準化 (Raw Features) 的不公平懲罰</div>
+                            <p class="text-red-700">
+                                假設溫度增加 $50\text{ K}$ 與催化劑增加 $0.01\text{ mol/L}$ 對產率同樣貢獻 $+10\%$ ：
+                            </p>
+                            <ul class="list-disc pl-4 text-red-700 space-y-1 font-mono">
+                                <li>溫度原始係數 $\beta_T = 10 / 50 = 0.2 \implies \beta_T^2 = 0.04$</li>
+                                <li>催化劑原始係數 $\beta_C = 10 / 0.01 = 1000 \implies \beta_C^2 = 10^6$</li>
+                            </ul>
+                            <p class="text-red-800 font-semibold pt-1">
+                                結果：L2 懲罰項 $\alpha(\beta_T^2 + \beta_C^2)$ 幾乎 100% 都在懲罰催化劑濃度！只要 $\alpha > 0.01$，催化劑的影響力就被壓到接近 0！
+                            </p>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs space-y-1.5">
+                            <div class="font-bold text-emerald-800 text-sm">✅ Z-score 標準化 (`StandardScaler`) 後</div>
+                            <p class="text-emerald-700">
+                                先將所有特徵轉換為均值 $0$ 、標準差 $1$ 的無因次量 $z_j = (x_j - \mu_j)/\sigma_j$ ：
+                            </p>
+                            <ul class="list-disc pl-4 text-emerald-700 space-y-1 font-mono">
+                                <li>溫度增加 $1\sigma$ 的係數 $\tilde{\beta}_T = 5.0 \implies \tilde{\beta}_T^2 = 25$</li>
+                                <li>催化劑增加 $1\sigma$ 的係數 $\tilde{\beta}_C = 5.0 \implies \tilde{\beta}_C^2 = 25$</li>
+                            </ul>
+                            <p class="text-emerald-800 font-semibold pt-1">
+                                結果：所有特徵站在同一起跑線上接受公平的 L2 正則化，模型預測精度 $R^2$ 大幅提升！
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：互動實驗切換器與 sklearn 標準流程 -->
+                <div class="w-full lg:w-2/5 flex flex-col gap-5">
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                        <h3 class="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">⚖️ 特徵尺度與標準化實驗</h3>
+
+                        <!-- 切換開關 -->
+                        <div class="mb-4">
+                            <p class="text-xs font-bold text-slate-600 mb-2 uppercase">1. 選擇資料前處理方式：</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setStep4Scaling(false)" id="s4BtnUnscaled" class="bg-red-600 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition shadow">
+                                    ❌ 未標準化 (Raw Data)
+                                </button>
+                                <button onclick="setStep4Scaling(true)" id="s4BtnScaled" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold py-2.5 px-3 rounded-lg transition">
+                                    ✅ 已標準化 (StandardScaler)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 改變催化劑單位按鈕 -->
+                        <div class="mb-4">
+                            <p class="text-xs font-bold text-slate-600 mb-2 uppercase">2. 改變催化劑濃度的計量單位：</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setStep4Unit('mol')" id="s4UnitMol" class="bg-blue-600 text-white text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                    單位：mol/L (數值 ~0.01)
+                                </button>
+                                <button onclick="setStep4Unit('mmol')" id="s4UnitMmol" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-2 rounded-lg transition">
+                                    單位：mmol/L (數值 ~10)
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-1">
+                                試著在「未標準化」與「已標準化」下切換單位，看看模型的預測結果是否會因為單位改變而劇烈變動！
+                            </p>
+                        </div>
+
+                        <!-- Alpha Slider for Step 4 -->
+                        <div class="mb-4">
+                            <label class="flex justify-between font-semibold text-slate-700 mb-1">
+                                <span>3. 正則化強度 $\alpha$ :</span>
+                                <span id="s4AlphaVal" class="text-amber-700 font-mono font-bold bg-amber-100 px-2 py-0.5 rounded">α = 1.0</span>
+                            </label>
+                            <input type="range" id="s4AlphaSlider" min="0.1" max="10" step="0.1" value="1.0">
+                        </div>
+
+                        <!-- 測試集 R2 指標對比 -->
+                        <div class="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600">目前模型測試集 $R^2$ 分數：</span>
+                            <span id="s4R2Badge" class="text-base font-mono font-bold text-red-600">R² = 0.482 (嚴重失真)</span>
+                        </div>
+                    </div>
+
+                    <!-- 標準 Python 程式碼備忘錄 -->
+                    <div class="bg-slate-900 text-slate-100 p-4 rounded-xl text-xs font-mono leading-relaxed shadow-sm">
+                        <div class="text-emerald-400 font-sans font-bold text-xs mb-2 flex items-center justify-between">
+                            <span>🐍 sklearn Ridge 標準建模黃金三步驟</span>
+                            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">Unit 10 必考重點</span>
+                        </div>
+<pre class="overflow-x-auto text-[11px] text-slate-200"><code><span class="text-slate-400"># Step 1: 必須先對特徵做 Z-score 標準化！</span>
+scaler = StandardScaler()
+X_train_s = scaler.fit_transform(X_train)
+X_test_s  = scaler.transform(X_test)
+
+<span class="text-slate-400"># Step 2: 用 RidgeCV 交叉驗證找出最佳 α</span>
+alphas = np.logspace(-3, 3, 50)
+ridge_cv = RidgeCV(alphas=alphas, cv=5)
+ridge_cv.fit(X_train_s, y_train)
+
+<span class="text-slate-400"># Step 3: 預測新數據 (別忘了先 transform)</span>
+y_pred = ridge_cv.predict(X_test_s)</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部逐步切換控制列與重點總結 -->
+        <div class="bg-slate-100 px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <button onclick="prevStep()" id="btnPrevStep" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition disabled:opacity-40 disabled:pointer-events-none">
+                ← 上一步
+            </button>
+            <div id="stepProgressText" class="text-xs md:text-sm font-bold text-slate-600">
+                學習進度：Step 1 / 4 — 抑制過擬合與高方差
+            </div>
+            <button onclick="nextStep()" id="btnNextStep" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition shadow-sm">
+                下一步：正則化路徑與係數收縮 →
+            </button>
+        </div>
+
+        <!-- 課程版權聲明區塊 -->
+        <div class="bg-slate-900 text-slate-400 px-6 py-5 text-xs border-t border-slate-800">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="space-y-1">
+                    <div class="text-slate-200 font-bold">課程資訊 | AI在化工上之應用 (ChemE 3590)</div>
+                    <div>課程單元：Unit10 Ridge Regression (L2 正則化回歸) 互動式教學</div>
+                    <div>課程製作：逢甲大學 化工系 智慧程序系統工程實驗室 ｜ 授課教師：莊曜禎 助理教授</div>
+                </div>
+                <div class="md:text-right space-y-1">
+                    <div class="text-slate-300 font-semibold">課程授權 [CC BY-NC-SA 4.0]</div>
+                    <div>
+                        本教材遵循 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh" target="_blank" class="text-blue-400 hover:underline">創用CC 姓名標示-非商業性-相同方式分享 4.0 國際</a> 授權。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        // ==========================================================
+        // 全域步驟切換邏輯 (Stepper Navigation)
+        // ==========================================================
+        let currentStep = 1;
+        const stepTitles = [
+            "Step 1 / 4 — 抑制過擬合與高方差",
+            "Step 2 / 4 — 正則化路徑與係數收縮",
+            "Step 3 / 4 — L2 幾何圓與偏差-方差權衡",
+            "Step 4 / 4 — 為什麼必須進行特徵標準化？"
+        ];
+        const nextBtnLabels = [
+            "下一步：正則化路徑與係數收縮 →",
+            "下一步：L2 幾何圓與偏差-方差 →",
+            "下一步：為什麼必須標準化？ →",
+            "🎉 已完成全部 4 個步驟！"
+        ];
+
+        function switchStep(step) {
+            currentStep = step;
+            for (let i = 1; i <= 4; i++) {
+                const panel = document.getElementById(`stepPanel${i}`);
+                const btn = document.getElementById(`stepBtn${i}`);
+                if (i === step) {
+                    panel.classList.add('active');
+                    btn.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
+                    btn.classList.remove('active');
+                }
+            }
+            document.getElementById('stepProgressText').innerText = `學習進度：${stepTitles[step - 1]}`;
+            const prevBtn = document.getElementById('btnPrevStep');
+            const nextBtn = document.getElementById('btnNextStep');
+            prevBtn.disabled = (step === 1);
+            nextBtn.innerText = nextBtnLabels[step - 1];
+            nextBtn.disabled = (step === 4);
+            if (step === 4) {
+                nextBtn.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                nextBtn.classList.remove('opacity-50', 'pointer-events-none');
+            }
+
+            // 觸發當前步驟圖表重繪以確保尺寸正確
+            if (step === 1 && s1FitChart) { s1FitChart.resize(); s1CoefChart.resize(); }
+            if (step === 2 && s2PathChart) { s2PathChart.resize(); updateStep2(); }
+            if (step === 3) { if (s3BVChart) s3BVChart.resize(); updateStep3(); }
+            if (step === 4 && s4ScaleChart) { s4ScaleChart.resize(); updateStep4(); }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) switchStep(currentStep - 1);
+        }
+        function nextStep() {
+            if (currentStep < 4) switchStep(currentStep + 1);
+        }
+
+        // ==========================================================
+        // 線性代數輔助函數：求解 (X^T X + alpha * I_pen) beta = X^T y
+        // ==========================================================
+        function solveLinearSystem(A, b) {
+            const n = A.length;
+            const M = A.map((row, i) => [...row, b[i]]);
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
+                }
+                [M[i], M[maxRow]] = [M[maxRow], M[i]];
+                const pivot = M[i][i] || 1e-12;
+                for (let j = i; j <= n; j++) M[i][j] /= pivot;
+                for (let k = 0; k < n; k++) {
+                    if (k !== i) {
+                        const factor = M[k][i];
+                        for (let j = i; j <= n; j++) M[k][j] -= factor * M[i][j];
+                    }
+                }
+            }
+            return M.map(row => row[n]);
+        }
+
+        // 建立Chebyshev/Legendre風格縮放多項式基底以展示明顯的高階震盪過擬合
+        const POLY_DEGREE = 7;
+        function buildPolyFeatures(x) {
+            // x in [-1, 1]
+            const row = [1]; // 截距項
+            for (let d = 1; d <= POLY_DEGREE; d++) {
+                row.push(Math.pow(x, d));
+            }
+            return row;
+        }
+
+        function fitPolyRidge(xs, ys, alpha) {
+            const n = xs.length;
+            const p = POLY_DEGREE + 1;
+            const X = xs.map(x => buildPolyFeatures(x));
+            const XtX = Array.from({ length: p }, () => Array(p).fill(0));
+            const Xty = Array(p).fill(0);
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < p; j++) {
+                    Xty[j] += X[i][j] * ys[i];
+                    for (let k = 0; k < p; k++) {
+                        XtX[j][k] += X[i][j] * X[i][k];
+                    }
+                }
+            }
+            // 對 j >= 1 的係數加上 L2 正則化 alpha (截距 j=0 不懲罰)，加上極微小基底穩定項防止奇異
+            for (let j = 1; j < p; j++) {
+                XtX[j][j] += alpha + 1e-9;
+            }
+            return solveLinearSystem(XtX, Xty);
+        }
+
+        function evalPoly(beta, x) {
+            const feats = buildPolyFeatures(x);
+            let sum = 0;
+            for (let j = 0; j < beta.length; j++) sum += beta[j] * feats[j];
+            return sum;
+        }
+
+        // ==========================================================
+        // STEP 1: 抑制過擬合與高方差 (Polynomial Ridge Demo)
+        // ==========================================================
+        let s1TrainX = [];
+        let s1TrainY = [];
+        let s1TestX = [];
+        let s1TestY = [];
+        let s1OlsBeta = [];
+        let s1FitChart = null;
+        let s1CoefChart = null;
+        let s1SeedIndex = 0;
+
+        const noisePresets = [
+            [0.18, -0.32, 0.38, -0.28, 0.35, -0.42, 0.31, -0.25, 0.29, -0.15],
+            [-0.25, 0.36, -0.31, 0.29, -0.38, 0.41, -0.27, 0.33, -0.22, 0.19],
+            [0.29, -0.24, 0.42, -0.39, 0.22, -0.31, 0.37, -0.33, 0.26, -0.21]
+        ];
+
+        function truePhysicalFunc(x) {
+            // 真實化工反應趨勢：平滑非線性曲線
+            return 0.5 * x + 0.8 * Math.sin(1.8 * x) + 0.2 * x * x;
+        }
+
+        function generateStep1Dataset(seedIdx) {
+            s1TrainX = [-0.95, -0.74, -0.52, -0.31, -0.10, 0.12, 0.33, 0.54, 0.75, 0.95];
+            const noises = noisePresets[seedIdx % noisePresets.length];
+            s1TrainY = s1TrainX.map((x, i) => truePhysicalFunc(x) + noises[i]);
+
+            s1TestX = [-0.85, -0.63, -0.41, -0.20, 0.01, 0.22, 0.44, 0.65, 0.86];
+            const testNoises = [-0.08, 0.11, -0.09, 0.07, -0.06, 0.09, -0.10, 0.08, -0.05];
+            s1TestY = s1TestX.map((x, i) => truePhysicalFunc(x) + testNoises[i]);
+
+            // 計算 OLS (alpha = 0)
+            s1OlsBeta = fitPolyRidge(s1TrainX, s1TrainY, 0.0);
+        }
+
+        function sliderToStep1Alpha(sliderVal) {
+            const v = parseFloat(sliderVal);
+            if (v <= 0) return 0;
+            // 對數映射 1..100 -> 10^-4 .. 10^2.3 (~200)
+            const logA = -4 + (v / 100) * 6.30103;
+            return Math.pow(10, logA);
+        }
+
+        function initStep1Charts() {
+            generateStep1Dataset(0);
+
+            const gridX = Array.from({ length: 81 }, (_, i) => -1.0 + (i / 80) * 2.0);
+            const trueCurve = gridX.map(x => ({ x, y: truePhysicalFunc(x) }));
+            const olsCurve = gridX.map(x => ({ x, y: evalPoly(s1OlsBeta, x) }));
+
+            const ctxFit = document.getElementById('step1FitChart').getContext('2d');
+            s1FitChart = new Chart(ctxFit, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'True Physical Curve',
+                            data: trueCurve,
+                            type: 'line',
+                            borderColor: '#059669',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'OLS (alpha = 0)',
+                            data: olsCurve,
+                            type: 'line',
+                            borderColor: '#94a3b8',
+                            borderWidth: 1.8,
+                            borderDash: [3, 3],
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Ridge Model Prediction',
+                            data: olsCurve,
+                            type: 'line',
+                            borderColor: '#2563eb',
+                            borderWidth: 3.2,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Training Data',
+                            data: s1TrainX.map((x, i) => ({ x, y: s1TrainY[i] })),
+                            backgroundColor: '#2563eb',
+                            borderColor: '#ffffff',
+                            borderWidth: 1.5,
+                            pointRadius: 6
+                        },
+                        {
+                            label: 'Testing Data',
+                            data: s1TestX.map((x, i) => ({ x, y: s1TestY[i] })),
+                            backgroundColor: '#f59e0b',
+                            borderColor: '#ffffff',
+                            borderWidth: 1.5,
+                            pointRadius: 5.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 80 },
+                    scales: {
+                        x: {
+                            min: -1.05,
+                            max: 1.05,
+                            title: { display: true, text: 'Normalized Process Feature x', font: { weight: 'bold' } }
+                        },
+                        y: {
+                            min: -1.8,
+                            max: 2.0,
+                            title: { display: true, text: 'Normalized Yield Response y', font: { weight: 'bold' } }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Polynomial Regression Curve Fitting: OLS vs. Ridge Regularization',
+                            font: { size: 13, weight: 'bold' }
+                        },
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            const ctxCoef = document.getElementById('step1CoefChart').getContext('2d');
+            const labels = Array.from({ length: POLY_DEGREE }, (_, i) => `β${i + 1} (x^${i + 1})`);
+            s1CoefChart = new Chart(ctxCoef, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'OLS Coefficients (alpha=0)',
+                            data: s1OlsBeta.slice(1),
+                            backgroundColor: 'rgba(148, 163, 184, 0.45)',
+                            borderColor: '#64748b',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Ridge Coefficients (Current alpha)',
+                            data: s1OlsBeta.slice(1),
+                            backgroundColor: 'rgba(37, 99, 235, 0.8)',
+                            borderColor: '#1d4ed8',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 80 },
+                    scales: {
+                        x: { title: { display: false } },
+                        y: {
+                            title: { display: true, text: 'Coefficient Value', font: { size: 11 } }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { boxWidth: 12, font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('s1AlphaSlider').addEventListener('input', updateStep1);
+            updateStep1();
+        }
+
+        function updateStep1() {
+            const sliderVal = document.getElementById('s1AlphaSlider').value;
+            const alpha = sliderToStep1Alpha(sliderVal);
+            const ridgeBeta = fitPolyRidge(s1TrainX, s1TrainY, alpha);
+
+            const gridX = Array.from({ length: 81 }, (_, i) => -1.0 + (i / 80) * 2.0);
+            s1FitChart.data.datasets[1].data = gridX.map(x => ({ x, y: evalPoly(s1OlsBeta, x) }));
+            s1FitChart.data.datasets[2].data = gridX.map(x => ({ x, y: evalPoly(ridgeBeta, x) }));
+            s1FitChart.data.datasets[3].data = s1TrainX.map((x, i) => ({ x, y: s1TrainY[i] }));
+            s1FitChart.data.datasets[4].data = s1TestX.map((x, i) => ({ x, y: s1TestY[i] }));
+            s1FitChart.update();
+
+            s1CoefChart.data.datasets[0].data = s1OlsBeta.slice(1).map(v => Number(v.toFixed(2)));
+            s1CoefChart.data.datasets[1].data = ridgeBeta.slice(1).map(v => Number(v.toFixed(2)));
+            s1CoefChart.update();
+
+            // 計算指標
+            let trainSE = 0;
+            for (let i = 0; i < s1TrainX.length; i++) {
+                const err = s1TrainY[i] - evalPoly(ridgeBeta, s1TrainX[i]);
+                trainSE += err * err;
+            }
+            const trainMSE = trainSE / s1TrainX.length;
+
+            let testSE = 0;
+            for (let i = 0; i < s1TestX.length; i++) {
+                const err = s1TestY[i] - evalPoly(ridgeBeta, s1TestX[i]);
+                testSE += err * err;
+            }
+            const testMSE = testSE / s1TestX.length;
+
+            let betaNormSq = 0;
+            for (let j = 1; j < ridgeBeta.length; j++) {
+                betaNormSq += ridgeBeta[j] * ridgeBeta[j];
+            }
+            const penalty = alpha * betaNormSq;
+
+            // 更新 UI 標籤
+            const alphaText = alpha === 0 ? "0.000 (OLS)" : (alpha < 0.01 ? alpha.toExponential(2) : alpha.toFixed(3));
+            document.getElementById('s1AlphaDisplay').innerText = alphaText;
+            document.getElementById('s1TrainMSE').innerText = trainMSE.toFixed(4);
+            document.getElementById('s1TestMSE').innerText = testMSE.toFixed(4);
+            document.getElementById('s1BetaNorm').innerText = betaNormSq.toFixed(2);
+            document.getElementById('s1Penalty').innerText = penalty.toFixed(3);
+            document.getElementById('step1NormText').innerText = `‖β‖₂² = ${betaNormSq.toFixed(2)}`;
+
+            const badge = document.getElementById('step1StatusBadge');
+            if (alpha < 0.005) {
+                badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700";
+                badge.innerText = "⚠️ 嚴重過擬合 (Overfitting)";
+            } else if (alpha <= 2.0) {
+                badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700";
+                badge.innerText = "★ 最佳泛化區間 (Well-Regularized)";
+            } else {
+                badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
+                badge.innerText = "📉 懲罰過重 / 欠擬合 (Underfitting)";
+            }
+        }
+
+        function setStep1AlphaPreset(sliderVal) {
+            document.getElementById('s1AlphaSlider').value = sliderVal;
+            updateStep1();
+        }
+
+        function resampleStep1Data() {
+            s1SeedIndex++;
+            generateStep1Dataset(s1SeedIndex);
+            updateStep1();
+        }
+        // ==========================================================
+        // STEP 2: 正則化路徑 (Regularization Path) - 化工催化反應產率案例
+        // ==========================================================
+        let s2PathChart = null;
+        let s2Scenario = 'mild'; // 'mild' (r=0.47, 講義案例) or 'severe' (r=0.98, 嚴重共線性)
+        const s2LogAlphas = Array.from({ length: 71 }, (_, i) => -3.0 + i * 0.1); // -3 to +4
+
+        // 使用真實的 4x4 相關矩陣求解 (n * R + alpha * I) beta = n * r_xy
+        function computeStep2Coefs(alpha, scenario) {
+            const n = 400; // 訓練集樣本數 400 (總樣本 500 的 80%)
+            let rTP = 0.473;
+            let olsBeta = [5.881085, 4.090323, 3.002742, 1.923576];
+
+            if (scenario === 'severe') {
+                rTP = 0.98;
+                // 嚴重共線性下，OLS 係數正負劇烈震盪抵消 (真實和約為 10.0)
+                olsBeta = [14.60, -4.60, 3.002742, 1.923576];
+            }
+
+            const R = [
+                [1.0, rTP, 0.02, 0.01],
+                [rTP, 1.0, 0.03, -0.01],
+                [0.02, 0.03, 1.0, 0.005],
+                [0.01, -0.01, 0.005, 1.0]
+            ];
+
+            // X^T y = (X^T X) * beta_OLS = n * R * beta_OLS
+            const Xty = [0, 0, 0, 0];
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    Xty[i] += n * R[i][j] * olsBeta[j];
+                }
+            }
+
+            const A = Array.from({ length: 4 }, (_, i) =>
+                Array.from({ length: 4 }, (__, j) => n * R[i][j] + (i === j ? alpha : 0))
+            );
+            return {
+                ols: olsBeta,
+                ridge: solveLinearSystem(A, Xty)
+            };
+        }
+
+        // 自訂外掛：在 Step 2 圖表上畫出當前選定的 log10(alpha) 紅色垂直虛線
+        const verticalAlphaLinePlugin = {
+            id: 'verticalAlphaLine',
+            afterDraw(chart) {
+                if (chart.canvas.id !== 'step2PathChart' && chart.canvas.id !== 'step3BVChart') return;
+                const xVal = chart.options.plugins.verticalLineX;
+                if (xVal === undefined) return;
+                const xScale = chart.scales.x;
+                const yScale = chart.scales.y;
+                const xPos = xScale.getPixelForValue(xVal);
+                if (xPos < xScale.left || xPos > xScale.right) return;
+
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 4]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#dc2626';
+                ctx.moveTo(xPos, yScale.top);
+                ctx.lineTo(xPos, yScale.bottom);
+                ctx.stroke();
+
+                ctx.fillStyle = '#dc2626';
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(chart.options.plugins.verticalLineLabel || '', xPos, yScale.top + 14);
+                ctx.restore();
+            }
+        };
+        Chart.register(verticalAlphaLinePlugin);
+
+        function initStep2Chart() {
+            const ctx = document.getElementById('step2PathChart').getContext('2d');
+            s2PathChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Temperature_C (β1)',
+                            data: [],
+                            borderColor: '#2563eb',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Pressure_bar (β2)',
+                            data: [],
+                            borderColor: '#ea580c',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Catalyst_wt% (β3)',
+                            data: [],
+                            borderColor: '#16a34a',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Time_min (β4)',
+                            data: [],
+                            borderColor: '#9333ea',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 100 },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: -3,
+                            max: 4,
+                            title: { display: true, text: 'Regularization Strength log10(Alpha)', font: { weight: 'bold' } }
+                        },
+                        y: {
+                            title: { display: true, text: 'Standardized Coefficients (β)', font: { weight: 'bold' } }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Ridge Regularization Path: Catalytic Reaction Yield Model',
+                            font: { size: 13, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { boxWidth: 14, font: { size: 11 } }
+                        },
+                        verticalLineX: 0.06,
+                        verticalLineLabel: 'Current α'
+                    }
+                }
+            });
+
+            document.getElementById('s2AlphaSlider').addEventListener('input', updateStep2);
+            rebuildStep2PathCurves();
+            updateStep2();
+        }
+
+        function rebuildStep2PathCurves() {
+            const curves = [[], [], [], []];
+            for (const logA of s2LogAlphas) {
+                const alpha = Math.pow(10, logA);
+                const res = computeStep2Coefs(alpha, s2Scenario);
+                for (let j = 0; j < 4; j++) {
+                    curves[j].push({ x: logA, y: res.ridge[j] });
+                }
+            }
+            for (let j = 0; j < 4; j++) {
+                s2PathChart.data.datasets[j].data = curves[j];
+            }
+        }
+
+        function updateStep2() {
+            const logA = parseFloat(document.getElementById('s2AlphaSlider').value);
+            const alpha = Math.pow(10, logA);
+
+            document.getElementById('s2AlphaVal').innerText =
+                `α = ${alpha < 0.1 ? alpha.toFixed(4) : (alpha < 10 ? alpha.toFixed(2) : alpha.toFixed(0))}`;
+
+            s2PathChart.options.plugins.verticalLineX = logA;
+            s2PathChart.options.plugins.verticalLineLabel = `α=${alpha < 10 ? alpha.toFixed(2) : alpha.toFixed(0)}`;
+            s2PathChart.update();
+
+            const res = computeStep2Coefs(alpha, s2Scenario);
+            const featureNames = [
+                { name: 'Temperature_C (反應溫度)', color: 'text-blue-600' },
+                { name: 'Pressure_bar (反應壓力)', color: 'text-orange-600' },
+                { name: 'Catalyst_wt% (催化劑濃度)', color: 'text-emerald-600' },
+                { name: 'Time_min (反應時間)', color: 'text-purple-600' }
+            ];
+
+            let tbodyHTML = '';
+            let totalShrinkPct = 0;
+            for (let j = 0; j < 4; j++) {
+                const olsV = res.ols[j];
+                const ridgeV = res.ridge[j];
+                const shrinkPct = Math.abs((olsV - ridgeV) / olsV) * 100;
+                totalShrinkPct += shrinkPct;
+                tbodyHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2 px-3 font-sans font-semibold ${featureNames[j].color}">${featureNames[j].name}</td>
+                        <td class="py-2 px-3 text-right text-slate-600">${olsV.toFixed(4)}</td>
+                        <td class="py-2 px-3 text-right font-bold text-slate-800">${ridgeV.toFixed(4)}</td>
+                        <td class="py-2 px-3 text-right">
+                            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">-${shrinkPct.toFixed(2)}%</span>
+                        </td>
+                    </tr>
+                `;
+            }
+            document.getElementById('s2CoefTableBody').innerHTML = tbodyHTML;
+            document.getElementById('s2AvgShrinkage').innerText = `平均變化幅度: ${(totalShrinkPct / 4).toFixed(2)}%`;
+        }
+
+        function setStep2Scenario(scen) {
+            s2Scenario = scen;
+            const btnMild = document.getElementById('s2BtnMild');
+            const btnSevere = document.getElementById('s2BtnSevere');
+            const label = document.getElementById('s2CollinearLabel');
+            if (scen === 'mild') {
+                btnMild.className = "bg-indigo-600 text-white text-xs font-semibold py-2 px-3 rounded-lg transition shadow-sm";
+                btnSevere.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-3 rounded-lg transition";
+                label.innerText = "講義案例 (r = 0.47, VIF = 1.29)";
+            } else {
+                btnSevere.className = "bg-red-600 text-white text-xs font-semibold py-2 px-3 rounded-lg transition shadow-sm";
+                btnMild.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-3 rounded-lg transition";
+                label.innerText = "嚴重共線性 (r = 0.98, VIF = 25.3)";
+            }
+            rebuildStep2PathCurves();
+            updateStep2();
+        }
+
+        function setStep2Alpha(logVal) {
+            document.getElementById('s2AlphaSlider').value = logVal;
+            updateStep2();
+        }
+
+        // ==========================================================
+        // STEP 3: L2 幾何圓形約束 Canvas & 偏差-方差權衡 (Bias-Variance)
+        // ==========================================================
+        let s3BVChart = null;
+        // 定義 2D 參數空間中的 OLS 解與 Hessian 矩陣 H = X^T X
+        const s3OlsBeta = [2.7, 2.1];
+        const s3H = [
+            [2.2, 1.1],
+            [1.1, 1.4]
+        ];
+
+        function solve2DRidge(alpha) {
+            // (H + alpha I) beta = H * beta_OLS
+            const rhs0 = s3H[0][0] * s3OlsBeta[0] + s3H[0][1] * s3OlsBeta[1];
+            const rhs1 = s3H[1][0] * s3OlsBeta[0] + s3H[1][1] * s3OlsBeta[1];
+            const A = [
+                [s3H[0][0] + alpha, s3H[0][1]],
+                [s3H[1][0], s3H[1][1] + alpha]
+            ];
+            return solveLinearSystem(A, [rhs0, rhs1]);
+        }
+
+        function sliderToStep3Alpha(v) {
+            const s = parseFloat(v);
+            if (s <= 0) return 0;
+            // 0..100 -> 0..15
+            return Math.pow(s / 30, 2.1);
+        }
+
+        function computeStep3BV(alpha) {
+            // 真實演示偏差-方差權衡曲線：
+            // Bias^2 隨 alpha 單調上升，Variance 隨 alpha 單調下降
+            const biasSq = 0.04 + 0.85 * Math.pow(alpha / (alpha + 2.4), 1.85);
+            const variance = 0.12 + 0.95 / Math.pow(1 + alpha * 0.85, 1.35);
+            return {
+                biasSq,
+                variance,
+                mse: biasSq + variance
+            };
+        }
+
+        function initStep3() {
+            const ctxBV = document.getElementById('step3BVChart').getContext('2d');
+            const alphas = Array.from({ length: 61 }, (_, i) => i * 0.15); // 0 to 9.0
+            const biasData = [];
+            const varData = [];
+            const mseData = [];
+
+            for (const a of alphas) {
+                const bv = computeStep3BV(a);
+                biasData.push({ x: a, y: bv.biasSq });
+                varData.push({ x: a, y: bv.variance });
+                mseData.push({ x: a, y: bv.mse });
+            }
+
+            s3BVChart = new Chart(ctxBV, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Total Test MSE (Bias² + Var)',
+                            data: mseData,
+                            borderColor: '#059669',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Variance (Model Instability)',
+                            data: varData,
+                            borderColor: '#2563eb',
+                            borderWidth: 2,
+                            borderDash: [5, 3],
+                            pointRadius: 0,
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Squared Bias (Bias²)',
+                            data: biasData,
+                            borderColor: '#d97706',
+                            borderWidth: 2,
+                            borderDash: [2, 2],
+                            pointRadius: 0,
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 60 },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: 0,
+                            max: 9,
+                            title: { display: true, text: 'Regularization Parameter Alpha (α)', font: { weight: 'bold', size: 11 } }
+                        },
+                        y: {
+                            min: 0,
+                            max: 1.3,
+                            title: { display: true, text: 'Expected Prediction Error', font: { weight: 'bold', size: 11 } }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { boxWidth: 12, font: { size: 10 } }
+                        },
+                        verticalLineX: 1.38,
+                        verticalLineLabel: 'Current α'
+                    }
+                }
+            });
+
+            document.getElementById('s3AlphaSlider').addEventListener('input', updateStep3);
+            updateStep3();
+        }
+
+        function drawStep3GeometryCanvas(alpha, ridgeBeta) {
+            const canvas = document.getElementById('step3GeoCanvas');
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // 座標轉換：beta1, beta2 in [-1.0, 3.6]
+            const minB = -1.0, maxB = 3.6;
+            const toX = b1 => ((b1 - minB) / (maxB - minB)) * (W - 40) + 25;
+            const toY = b2 => H - 25 - ((b2 - minB) / (maxB - minB)) * (H - 40);
+            const scaleLen = r => (r / (maxB - minB)) * (W - 40);
+
+            const ox = toX(0);
+            const oy = toY(0);
+
+            // 1. 繪製背景網格與座標軸
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let g = -0.5; g <= 3.5; g += 0.5) {
+                ctx.beginPath();
+                ctx.moveTo(toX(g), 10);
+                ctx.lineTo(toX(g), H - 15);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(15, toY(g));
+                ctx.lineTo(W - 10, toY(g));
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(15, oy);
+            ctx.lineTo(W - 10, oy);
+            ctx.moveTo(ox, H - 15);
+            ctx.lineTo(ox, 10);
+            ctx.stroke();
+
+            ctx.fillStyle = '#475569';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('β₁', W - 22, oy - 6);
+            ctx.fillText('β₂', ox + 6, 20);
+            ctx.fillText('(0,0)', ox - 28, oy + 14);
+
+            // 2. 計算當前切點處的 RSS 等高線值：(b - b_ols)^T H (b - b_ols)
+            const db0 = ridgeBeta[0] - s3OlsBeta[0];
+            const db1 = ridgeBeta[1] - s3OlsBeta[1];
+            const currentRSS = db0 * (s3H[0][0] * db0 + s3H[0][1] * db1) + db1 * (s3H[1][0] * db0 + s3H[1][1] * db1);
+
+            // 繪製數層紅色同心橢圓 RSS 等高線 (包含剛好切於 ridgeBeta 的那一圈)
+            const levels = [0.25, 0.9, 2.0, 3.6];
+            if (currentRSS > 0.02) levels.push(currentRSS);
+
+            // 對 H 做特徵分解以精準繪製傾斜橢圓
+            // H = [[2.2, 1.1], [1.1, 1.4]]
+            const tr = s3H[0][0] + s3H[1][1];
+            const det = s3H[0][0] * s3H[1][1] - s3H[0][1] * s3H[1][0];
+            const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
+            const lam1 = tr / 2 + disc;
+            const lam2 = tr / 2 - disc;
+            const angle = 0.5 * Math.atan2(2 * s3H[0][1], s3H[0][0] - s3H[1][1]);
+
+            for (const c of levels) {
+                const isTangent = Math.abs(c - currentRSS) < 1e-4 && currentRSS > 0.02;
+                ctx.save();
+                ctx.beginPath();
+                const steps = 80;
+                for (let i = 0; i <= steps; i++) {
+                    const theta = (i / steps) * 2 * Math.PI;
+                    const u = Math.sqrt(c / lam1) * Math.cos(theta);
+                    const v = Math.sqrt(c / lam2) * Math.sin(theta);
+                    const b1 = s3OlsBeta[0] + u * Math.cos(angle) - v * Math.sin(angle);
+                    const b2 = s3OlsBeta[1] + u * Math.sin(angle) + v * Math.cos(angle);
+                    if (i === 0) ctx.moveTo(toX(b1), toY(b2));
+                    else ctx.lineTo(toX(b1), toY(b2));
+                }
+                ctx.closePath();
+                if (isTangent) {
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.lineWidth = 2.2;
+                } else {
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+                    ctx.lineWidth = 1.2;
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 3. 繪製 L2 藍色圓形約束區域 beta1^2 + beta2^2 <= r^2
+            const r = Math.hypot(ridgeBeta[0], ridgeBeta[1]);
+            const rPx = scaleLen(r);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(ox, oy, rPx, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.14)';
+            ctx.fill();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2.2;
+            ctx.stroke();
+            ctx.restore();
+
+            // 選配：繪製 L1 菱形對照
+            const showL1 = document.getElementById('s3ShowL1Toggle').checked;
+            if (showL1) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(toX(r), toY(0));
+                ctx.lineTo(toX(0), toY(r));
+                ctx.lineTo(toX(-r), toY(0));
+                ctx.lineTo(toX(0), toY(-r));
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(217, 119, 6, 0.12)';
+                ctx.fill();
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = '#d97706';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 4. 繪製完整 Ridge 收縮軌跡曲線 (從 OLS 到原點)
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([3, 3]);
+            ctx.strokeStyle = '#0f766e';
+            ctx.lineWidth = 1.8;
+            for (let k = 0; k <= 60; k++) {
+                const aTest = Math.pow(k / 15, 2.2);
+                const pt = solve2DRidge(aTest);
+                if (k === 0) ctx.moveTo(toX(pt[0]), toY(pt[1]));
+                else ctx.lineTo(toX(pt[0]), toY(pt[1]));
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            // 5. 繪製 OLS 紅點與 Ridge 綠點
+            const olsX = toX(s3OlsBeta[0]);
+            const olsY = toY(s3OlsBeta[1]);
+            ctx.beginPath();
+            ctx.arc(olsX, olsY, 5.5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#dc2626';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#991b1b';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('β_OLS', olsX + 7, olsY - 5);
+
+            const curX = toX(ridgeBeta[0]);
+            const curY = toY(ridgeBeta[1]);
+            ctx.beginPath();
+            ctx.arc(curX, curY, 6.5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#10b981';
+            ctx.fill();
+            ctx.strokeStyle = '#064e3b';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#065f46';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('β_Ridge', curX - 45, curY - 8);
+        }
+
+        function updateStep3() {
+            const sliderVal = document.getElementById('s3AlphaSlider').value;
+            const alpha = sliderToStep3Alpha(sliderVal);
+            const ridgeBeta = solve2DRidge(alpha);
+            const radius = Math.hypot(ridgeBeta[0], ridgeBeta[1]);
+            const bv = computeStep3BV(alpha);
+
+            document.getElementById('s3AlphaDisplay').innerText = `α = ${alpha.toFixed(2)}`;
+            document.getElementById('s3BetaCoords').innerText = `(${ridgeBeta[0].toFixed(2)}, ${ridgeBeta[1].toFixed(2)})`;
+            document.getElementById('s3RadiusVal').innerText = `r = ${radius.toFixed(2)}`;
+            document.getElementById('s3BVBreakdown').innerText = `${bv.biasSq.toFixed(2)} + ${bv.variance.toFixed(2)}`;
+            document.getElementById('s3TotalMSE').innerText = bv.mse.toFixed(3);
+
+            drawStep3GeometryCanvas(alpha, ridgeBeta);
+
+            if (s3BVChart) {
+                s3BVChart.options.plugins.verticalLineX = Math.min(9.0, alpha);
+                s3BVChart.options.plugins.verticalLineLabel = `α=${alpha.toFixed(2)}`;
+                s3BVChart.update();
+            }
+        }
+
+        function setStep3Preset(val) {
+            document.getElementById('s3AlphaSlider').value = val;
+            updateStep3();
+        }
+
+        // ==========================================================
+        // STEP 4: 為什麼必須進行特徵標準化？(Feature Scaling Lab)
+        // ==========================================================
+        let s4ScaleChart = null;
+        let s4IsScaled = false;
+        let s4CatUnit = 'mol'; // 'mol' (0.01 mol/L) or 'mmol' (10 mmol/L)
+
+        function initStep4Chart() {
+            const ctx = document.getElementById('step4ScaleChart').getContext('2d');
+            s4ScaleChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        'Temperature (300~400 K)',
+                        'Pressure (1~5 bar)',
+                        'Catalyst Conc. (0.01 mol/L)',
+                        'Reaction Time (60~180 min)'
+                    ],
+                    datasets: [
+                        {
+                            label: 'True Physical Contribution (100% Baseline)',
+                            data: [100, 100, 100, 100],
+                            backgroundColor: 'rgba(148, 163, 184, 0.35)',
+                            borderColor: '#64748b',
+                            borderWidth: 1.5
+                        },
+                        {
+                            label: 'Retained Effect by Current Ridge Model (%)',
+                            data: [99.8, 92.0, 3.2, 99.9],
+                            backgroundColor: [
+                                'rgba(37, 99, 235, 0.8)',
+                                'rgba(37, 99, 235, 0.8)',
+                                'rgba(220, 38, 38, 0.85)',
+                                'rgba(37, 99, 235, 0.8)'
+                            ],
+                            borderColor: '#1e293b',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 115,
+                            title: { display: true, text: 'Retained Feature Signal (%)', font: { weight: 'bold' } }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Impact of Feature Scale on Ridge Coefficient Retention',
+                            font: { size: 13, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { boxWidth: 12, font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('s4AlphaSlider').addEventListener('input', updateStep4);
+            updateStep4();
+        }
+
+        function updateStep4() {
+            const alpha = parseFloat(document.getElementById('s4AlphaSlider').value);
+            document.getElementById('s4AlphaVal').innerText = `α = ${alpha.toFixed(1)}`;
+
+            // 每個特徵的標準差 sigma_j：
+            // 對於單一特徵 j，若未標準化，X_j^T X_j = n * sigma_j^2
+            // 因此保留比例 = (n * sigma_j^2) / (n * sigma_j^2 + alpha)
+            // 若已標準化，每個特徵的 sigma_j = 1，保留比例一律為 n / (n + alpha)
+            const n = 50; // 小樣本實驗數據 n = 50
+            let sigmas = [25.0, 1.2, 0.005, 35.0]; // mol/L 時催化劑濃度標準差僅 0.005
+            let catLabel = 'Catalyst Conc. (0.01 mol/L)';
+
+            if (s4CatUnit === 'mmol') {
+                sigmas = [25.0, 1.2, 5.0, 35.0]; // 換成 mmol/L 後標準差放大 1000 倍為 5.0
+                catLabel = 'Catalyst Conc. (10 mmol/L)';
+            }
+
+            s4ScaleChart.data.labels[2] = catLabel;
+
+            let retained = [];
+            let barColors = [];
+            let r2Score = 0.915;
+
+            if (s4IsScaled) {
+                for (let j = 0; j < 4; j++) {
+                    const pct = (n / (n + alpha)) * 100;
+                    retained.push(Number(pct.toFixed(1)));
+                    barColors.push('rgba(16, 185, 129, 0.85)');
+                }
+                r2Score = 0.918 - 0.0015 * alpha;
+            } else {
+                for (let j = 0; j < 4; j++) {
+                    const s2 = n * sigmas[j] * sigmas[j];
+                    const pct = (s2 / (s2 + alpha)) * 100;
+                    retained.push(Number(pct.toFixed(1)));
+                    barColors.push(pct < 60 ? 'rgba(220, 38, 38, 0.85)' : 'rgba(37, 99, 235, 0.8)');
+                }
+                const catRetain = retained[2] / 100;
+                const presRetain = retained[1] / 100;
+                r2Score = 0.42 + 0.35 * catRetain + 0.14 * presRetain;
+            }
+
+            s4ScaleChart.data.datasets[1].data = retained;
+            s4ScaleChart.data.datasets[1].backgroundColor = barColors;
+            s4ScaleChart.update();
+
+            const tag = document.getElementById('s4ModeTag');
+            const r2Badge = document.getElementById('s4R2Badge');
+
+            if (s4IsScaled) {
+                tag.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800";
+                tag.innerText = "✅ 已標準化：所有特徵公平縮減且不受單位影響！";
+                r2Badge.className = "text-base font-mono font-bold text-emerald-700";
+                r2Badge.innerText = `R² = ${r2Score.toFixed(3)} (穩健高精準度)`;
+            } else {
+                tag.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700";
+                tag.innerText = s4CatUnit === 'mol'
+                    ? `❌ 未標準化：催化劑僅保留 ${retained[2]}% 訊號！`
+                    : `⚠️ 未標準化：改變單位竟讓模型結果徹底改變！`;
+                r2Badge.className = "text-base font-mono font-bold text-red-600";
+                r2Badge.innerText = `R² = ${r2Score.toFixed(3)} (受尺度扭曲)`;
+            }
+        }
+
+        function setStep4Scaling(scaled) {
+            s4IsScaled = scaled;
+            const btnUn = document.getElementById('s4BtnUnscaled');
+            const btnSc = document.getElementById('s4BtnScaled');
+            if (scaled) {
+                btnSc.className = "bg-emerald-600 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition shadow";
+                btnUn.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold py-2.5 px-3 rounded-lg transition";
+            } else {
+                btnUn.className = "bg-red-600 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition shadow";
+                btnSc.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold py-2.5 px-3 rounded-lg transition";
+            }
+            updateStep4();
+        }
+
+        function setStep4Unit(unit) {
+            s4CatUnit = unit;
+            const btnMol = document.getElementById('s4UnitMol');
+            const btnMmol = document.getElementById('s4UnitMmol');
+            if (unit === 'mol') {
+                btnMol.className = "bg-blue-600 text-white text-xs font-semibold py-2 px-2 rounded-lg transition";
+                btnMmol.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-2 rounded-lg transition";
+            } else {
+                btnMmol.className = "bg-blue-600 text-white text-xs font-semibold py-2 px-2 rounded-lg transition";
+                btnMol.className = "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold py-2 px-2 rounded-lg transition";
+            }
+            updateStep4();
+        }
+
+        // ==========================================================
+        // 初始化所有互動實驗室
+        // ==========================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initStep1Charts();
+            initStep2Chart();
+            initStep3();
+            initStep4Chart();
+        });
+    </script>
+</body>
+</html>

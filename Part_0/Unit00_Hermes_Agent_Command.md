@@ -645,7 +645,7 @@ sequenceDiagram
 
 > **延伸閱讀**：
 > - 安裝與介面導覽：[Unit00 Hermes Agent 安裝與使用教學](Unit00_Hermes_Agent_Setup.md)
-> - 化工系必裝技能與外掛推薦：[Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南](Unit00_Hermes_Agent_Skills&Plugins.md)
+> - 化工系技能與外掛推薦：[Unit00 Hermes Agent 技能（Skills）與外掛（Plugins）推薦指南](Unit00_Hermes_Agent_Skills&Plugins.md)
 > - 完整官方文件：[Hermes Agent Docs](https://hermes-agent.nousresearch.com/docs)
 
 ---

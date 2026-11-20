@@ -235,7 +235,7 @@ score = model.score(X, y)
 - `y`: 真實目標值
 
 **返回值**：
-- 決定係數 $R^2$ (範圍：$(-\infty, 1]$ ， $R^2 = 1$ 表示完美預測)
+- 決定係數 $R^2$ (範圍： $(-\infty, 1]$ ， $R^2 = 1$ 表示完美預測)
 
 ### 4.3 模型屬性
 
@@ -913,6 +913,8 @@ sfs = SFS(LinearRegression(),
 sfs.fit(X_train, y_train)
 ```
 
+> 逐步回歸的完整理論（前向選擇、後向消除、雙向逐步）與 AIC/BIC/p-value 選擇準則，以及化工實戰案例，詳見 [Unit10_Stepwise_Regression.md](Unit10_Stepwise_Regression.md)。該方法以本單元的 OLS 為內核，是線性回歸的特徵選擇延伸。
+
 ### 9.2 處理多重共線性
 
 **檢查 VIF**：
@@ -1023,6 +1025,7 @@ print(f"平均 R²: {cv_scores.mean():.3f} (+/- {cv_scores.std():.3f})")
 - **Unit10_Ridge_Regression**：了解 L2 正則化如何改善多重共線性問題
 - **Unit10_Lasso_Regression**：學習 L1 正則化與特徵選擇
 - **Unit10_ElasticNet_Regression**：結合 Ridge 與 Lasso 的優點
+- **Unit10_Stepwise_Regression**：以逐步回歸進行包裹式特徵選擇（以本單元的 OLS 為內核，自動挑選重要特徵）
 
 配合 **Unit10_Linear_Regression.ipynb** 程式演練，您將能夠完整掌握線性回歸的實作技巧！
 

@@ -254,7 +254,7 @@ hermes config set model <provider/model>
 
 1. **模型**：課程作業、課堂練習與共同任務一律使用實驗室端點，不需購買或訂閱商業模型。
 2. **技能、外掛與 MCP 工具**：擴充 Agent 是本課程的訓練重點。在本機執行的技能（Skills）與本機自架的 MCP 伺服器（見 [Skills & Plugins 講義](Unit00_Hermes_Agent_Skills&Plugins.md) 4.6 節）可直接用於課程作業，鼓勵同學持續擴充自己的 Agent 配置；MCP 工具以本機佈置為主，需要共用的計算或資料服務，將由實驗室主機架設。課程工具清單會在開課前公布，觀察點作答前請以 `hermes skills list` 與 `hermes mcp list` 匯出自己的配置清單附於 Notebook。凡會把查詢或檔案內容送到實驗室以外的技能、外掛、MCP 與工具閘道（網頁搜尋、雲端瀏覽器、影像生成、TTS 等），只在教師指定的練習中使用，教師會事先說明資料會傳到哪裡；共同任務等觀察點任務期間不使用。訊息閘道（Telegram、Discord 等）屬課外參考，課程中不使用。
-3. **紀錄的存放與研究使用**：Hermes 的設定、對話與記憶存放在你自己電腦的 `HERMES_HOME`（見 4.4）；模型推理與實驗室主機上的共用工具會收到你送出的查詢與檔案（不經第三方），實驗室主機只保存時間、帳號代碼與用量等運作紀錄，不保存提示與回覆內容，30 天後刪除。請為本課程建立專用的設定檔（profile），課程任務都在這個設定檔中進行，避免與其他課程或私人對話混在一起。若你同意研究使用對話紀錄，請在各觀察點任務完成後，依自己在同意表單勾選的項目，用 `hermes sessions export` 匯出使用實驗室端點完成的本課程任務對話（不含記憶檔），匯出前可以刪除與任務無關的內容，再上傳到保管者（非本課程評分的教師）建立的表單；授課教師看不到這份表單。不同意研究不影響成績與 AI 資源。
+3. **紀錄的存放與研究使用**：Hermes 的設定、對話與記憶存放在你自己電腦的 `HERMES_HOME`（見 4.4）；模型推理與實驗室主機上的共用工具會收到你送出的查詢與檔案（不經第三方），實驗室主機只保存時間、帳號代碼與用量等運作紀錄，不保存提示與回覆內容，30 天後刪除。請為本課程建立專用的設定檔（profile），課程任務都在這個設定檔中進行，避免與其他課程或私人對話混在一起。若你同意研究使用對話紀錄，請在各觀察點任務完成後，依自己在同意表單勾選的項目，用 `hermes sessions export` 匯出使用實驗室端點完成的本課程任務對話（JSONL 格式，每則訊息附時間）。可先加 `--dry-run` 列出符合的對話，例如 `hermes sessions export --model Nemotron --newer-than 7d --dry-run -`，確認後去掉 `--dry-run`，並把 `-` 換成輸出檔名。匯出檔的 `system_prompt` 欄位會帶入你的 Agent 記憶與使用者側寫，保管者收件後會先刪除這個欄位。匯出前可以刪除與任務無關的內容，再上傳到保管者（非本課程評分的教師）建立的表單；授課教師看不到這份表單。不同意研究不影響成績與 AI 資源。
 4. **不放入敏感資料**：不要把他人的個人資料、未公開的研究資料或其他課程的內容貼進對話。
 5. **課外使用**：若你在課外自行連接雲端供應商，請自行留意該服務的資料政策；課程作業仍須改回實驗室端點完成。
 
@@ -990,7 +990,7 @@ Hermes Agent 最大的價值在於它是一個「會隨著使用而成長」的�
 
 > **延伸閱讀**：
 > - 終端機與斜線指令大全：[Unit00 Hermes Agent 常用指令詳細教學](Unit00_Hermes_Agent_Command.md)
-> - 化工系必裝技能與外掛推薦：[Unit00 Hermes Agent 必裝技能（Skills）與外掛（Plugins）推薦指南](Unit00_Hermes_Agent_Skills&Plugins.md)
+> - 化工系技能與外掛推薦：[Unit00 Hermes Agent 技能（Skills）與外掛（Plugins）推薦指南](Unit00_Hermes_Agent_Skills&Plugins.md)
 > - 官方文件：[Hermes Agent Docs](https://hermes-agent.nousresearch.com/docs)、[Quickstart 教學](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart) 與 [GitHub 原始碼](https://github.com/NousResearch/hermes-agent)。
 
 ---

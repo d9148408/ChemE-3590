@@ -1,0 +1,3051 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式教學：Elastic Net 回歸 (L1+L2 混合正則化) 原理與群組效應 | ChemE 3590</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .font-mono-code {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #7c3aed;
+            cursor: pointer;
+            margin-top: -6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #8b5cf6;
+        }
+
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #7c3aed;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
+        }
+
+        .step-tab-active {
+            background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 55%, #0d9488 100%);
+            color: #ffffff;
+            box-shadow: 0 6px 16px -3px rgba(109, 40, 217, 0.35);
+            border-color: transparent;
+        }
+
+        .canvas-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        }
+
+        .group-badge-glow {
+            box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen py-6 px-3 md:px-8">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- ==================== 頂部課程標題橫幅 ==================== -->
+        <header
+            class="bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-950 text-white rounded-2xl shadow-xl p-6 md:p-8 mb-6 relative overflow-hidden">
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div>
+                    <div
+                        class="inline-flex items-center gap-2 bg-purple-500/20 border border-purple-400/40 text-purple-200 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                        <span>ChemE 3590 · AI 在化工上之應用</span>
+                        <span>｜</span>
+                        <span>Unit 10 互動式原理實驗室</span>
+                    </div>
+                    <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight mb-2">
+                        🧬 Elastic Net 彈性網路回歸 (L1+L2 混合正則化) 逐步互動教學
+                    </h1>
+                    <p class="text-slate-200 text-sm md:text-base max-w-3xl leading-relaxed">
+                        當化工製程遇到<strong>多測點高度共線性</strong>（例如反應器入口/出口溫度 $r=0.97$、入口/出口壓力 $r=0.99$）時，<strong>Ridge</strong> 無法簡化特徵，<strong>Lasso</strong> 又會隨機二選一且隨數據擾動跳變！透過以下 <strong>5 個循序漸進的互動實驗</strong>，親手操作<strong>膨脹菱形幾何 ($\rho$)、雙重收縮軟閾值、群組效應 (Grouping Effect) 對決、10 特徵反應器正則化路徑與調參指南</strong>，一次徹底掌握 Elastic Net！
+                    </p>
+                </div>
+
+                <!-- 核心對照小卡：Ridge vs Lasso vs Elastic Net -->
+                <div
+                    class="bg-slate-800/80 border border-slate-600/70 rounded-xl p-4 lg:w-[420px] shrink-0 backdrop-blur-sm">
+                    <div class="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2">💡 正則化三巨頭核心特性對照</div>
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                        <div class="bg-slate-900/70 p-2 rounded-lg border border-sky-500/40">
+                            <div class="font-bold text-sky-300 mb-1">🔵 Ridge ($\rho=0$)</div>
+                            <p class="text-slate-300 leading-snug">純 L2 圓形邊界。共線特徵平分權重，但<strong>係數永不為 0</strong>，無法篩選特徵。</p>
+                        </div>
+                        <div class="bg-slate-900/70 p-2 rounded-lg border border-emerald-500/40">
+                            <div class="font-bold text-emerald-300 mb-1">💎 Lasso ($\rho=1$)</div>
+                            <p class="text-slate-300 leading-snug">純 L1 菱形尖角。可將係數歸零，但遇共線特徵會<strong>隨機留一砍一、極不穩定</strong>。</p>
+                        </div>
+                        <div class="bg-purple-950/80 p-2 rounded-lg border border-purple-400/60 group-badge-glow">
+                            <div class="font-bold text-purple-200 mb-1">🧬 Elastic Net</div>
+                            <p class="text-purple-100/95 leading-snug">L1+L2 <strong>膨脹菱形</strong>。兼具<strong>尖角歸零</strong>與<strong>嚴格凸群組效應</strong>，相關特徵同進同出！</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ==================== 6 階段互動導覽列 ==================== -->
+        <nav class="bg-white rounded-xl shadow-sm border border-slate-200 p-3 mb-6 sticky top-2 z-30">
+            <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 flex-1">
+                    <button onclick="switchStage(0)" id="tabBtn0"
+                        class="step-tab-active flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-white/20 text-xs font-extrabold flex items-center justify-center shrink-0">0</span>
+                        <div>
+                            <div class="text-[11px] opacity-80 font-medium">Step 0 · 先備直覺</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">誤差等高線怎麼來的？</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(1)" id="tabBtn1"
+                        class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">1</span>
+                        <div>
+                            <div class="text-[11px] opacity-75 font-medium">Step 1 · 混合幾何</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">膨脹菱形與 L1 比例 $\rho$</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(2)" id="tabBtn2"
+                        class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">2</span>
+                        <div>
+                            <div class="text-[11px] opacity-75 font-medium">Step 2 · 數學引擎</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">雙重收縮：軟閾值 + 縮放</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(3)" id="tabBtn3"
+                        class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">3</span>
+                        <div>
+                            <div class="text-[11px] opacity-75 font-medium">Step 3 · 群組效應</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">共線性特徵同進同出對決</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(4)" id="tabBtn4"
+                        class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">4</span>
+                        <div>
+                            <div class="text-[11px] opacity-75 font-medium">Step 4 · 化工案例</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">反應器 10 特徵正則化路徑</div>
+                        </div>
+                    </button>
+                    <button onclick="switchStage(5)" id="tabBtn5"
+                        class="bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all">
+                        <span
+                            class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">5</span>
+                        <div>
+                            <div class="text-[11px] opacity-75 font-medium">Step 5 · 實戰調參</div>
+                            <div class="text-xs md:text-sm font-bold leading-tight">四模型比較與選型決策</div>
+                        </div>
+                    </button>
+                </div>
+
+                <div
+                    class="flex items-center justify-end gap-2 border-t xl:border-t-0 xl:border-l border-slate-200 pt-2 xl:pt-0 xl:pl-3 shrink-0">
+                    <button onclick="toggleViewAll()" id="btnViewAll"
+                        class="text-xs font-semibold px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                        📖 展開全部單元
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- ==================== STEP 0: 誤差等高線 (Error Contours) 的誕生 ==================== -->
+        <section id="stage0" class="mb-8">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div
+                    class="bg-gradient-to-r from-rose-50 via-amber-50 to-purple-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="inline-block bg-rose-600 text-white text-xs font-bold px-2.5 py-0.5 rounded mr-2">STEP
+                            0 · 先備觀念解惑</span>
+                        <h2 class="inline text-xl md:text-2xl font-extrabold text-slate-800">「誤差等高線」到底是什麼？從擬合殘差、3D 誤差碗到 2D 地形圖！</h2>
+                    </div>
+                    <div class="text-xs text-slate-600 font-medium">
+                        👉 操作方式：<strong>拖曳下方 $\beta_1, \beta_2$ 滑桿</strong> 或 <strong>直接拖曳右圖的黃色探針點</strong>，並點擊「🔄 沿當前等高線繞一圈」觀察三張圖如何同步連動！
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- 三步驟直覺說明卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                        <div class="bg-rose-50/80 border border-rose-200 rounded-xl p-3.5 text-xs leading-relaxed">
+                            <div class="font-extrabold text-rose-900 text-sm mb-1">① 左圖：數據空間中的「殘差平方和 RSS」</div>
+                            <p class="text-slate-700">
+                                每當你選定一組係數 $(\beta_1, \beta_2)$，模型就會畫出一條預測線 $\hat{y}_i = \beta_1 x_{i1} + \beta_2 x_{i2}$。每個真實數據點與預測線之間的<strong>紅色垂直距離平方加總</strong>，就是這組係數的<strong>總誤差 $\text{RSS}(\beta_1, \beta_2)$</strong>！
+                            </p>
+                        </div>
+                        <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs leading-relaxed">
+                            <div class="font-extrabold text-amber-900 text-sm mb-1">② 中圖：因為誤差取「平方」，立體圖是一個碗！</div>
+                            <p class="text-slate-700">
+                                把橫軸設為 $\beta_1$、縱軸設為 $\beta_2$、<strong>高度 (Z 軸) 設為總誤差 RSS</strong>：因為誤差是二次方項 $\sum (y_i - \hat{y}_i)^2$，曲面向外呈拋物線上升，形成一個<strong>「3D 拋物面誤差碗」</strong>，碗底最低點就是 <strong>OLS 最佳解 $\hat{\boldsymbol{\beta}}^{\text{OLS}}$</strong>！
+                            </p>
+                        </div>
+                        <div class="bg-purple-50/80 border border-purple-200 rounded-xl p-3.5 text-xs leading-relaxed">
+                            <div class="font-extrabold text-purple-900 text-sm mb-1">③ 右圖：把 3D 誤差碗「水平切開」向下投影！</div>
+                            <p class="text-slate-700">
+                                就像地理課的<strong>山谷等高線地形圖</strong>：拿一把水平刀在固定誤差高度（例如 $\text{RSS} = 15, 25, 40$）把 3D 碗切開，切出來的<strong>橢圓形截面投影到 2D $(\beta_1, \beta_2)$ 平面</strong>，就是<strong>誤差等高線</strong>！同一圈上所有點的誤差完全相同。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 互動控制面板 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-5">
+                        <div class="lg:col-span-3 bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-slate-700">① 嘗試係數 $\beta_1$ (特徵 1 權重)</label>
+                                <span id="s0Beta1Badge" class="font-mono-code text-xs font-bold bg-purple-700 text-white px-2 py-0.5 rounded">β₁ = 1.25</span>
+                            </div>
+                            <input type="range" id="s0Beta1Slider" min="0.00" max="4.00" step="0.02" value="1.25"
+                                oninput="updateStage0FromSliders()">
+                            <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono-code">
+                                <span>0.00</span>
+                                <span class="text-rose-600 font-bold">碗底 OLS: 2.30</span>
+                                <span>4.00</span>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-3 bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-slate-700">② 嘗試係數 $\beta_2$ (特徵 2 權重)</label>
+                                <span id="s0Beta2Badge" class="font-mono-code text-xs font-bold bg-teal-700 text-white px-2 py-0.5 rounded">β₂ = 0.45</span>
+                            </div>
+                            <input type="range" id="s0Beta2Slider" min="-1.00" max="3.00" step="0.02" value="0.45"
+                                oninput="updateStage0FromSliders()">
+                            <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono-code">
+                                <span>-1.00</span>
+                                <span class="text-rose-600 font-bold">碗底 OLS: 1.05</span>
+                                <span>3.00</span>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-6 bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex flex-col justify-between">
+                            <div class="text-xs font-bold text-slate-700 mb-1.5">
+                                ③ 關鍵驗證實驗：為什麼「同一圈等高線」上的不同 $(\beta_1, \beta_2)$ 組合會有完全相同的誤差 RSS？
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <button onclick="toggleStage0Orbit()" id="s0BtnOrbit"
+                                    class="px-3 py-2 rounded-lg text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow transition flex items-center justify-center gap-1.5">
+                                    <span>🔄 沿當前等高線繞一圈</span>
+                                </button>
+                                <button onclick="setStage0ToOLS()"
+                                    class="px-3 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow transition">
+                                    🎯 跳至碗底最低點 (OLS)
+                                </button>
+                                <button onclick="switchStage(1)"
+                                    class="px-3 py-2 rounded-lg text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white shadow transition">
+                                    👉 看懂了！前往 Step 1 膨脹菱形
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 即時數值分解橫幅 -->
+                    <div class="bg-slate-900 text-white rounded-xl px-4 py-3 mb-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border border-slate-700">
+                        <div class="flex items-center gap-3">
+                            <span id="s0StatusBadge"
+                                class="px-2.5 py-1 rounded bg-amber-500/25 border border-amber-400 text-amber-300 font-mono-code text-xs font-bold shrink-0">
+                                🟡 當前探針位置：(β₁=1.25, β₂=0.45)
+                            </span>
+                            <p id="s0StatusText" class="text-xs md:text-sm text-slate-200 leading-relaxed">
+                                偏離碗底 OLS $(2.30, 1.05)$ 時，左圖的紅色殘差柱變長，對應到中圖 3D 誤差碗爬升至高度 <strong>$\text{RSS} = 31.42$</strong>，在右圖則精準落在 <strong>$\text{RSS} = 31.42$ 的亮黃色等高線橢圓</strong>上！
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-4 shrink-0 text-xs font-mono-code bg-slate-800 px-3.5 py-2 rounded-lg border border-slate-700">
+                            <div>碗底最小誤差 $\text{RSS}_{\min}$: <span class="text-rose-400 font-bold">10.00</span></div>
+                            <div class="border-l border-slate-700 pl-3">偏離增量 $\Delta \text{RSS}$: <span id="s0DeltaRSS" class="text-amber-300 font-bold">+21.42</span></div>
+                            <div class="border-l border-slate-700 pl-3">當前總誤差 $\text{RSS}$: <span id="s0TotalRSS" class="text-emerald-400 font-extrabold text-sm">31.42</span></div>
+                        </div>
+                    </div>
+
+                    <!-- 三聯畫布 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-5">
+                        <div class="lg:col-span-4 canvas-card p-3.5 bg-slate-950 text-white flex flex-col">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold text-rose-300">① 數據與殘差空間：$\text{RSS} = \sum (y_i - \hat{y}_i)^2$</span>
+                                <span class="text-[10px] text-slate-400 font-mono-code">紅線方塊 = 殘差 $e_i^2$</span>
+                            </div>
+                            <div class="relative w-full h-[320px]">
+                                <canvas id="stage0DataCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-400 leading-snug">
+                                💡 虛線為碗底 OLS 最佳回歸線；<span class="text-amber-300 font-semibold">亮黃線</span>為你當前 $(\beta_1, \beta_2)$ 的預測線。偏離 OLS 越遠，紅色殘差平方和越大！
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-4 canvas-card p-3.5 bg-slate-950 text-white flex flex-col">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold text-amber-300">② 3D 誤差碗曲面：高度 $Z = \text{RSS}(\beta_1, \beta_2)$</span>
+                                <span class="text-[10px] text-slate-400 font-mono-code">黃色水平環 = 等高切面</span>
+                            </div>
+                            <div class="relative w-full h-[320px]">
+                                <canvas id="stage0BowlCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-400 leading-snug">
+                                💡 碗底紅星是誤差最低點 $\text{RSS}_{\min}=10$。當前探針在碗壁上的高度，切出一圈<span class="text-amber-300 font-semibold">水平橢圓環</span>，垂直向下投影到底部平面！
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-4 canvas-card p-3.5 bg-slate-950 text-white flex flex-col">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold text-emerald-300">③ 2D 係數平面：投影出的「誤差等高線」</span>
+                                <span class="text-[10px] text-amber-300 font-mono-code">🖱️ 可直接拖曳黃點！</span>
+                            </div>
+                            <div class="relative w-full h-[320px]">
+                                <canvas id="stage0ContourCanvas" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-400 leading-snug">
+                                💡 這就是 Step 1 看到的同心橢圓！<strong>越內圈代表在碗底附近（誤差越小）</strong>，越外圈代表爬到碗壁高處（誤差越大）。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部數學與幾何問答拆解小卡 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700 leading-relaxed">
+                        <div>
+                            <div class="font-extrabold text-slate-900 text-sm mb-1">❓ 常見疑問 1：為什麼當兩個特徵高度共線時，等高線橢圓會變得「極度扁長且傾斜 $45^\circ$」？</div>
+                            <p>
+                                展開誤差平方和公式可得二次型：
+                                $$\text{RSS}(\boldsymbol{\beta}) = \text{RSS}_{\min} + (\boldsymbol{\beta} - \hat{\boldsymbol{\beta}}^{\text{OLS}})^T (\mathbf{X}^T \mathbf{X}) (\boldsymbol{\beta} - \hat{\boldsymbol{\beta}}^{\text{OLS}})$$
+                                當兩特徵高度相關 ($X_1 \approx X_2$) 時，只要 $\beta_1 + \beta_2$ 總和不變，預測值 $\hat{y}$ 就幾乎不變！因此沿著 $\beta_1 + \beta_2 = \text{const}$ 方向的碗底變成一條平坦狹長的山谷，水平切開後就會形成<strong>極度扁長的斜向橢圓等高線</strong>！
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-extrabold text-slate-900 text-sm mb-1">❓ 常見疑問 2：理解了誤差等高線，那跟 Step 1 的正則化約束區有什麼關係？</div>
+                            <p>
+                                在正則化回歸中，係數被限制在約束區內部（Lasso 是菱形、Ridge 是圓形、Elastic Net 是<strong>膨脹菱形</strong>）。為了在約束區內找到<strong>誤差 RSS 最小（最靠近碗底）</strong>的點，我們把等高線從碗底紅星像水波一樣一圈一圈往外放大，<strong>第一圈碰到約束邊界的那個切點</strong>，就是該模型的最佳解！
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== STEP 1: 混合正則化幾何直覺 (膨脹菱形與 l1_ratio) ==================== -->
+        <section id="stage1" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 單元標題列 -->
+                <div
+                    class="bg-gradient-to-r from-purple-50 via-indigo-50 to-teal-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="text-xs font-extrabold uppercase tracking-wider text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">Step
+                            1 · 幾何直覺 (Geometric Intuition)</span>
+                        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mt-1">
+                            為什麼 Elastic Net 能「既砍掉廢特徵、又讓共線特徵同進同出」？—— 膨脹菱形約束區
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-white/90 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        目標函數：$\min_{\boldsymbol{\beta}} \left\{ \|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2 + \alpha \left[ \rho \|\boldsymbol{\beta}\|_1 + \frac{1-\rho}{2} \|\boldsymbol{\beta}\|_2^2 \right] \right\}$
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- 左側：2D 係數空間約束區與等高線 Canvas -->
+                    <div class="lg:col-span-7 flex flex-col items-center">
+                        <div class="canvas-card w-full p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs text-slate-600">
+                                <div class="font-bold text-slate-700">2D 係數空間 $(\beta_1, \beta_2)$：RSS 誤差等高線 vs. 正則化約束邊界</div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-3 rounded-sm bg-purple-500/25 border-2 border-purple-600 inline-block"></span>Elastic Net 邊界</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-0.5 bg-emerald-600 border-b border-dashed inline-block"></span>Lasso 菱形參考</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-0.5 bg-sky-500 border-b border-dashed inline-block"></span>Ridge 圓形參考</span>
+                                </div>
+                            </div>
+                            <canvas id="geomCanvas" width="600" height="450"
+                                class="w-full h-auto rounded-lg bg-slate-50 border border-slate-200"></canvas>
+                        </div>
+
+                        <!-- 底部幾何圖解比較卡 -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full mt-3 text-xs">
+                            <div class="bg-sky-50 border border-sky-200 rounded-xl p-3">
+                                <div class="font-bold text-sky-900 mb-1">🔵 $\rho = 0$：純 Ridge (圓形)</div>
+                                <p class="text-sky-800 leading-relaxed">
+                                    邊界處處光滑無尖角，等高線切點<strong>幾乎不可能剛好落在座標軸上</strong>（無法歸零）；但因嚴格凸性，共線特徵會穩定靠近對角線 $\beta_1 \approx \beta_2$。
+                                </p>
+                            </div>
+                            <div class="bg-purple-50 border border-purple-200 rounded-xl p-3">
+                                <div class="font-bold text-purple-900 mb-1">🧬 $0 < \rho < 1$：Elastic Net (膨脹菱形)</div>
+                                <p class="text-purple-800 leading-relaxed">
+                                    $\rho(|\beta_1|+|\beta_2|) + \frac{1-\rho}{2}(\beta_1^2+\beta_2^2) \le t$。<strong>座標軸上仍有尖頂點</strong>（保留稀疏歸零力），且<strong>四條邊向外弧形鼓出（嚴格凸）</strong>，讓共線特徵穩定收斂！
+                                </p>
+                            </div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                                <div class="font-bold text-emerald-900 mb-1">💎 $\rho = 1$：純 Lasso (平坦菱形)</div>
+                                <p class="text-emerald-800 leading-relaxed">
+                                    菱形四邊是<strong>平坦直線</strong>（非嚴格凸）。當兩特徵高度共線時，等高線與菱形斜邊幾乎平行，微小的數據擾動就會讓解在兩個頂點間劇烈跳動！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側：互動控制面板與即時數值讀數 -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="text-base font-bold text-slate-800 mb-3 flex items-center justify-between">
+                                <span>🎛️ 雙超參數互動控制面板</span>
+                                <span id="geomStatusBadge"
+                                    class="text-xs font-extrabold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800">
+                                    🧬 平衡混合 (ρ = 0.50)
+                                </span>
+                            </h3>
+
+                            <!-- 滑桿 1：L1 混合比例 l1_ratio (rho) -->
+                            <div class="mb-4 bg-white p-3.5 rounded-lg border border-purple-200 shadow-sm">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>L1 混合比例 $\rho$ (<code>l1_ratio</code>)：</span>
+                                    <span id="lblGeomRho" class="font-mono-code text-sm font-extrabold text-purple-700">ρ = 0.50 (50% L1 + 50% L2)</span>
+                                </div>
+                                <input type="range" id="sliderGeomRho" min="0" max="1" step="0.05" value="0.50"
+                                    oninput="updateStage1()">
+                                <div class="flex justify-between text-[11px] text-slate-500 mt-1">
+                                    <span>0.00 (純 Ridge 圓形)</span>
+                                    <span>0.50 (膨脹菱形)</span>
+                                    <span>1.00 (純 Lasso 菱形)</span>
+                                </div>
+                                <!-- 快速預設按鈕 -->
+                                <div class="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-slate-100">
+                                    <button onclick="setGeomPreset(0.0, null)"
+                                        class="text-[11px] font-semibold px-2 py-1 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 transition">ρ=0 (純 Ridge)</button>
+                                    <button onclick="setGeomPreset(0.2, null)"
+                                        class="text-[11px] font-semibold px-2 py-1 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-800 transition">ρ=0.2 (偏重共線穩定)</button>
+                                    <button onclick="setGeomPreset(0.5, null)"
+                                        class="text-[11px] font-semibold px-2 py-1 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 transition">ρ=0.5 (均衡混合)</button>
+                                    <button onclick="setGeomPreset(0.8, null)"
+                                        class="text-[11px] font-semibold px-2 py-1 rounded bg-teal-100 hover:bg-teal-200 text-teal-800 transition">ρ=0.8 (偏重特徵選擇)</button>
+                                    <button onclick="setGeomPreset(1.0, null)"
+                                        class="text-[11px] font-semibold px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition">ρ=1.0 (純 Lasso)</button>
+                                </div>
+                            </div>
+
+                            <!-- 滑桿 2：約束預算半徑 t (反比於總強度 alpha) -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>約束區大小 $t$（對應總正則化強度 $\alpha$）：</span>
+                                    <span id="lblGeomT" class="font-mono-code text-sm font-bold text-indigo-700">t = 1.60 (中等 α)</span>
+                                </div>
+                                <input type="range" id="sliderGeomT" min="0.45" max="3.00" step="0.05" value="1.60"
+                                    oninput="updateStage1()">
+                                <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                    <span>強正則化 (t=0.45, 高 α)</span>
+                                    <span>中等約束</span>
+                                    <span>無正則化 (碰觸 OLS)</span>
+                                </div>
+                            </div>
+
+                            <!-- 情境切換：次要特徵情境 vs 共線特徵情境 -->
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">切換特徵物理情境（觀察等高線形狀與解的位置）：</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="setGeomScenario('sparse')" id="btnGeomSparse"
+                                        class="text-xs font-bold py-2 px-3 rounded-lg border-2 border-purple-600 bg-purple-50 text-purple-800 transition">
+                                        🎯 情境 A：$\beta_2$ 為次要特徵<br><span class="font-normal text-[11px]">（測試尖角歸零能力）</span>
+                                    </button>
+                                    <button onclick="setGeomScenario('collinear')" id="btnGeomCollinear"
+                                        class="text-xs font-bold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition">
+                                        🔗 情境 B：$X_1, X_2$ 高度共線<br><span class="font-normal text-[11px]">（測試弧形邊群組效應）</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 即時係數比較表 -->
+                            <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm">
+                                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                    📊 當前約束邊界上的最佳解 $(\hat{\beta}_1, \hat{\beta}_2)$
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 text-xs">
+                                    <div class="p-2.5 rounded-lg bg-purple-50/90 border border-purple-300">
+                                        <div class="font-bold text-purple-900 mb-1">🧬 Elastic Net</div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_1$: <span id="valEN1" class="font-bold">1.60</span></div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_2$: <span id="valEN2" class="font-bold text-purple-700">0.00</span></div>
+                                        <div id="noteEN" class="text-[11px] text-purple-700 font-semibold mt-1">✓ 撞上尖角歸零</div>
+                                    </div>
+                                    <div class="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                                        <div class="font-bold text-emerald-900 mb-1">💎 純 Lasso ($\rho=1$)</div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_1$: <span id="valLasso1" class="font-bold">1.60</span></div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_2$: <span id="valLasso2" class="font-bold">0.00</span></div>
+                                        <div id="noteLasso" class="text-[11px] text-emerald-700 font-semibold mt-1">✓ 尖角歸零</div>
+                                    </div>
+                                    <div class="p-2.5 rounded-lg bg-sky-50/70 border border-sky-200">
+                                        <div class="font-bold text-sky-900 mb-1">🔵 純 Ridge ($\rho=0$)</div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_1$: <span id="valRidge1" class="font-bold">1.53</span></div>
+                                        <div class="font-mono-code text-slate-800">$\hat{\beta}_2$: <span id="valRidge2" class="font-bold text-rose-600">0.46</span></div>
+                                        <div id="noteRidge" class="text-[11px] text-rose-600 font-semibold mt-1">✗ 非零殘留</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 教學引導重點框 -->
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-950 leading-relaxed">
+                            <div class="font-bold text-amber-900 text-sm mb-1">🎓 動手做實驗（Step 1 重點觀察）：</div>
+                            <ol class="list-decimal list-inside space-y-1.5">
+                                <li>在<strong>「情境 A：$\beta_2$ 為次要特徵」</strong>下，將 $\rho$ 從 <code>0.0</code> 慢慢拉到 <code>0.5</code>：注意看圓形邊界在四個座標軸上長出<strong>「尖頂點 (Corners)」</strong>，等高線立刻被尖角吸住，使 $\hat{\beta}_2 = 0.00$！</li>
+                                <li>切換到<strong>「情境 B：$X_1, X_2$ 高度共線」</strong>（狹長斜向橢圓等高線）：當 $\rho=1.0$（純 Lasso）時，平坦菱形邊與等高線幾乎貼合，解偏在一端；一旦把 $\rho$ 調到 <code>0.3 ~ 0.7</code>，<strong>向外鼓出的弧形邊（嚴格凸性）</strong>就會把切點穩穩托在對角線附近（$\hat{\beta}_1 \approx \hat{\beta}_2$，<strong>群組效應</strong>）！</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== STEP 2: 數學引擎 — 雙重收縮 (軟閾值 + L2 縮放) ==================== -->
+        <section id="stage2" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <div
+                    class="bg-gradient-to-r from-indigo-50 via-purple-50 to-sky-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="text-xs font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">Step
+                            2 · 數學引擎 (Double Shrinkage & Soft-Thresholding)</span>
+                        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mt-1">
+                            座標下降法如何同時執行 L1 與 L2？—— 先「軟閾值砍零」再「按比例縮放」
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-white/90 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        解析公式：$\hat{\beta}_j^{\text{EN}} = \dfrac{\mathcal{S}(z_j,\, \alpha \rho)}{1 + \alpha(1-\rho)}$
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- 左側：算子映射圖 -->
+                    <div class="lg:col-span-7 flex flex-col items-center">
+                        <div class="canvas-card w-full p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs text-slate-600">
+                                <div class="font-bold text-slate-700">單變數正交特徵下：OLS 係數 $z_j$ $\rightarrow$ 正則化後係數 $\hat{\beta}_j$ 映射曲線</div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-0.5 bg-slate-400 inline-block"></span>OLS ($\hat{\beta}=z$)</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-0.5 bg-sky-500 inline-block"></span>Ridge (斜率變緩)</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-0.5 bg-emerald-600 inline-block"></span>Lasso (死區+平行平移)</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-1 bg-purple-600 inline-block"></span>Elastic Net (死區+斜率縮放)</span>
+                                </div>
+                            </div>
+                            <canvas id="softCanvas" width="600" height="420"
+                                class="w-full h-auto rounded-lg bg-slate-50 border border-slate-200"></canvas>
+                        </div>
+
+                        <!-- 數學公式拆解三欄卡 -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full mt-3 text-xs">
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+                                <div class="font-bold text-emerald-900 mb-1">① 分子：L1 軟閾值死區 $\mathcal{S}(z_j, \lambda_1)$</div>
+                                <p class="text-emerald-800 leading-relaxed">
+                                    令 $\lambda_1 = \alpha \rho$。當 $|z_j| \le \lambda_1$ 時，分子直接等於 <strong>0</strong>（死區寬度 $\pm \alpha \rho$），負責<strong>自動剔除噪音與冗餘特徵</strong>。
+                                </p>
+                            </div>
+                            <div class="bg-sky-50 border border-sky-200 rounded-xl p-3.5">
+                                <div class="font-bold text-sky-900 mb-1">② 分母：L2 比例縮放 $\frac{1}{1+\lambda_2}$</div>
+                                <p class="text-sky-800 leading-relaxed">
+                                    令 $\lambda_2 = \alpha(1-\rho)$。通過死區的特徵，除了被扣掉 $\lambda_1$ 外，斜率還會再除以 $1+\alpha(1-\rho)$，負責<strong>抑制共線係數暴衝</strong>。
+                                </p>
+                            </div>
+                            <div class="bg-purple-50 border border-purple-200 rounded-xl p-3.5">
+                                <div class="font-bold text-purple-900 mb-1">③ Zou & Hastie 雙重收縮效應</div>
+                                <p class="text-purple-800 leading-relaxed">
+                                    正因為同時受到 L1 扣減與 L2 除法縮放，稱為<strong>「雙重收縮 (Double Shrinkage)」</strong>（註：<code>sklearn.ElasticNet</code> 直接輸出此公式解）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側：控制滑桿與單一特徵即時試算器 -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="text-base font-bold text-slate-800 mb-3">🔬 雙重收縮算子互動試算器</h3>
+
+                            <!-- 滑桿 1: alpha -->
+                            <div class="mb-3.5">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>總正則化強度 $\alpha$ (<code>alpha</code>)：</span>
+                                    <span id="lblSoftAlpha" class="font-mono-code text-sm font-bold text-indigo-700">α = 1.20</span>
+                                </div>
+                                <input type="range" id="sliderSoftAlpha" min="0.1" max="2.5" step="0.05" value="1.20"
+                                    oninput="updateStage2()">
+                            </div>
+
+                            <!-- 滑桿 2: rho -->
+                            <div class="mb-3.5">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>L1 比例 $\rho$ (<code>l1_ratio</code>)：</span>
+                                    <span id="lblSoftRho" class="font-mono-code text-sm font-bold text-purple-700">ρ = 0.50</span>
+                                </div>
+                                <input type="range" id="sliderSoftRho" min="0.0" max="1.0" step="0.05" value="0.50"
+                                    oninput="updateStage2()">
+                            </div>
+
+                            <!-- 滑桿 3: 測試特徵原始 OLS 值 z_j -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>測試特徵的未正則化係數 $z_j$：</span>
+                                    <span id="lblSoftZ" class="font-mono-code text-sm font-bold text-amber-600">z_j = 1.80</span>
+                                </div>
+                                <input type="range" id="sliderSoftZ" min="-3.5" max="3.5" step="0.05" value="1.80"
+                                    oninput="updateStage2()">
+                            </div>
+
+                            <!-- 拆解計算過程展示卡 -->
+                            <div class="bg-white rounded-xl border border-purple-200 p-3.5 mb-3 shadow-sm">
+                                <div class="text-xs font-bold text-purple-900 mb-2">🧮 Elastic Net 兩步驟收縮即時拆解：</div>
+                                <div class="space-y-1.5 text-xs font-mono-code">
+                                    <div class="flex justify-between text-slate-600">
+                                        <span>• L1 死區門檻 $\lambda_1 = \alpha \rho$：</span>
+                                        <span id="calcLambda1" class="font-bold text-emerald-700">0.600</span>
+                                    </div>
+                                    <div class="flex justify-between text-slate-600">
+                                        <span>• L2 縮放係數 $\lambda_2 = \alpha(1-\rho)$：</span>
+                                        <span id="calcLambda2" class="font-bold text-sky-700">0.600</span>
+                                    </div>
+                                    <div class="border-t border-slate-100 my-1 pt-1 flex justify-between text-slate-700">
+                                        <span>Step A (L1 軟閾值後分子)：</span>
+                                        <span id="calcStepA" class="font-bold text-emerald-700">1.200</span>
+                                    </div>
+                                    <div class="flex justify-between text-slate-800">
+                                        <span>Step B (再除以 $1+\lambda_2$ 最終解)：</span>
+                                        <span id="calcStepB" class="font-extrabold text-purple-700 text-sm">0.750</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 四模型輸出比較 -->
+                            <div class="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2 text-xs">
+                                <div class="flex items-center justify-between py-1 border-b border-slate-100">
+                                    <span class="font-semibold text-slate-600">⚪ OLS 原始係數 ($z_j$)：</span>
+                                    <span id="outSoftOLS" class="font-mono-code font-bold text-slate-800">1.800</span>
+                                </div>
+                                <div class="flex items-center justify-between py-1 border-b border-slate-100">
+                                    <span class="font-semibold text-sky-700">🔵 純 Ridge ($\rho=0$) $\frac{z_j}{1+\alpha}$：</span>
+                                    <span id="outSoftRidge" class="font-mono-code font-bold text-sky-700">0.818</span>
+                                </div>
+                                <div class="flex items-center justify-between py-1 border-b border-slate-100">
+                                    <span class="font-semibold text-emerald-700">💎 純 Lasso ($\rho=1$) $\mathcal{S}(z_j, \alpha)$：</span>
+                                    <span id="outSoftLasso" class="font-mono-code font-bold text-emerald-700">0.600</span>
+                                </div>
+                                <div class="flex items-center justify-between py-1">
+                                    <span class="font-bold text-purple-800">🧬 Elastic Net ($\rho$ 混合)：</span>
+                                    <span id="outSoftEN" class="font-mono-code font-extrabold text-purple-700 text-sm">0.750</span>
+                                </div>
+                                <div id="softZoneAlert"
+                                    class="mt-1 p-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-center">
+                                    當前 $|z_j| > \alpha \rho$：特徵保留，並接受 L1 平移與 L2 比例雙重收縮。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== STEP 3: 群組效應實驗室 (Grouping Effect vs Lasso 隨機跳動) ==================== -->
+        <section id="stage3" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <div
+                    class="bg-gradient-to-r from-amber-50 via-purple-50 to-emerald-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="text-xs font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">Step
+                            3 · 群組效應 (The Grouping Effect Laboratory)</span>
+                        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mt-1">
+                            當反應器入口/出口測點高度共線 ($r = 0.97 \sim 0.99$) 時：為什麼 Lasso 會隨機亂跳，而 Elastic Net 能「同進同出」？
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-white/90 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        群組效應定理：$|\hat{\beta}_i^{\text{EN}} - \hat{\beta}_j^{\text{EN}}| \le \dfrac{\|\mathbf{y}\|_1}{\alpha(1-\rho)} \sqrt{2(1 - r_{ij})}$
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- 左側：群組效應比較 Canvas -->
+                    <div class="lg:col-span-7 flex flex-col items-center">
+                        <div class="canvas-card w-full p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs text-slate-600">
+                                <div class="font-bold text-slate-700">共線特徵組對決：溫度組 $(T_1, T_2)$ 與 壓力組 $(P_1, P_2)$ 在三種模型下的係數分配</div>
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-3 rounded-sm bg-sky-500 inline-block"></span>Ridge ($\rho=0$)</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-3 rounded-sm bg-purple-600 inline-block"></span>Elastic Net ($0<\rho<1$)</span>
+                                    <span class="inline-flex items-center gap-1"><span
+                                            class="w-3 h-3 rounded-sm bg-emerald-600 inline-block"></span>Lasso ($\rho=1$)</span>
+                                </div>
+                            </div>
+                            <canvas id="groupCanvas" width="620" height="430"
+                                class="w-full h-auto rounded-lg bg-slate-50 border border-slate-200"></canvas>
+                        </div>
+
+                        <!-- Zou & Hastie (2005) 群組效應定理直觀解釋 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mt-3 text-xs">
+                            <div class="bg-purple-50 border border-purple-200 rounded-xl p-3.5">
+                                <div class="font-bold text-purple-900 mb-1">📐 為什麼 L2 項 $(1-\rho)$ 能保證「同進同出」？</div>
+                                <p class="text-purple-800 leading-relaxed">
+                                    根據 Zou & Hastie (2005) 定理，兩個標準化特徵的係數差上限正比於 $\frac{\sqrt{2(1-r)}}{\alpha(1-\rho)}$。當相關係數 $r \to 1$ 且 $\rho < 1$ 時，$\sqrt{2(1-r)} \to 0$，<strong>數學上強制要求兩個共線特徵的係數必須幾乎相等</strong>！
+                                </p>
+                            </div>
+                            <div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5">
+                                <div class="font-bold text-rose-900 mb-1">⚠️ 為什麼純 Lasso ($\rho = 1$) 會失效並隨機跳動？</div>
+                                <p class="text-rose-800 leading-relaxed">
+                                    當 $\rho = 1$ 時，分母 $\alpha(1-\rho) = 0$，上界變成 $\infty$（群組保證完全消失）！因為 $|\beta_1|+|\beta_2|$ 對「全押 $T_1$」或「全押 $T_2$」懲罰一模一樣，只要換一批訓練樣本，Lasso 就會在 $T_1$ 與 $T_2$ 之間隨機翻盤！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側：共線性與數據擾動互動控制面板 -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="text-base font-bold text-slate-800 mb-3">🧪 共線性群組與抽樣擾動實驗台</h3>
+
+                            <!-- 滑桿 1: 特徵組內相關係數 r -->
+                            <div class="mb-3.5">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>測點間共線性相關係數 $r$：</span>
+                                    <span id="lblGroupR" class="font-mono-code text-sm font-bold text-amber-700">r = 0.97 (極高共線性)</span>
+                                </div>
+                                <input type="range" id="sliderGroupR" min="0.50" max="0.99" step="0.01" value="0.97"
+                                    oninput="updateStage3()">
+                            </div>
+
+                            <!-- 滑桿 2: Elastic Net 的 l1_ratio -->
+                            <div class="mb-3.5">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>Elastic Net 的 L1 比例 $\rho$ (<code>l1_ratio</code>)：</span>
+                                    <span id="lblGroupRho" class="font-mono-code text-sm font-bold text-purple-700">ρ = 0.50</span>
+                                </div>
+                                <input type="range" id="sliderGroupRho" min="0.10" max="0.95" step="0.05" value="0.50"
+                                    oninput="updateStage3()">
+                            </div>
+
+                            <!-- 隨機抽樣批次切換按鈕 (測試穩定性) -->
+                            <div class="mb-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-slate-700">🎲 模擬不同訓練集隨機切分 (10 Trials)：</span>
+                                    <span id="lblTrialBadge"
+                                        class="text-xs font-mono-code font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">Trial #1</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 mb-2.5">
+                                    點擊下方按鈕模擬工廠重新抽樣訓練集（微小噪音擾動），觀察 <strong>Lasso 是否突然從選 $T_1$ 跳成選 $T_2$</strong>，而 <strong>Elastic Net 始終穩定同進同出</strong>！
+                                </p>
+                                <div class="flex gap-2">
+                                    <button onclick="triggerNextTrial()"
+                                        class="flex-1 text-xs font-bold py-2 px-3 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm transition">
+                                        🔄 換一批隨機訓練樣本 (Next Trial)
+                                    </button>
+                                    <button onclick="resetTrial()"
+                                        class="text-xs font-semibold py-2 px-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition">
+                                        重置
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 即時數值對比卡片 -->
+                            <div class="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2.5 text-xs">
+                                <div class="font-bold text-slate-700 border-b border-slate-100 pb-1.5">
+                                    📋 雙特徵組係數行為即時診斷：
+                                </div>
+                                <div class="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200">
+                                    <div class="font-bold text-amber-900 mb-1">🔥 重要共線群組：溫度測點組 $(T_1, T_2)$</div>
+                                    <div id="diagTempGroup" class="text-slate-700 leading-relaxed font-mono-code text-[11px]">
+                                        載入中...
+                                    </div>
+                                </div>
+                                <div class="p-2.5 rounded-lg bg-sky-50/70 border border-sky-200">
+                                    <div class="font-bold text-sky-900 mb-1">💤 冗餘共線群組：次要壓力殘差組 $(P_1, P_2)$</div>
+                                    <div id="diagPressGroup" class="text-slate-700 leading-relaxed font-mono-code text-[11px]">
+                                        載入中...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== STEP 4: 化工反應器 10 特徵正則化路徑與 ElasticNetCV ==================== -->
+        <section id="stage4" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <div
+                    class="bg-gradient-to-r from-teal-50 via-purple-50 to-indigo-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="text-xs font-extrabold uppercase tracking-wider text-teal-800 bg-teal-100 px-2.5 py-0.5 rounded-full">Step
+                            4 · 化工案例 (Unit 10 Chemical Reactor Yield Case Study)</span>
+                        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mt-1">
+                            化學反應器產率預測 (10 個特徵)：調整 $\alpha$ 與 $\rho$，觀察正則化路徑與群組篩選
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-white/90 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        真實機制：$\text{Yield} = 50 + 0.6T + 3.5P + 5.0C + 0.08t + \epsilon$ （含 2 組共線測點 + 2 個冗餘變數）
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- 左側：正則化路徑圖與 5-Fold CV 曲線 -->
+                    <div class="lg:col-span-7 flex flex-col gap-4">
+                        <div class="canvas-card w-full p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
+                                <span class="font-bold text-slate-700">📈 Elastic Net 正則化路徑 (Regularization Path) 與 5-Fold CV 誤差</span>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">綠線：4 核心特徵</span>
+                                    <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">橘線：溫度組 (T1, T2)</span>
+                                    <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-semibold">藍線：壓力組 (P1, P2)</span>
+                                    <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-semibold">灰虛線：2 冗餘特徵</span>
+                                </div>
+                            </div>
+                            <canvas id="pathCanvas" width="640" height="440"
+                                class="w-full h-auto rounded-lg bg-slate-50 border border-slate-200"></canvas>
+                        </div>
+
+                        <!-- 快速情境按鈕 -->
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                            <span class="font-bold text-slate-600">⚡ 快速切換教學檢查點：</span>
+                            <button onclick="setPathPreset(-3.5, 0.50)"
+                                class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition">
+                                極小 α ≈ 0.0003 (接近 OLS)
+                            </button>
+                            <button onclick="setPathPreset(-1.323, 0.99)"
+                                class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold border border-rose-300 transition">
+                                🏆 講義 ElasticNetCV 最佳點 (α=0.0475, ρ=0.99)
+                            </button>
+                            <button onclick="setPathPreset(-0.85, 0.50)"
+                                class="px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold border border-purple-300 transition">
+                                🧬 均衡群組模式 (α=0.14, ρ=0.50 → 僅留核心+溫度組)
+                            </button>
+                            <button onclick="setPathPreset(0.45, 0.50)"
+                                class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold transition">
+                                過大 α ≈ 2.8 (欠擬合 Underfitting)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 右側：雙滑桿與 10 特徵即時排行榜 -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <!-- 滑桿 1: log10(alpha) -->
+                            <div class="mb-3.5">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>總正則化強度 $\alpha$（對數尺度 $\log_{10}\alpha$）：</span>
+                                    <span id="lblPathAlpha" class="font-mono-code text-sm font-extrabold text-rose-700">α = 0.0475</span>
+                                </div>
+                                <input type="range" id="sliderPathAlpha" min="-3.5" max="0.8" step="0.025" value="-1.323"
+                                    oninput="updateStage4()">
+                            </div>
+
+                            <!-- 滑桿 2: l1_ratio -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+                                    <span>混合比例 $\rho$ (<code>l1_ratio</code>)：</span>
+                                    <span id="lblPathRho" class="font-mono-code text-sm font-extrabold text-purple-700">ρ = 0.99 (99% L1 + 1% L2)</span>
+                                </div>
+                                <input type="range" id="sliderPathRho" min="0.10" max="0.99" step="0.01" value="0.99"
+                                    oninput="updateStage4()">
+                            </div>
+
+                            <!-- 三格關鍵指標 -->
+                            <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                                <div class="bg-white p-2.5 rounded-lg border border-slate-200">
+                                    <div class="text-[11px] text-slate-500">保留特徵數</div>
+                                    <div id="statPathKept" class="text-base font-extrabold text-purple-700 font-mono-code">8 / 10</div>
+                                </div>
+                                <div class="bg-white p-2.5 rounded-lg border border-slate-200">
+                                    <div class="text-[11px] text-slate-500">測試集 RMSE</div>
+                                    <div id="statPathRMSE" class="text-base font-extrabold text-indigo-700 font-mono-code">3.242</div>
+                                </div>
+                                <div class="bg-white p-2.5 rounded-lg border border-slate-200">
+                                    <div class="text-[11px] text-slate-500">測試集 $R^2$</div>
+                                    <div id="statPathR2" class="text-base font-extrabold text-slate-800 font-mono-code">0.8580</div>
+                                </div>
+                            </div>
+
+                            <!-- 10 個化工特徵即時係數列表 -->
+                            <div class="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                                <span>🧪 10 個反應器特徵係數即時狀態（標準化空間）</span>
+                                <span class="text-[11px] font-normal text-slate-500">分組色彩標記</span>
+                            </div>
+                            <div id="featureBarsContainer" class="space-y-1.5">
+                                <!-- 由 JS 動態渲染 10 個特徵列 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== STEP 5: 四模型對決、穩定性驗證與 l1_ratio 選型指南 ==================== -->
+        <section id="stage5" class="mb-8 hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <div
+                    class="bg-gradient-to-r from-purple-50 via-slate-50 to-amber-50 border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                        <span
+                            class="text-xs font-extrabold uppercase tracking-wider text-purple-800 bg-purple-100 px-2.5 py-0.5 rounded-full">Step
+                            5 · 實戰調參與選型 (Model Showdown & Practical Guide)</span>
+                        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mt-1">
+                            Unit 10 講義四模型實測對決、特徵標準化鐵律與 <code>l1_ratio</code> 選型決策樹
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-white/90 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        涵蓋：OLS vs Ridge vs Lasso vs Elastic Net + $p \gg n$ 突破限制
+                    </div>
+                </div>
+
+                <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- 左側：講義 7.6 節四模型係數並排互動圖 -->
+                    <div class="lg:col-span-7 flex flex-col gap-4">
+                        <div class="canvas-card w-full p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
+                                <span class="font-bold text-slate-700">📊 講義 7.6 節實測數據：四種模型在 10 個特徵上的回歸係數並排比較</span>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button onclick="setCompareHighlight('all')" id="btnCmpAll"
+                                        class="px-2 py-0.5 rounded bg-purple-600 text-white font-semibold">顯示全部特徵</button>
+                                    <button onclick="setCompareHighlight('pressure')" id="btnCmpPress"
+                                        class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">🔍 聚焦壓力組補償現象</button>
+                                    <button onclick="setCompareHighlight('temp')" id="btnCmpTemp"
+                                        class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">🔍 聚焦溫度組群組效應</button>
+                                </div>
+                            </div>
+                            <canvas id="compareCanvas" width="640" height="390"
+                                class="w-full h-auto rounded-lg bg-slate-50 border border-slate-200"></canvas>
+                        </div>
+
+                        <!-- 為什麼 OLS 與 Ridge 在 P1/P2 出現負係數？講義重點解析 -->
+                        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-950 leading-relaxed">
+                            <div class="font-bold text-indigo-900 text-sm mb-1">💡 講義關鍵發現：為什麼 OLS 與 Ridge 的壓力組 (`P1_inlet`, `P2_outlet`) 會出現約 `-2.2` 的負係數？</div>
+                            <p>
+                                在真實數據中，產率明明與壓力呈正相關，但因為 `P1_inlet`、`P2_outlet` 與核心特徵 `Pressure_bar` 高度共線，<strong>OLS 與 Ridge 不具備歸零能力</strong>，只好把 `Pressure_bar` 的係數灌水放大到 <strong>+8.78 / +8.46</strong>，再賦予 `P1_inlet` 與 `P2_outlet` <strong>-2.53 / -2.02 的負係數來互相抵消補償</strong>！這會導致物理意義完全失真。相反地，<strong>Elastic Net 與 Lasso 直接將多餘的 `P1_inlet` 與 `P2_outlet` 雙雙歸零</strong>，讓 `Pressure_bar` 恢復乾淨準確的 <strong>+4.04</strong>！
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 右側：l1_ratio 互動選型顧問 + 標準化提醒 + 4模型總表 -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <!-- 互動式 l1_ratio 選型推薦器 -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="text-base font-bold text-slate-800 mb-2">🧭 化工建模 <code>l1_ratio</code> 互動選型顧問</h3>
+                            <p class="text-xs text-slate-600 mb-3">點選您的化工數據場景，查看推薦的 <code>l1_ratio</code> 搜尋區間與模型理由：</p>
+                            <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+                                <button onclick="selectAdvisorScenario('nir')" id="advBtn_nir"
+                                    class="p-2.5 rounded-lg border-2 border-purple-600 bg-purple-50 text-purple-900 font-bold text-left transition">
+                                    🌈 高維近紅外光譜 (NIR)<br><span class="text-[11px] font-normal text-purple-700">$p \gg n$ 且相鄰波長極度共線</span>
+                                </button>
+                                <button onclick="selectAdvisorScenario('reactor')" id="advBtn_reactor"
+                                    class="p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-left transition">
+                                    ⚗️ 多測點反應器軟測量<br><span class="text-[11px] font-normal text-slate-500">含多組進出口溫壓測點與噪音</span>
+                                </button>
+                                <button onclick="selectAdvisorScenario('sparse')" id="advBtn_sparse"
+                                    class="p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-left transition">
+                                    🧹 大量無關感測器篩選<br><span class="text-[11px] font-normal text-slate-500">追求極簡稀疏模型 + 微量防呆</span>
+                                </button>
+                                <button onclick="selectAdvisorScenario('indep')" id="advBtn_indep"
+                                    class="p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-left transition">
+                                    📐 少數正交獨立操作參數<br><span class="text-[11px] font-normal text-slate-500">實驗設計 (DOE) 特徵皆重要</span>
+                                </button>
+                            </div>
+                            <div id="advisorResultBox" class="bg-white rounded-xl border border-purple-200 p-3.5 text-xs space-y-1.5 shadow-sm">
+                                <!-- 由 JS 動態填入建議 -->
+                            </div>
+                        </div>
+
+                        <!-- 四模型全方位對照表 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm overflow-x-auto">
+                            <div class="text-xs font-bold text-slate-800 mb-2">📋 四種線性模型核心特性與講義實測績效總表</div>
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                        <th class="p-2">評估項目</th>
+                                        <th class="p-2">OLS</th>
+                                        <th class="p-2 text-sky-700">Ridge (L2)</th>
+                                        <th class="p-2 text-emerald-700">Lasso (L1)</th>
+                                        <th class="p-2 text-purple-700 font-extrabold">Elastic Net</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="p-2 font-semibold">特徵選擇 (歸零)</td>
+                                        <td class="p-2 text-slate-400">✗ (10/10)</td>
+                                        <td class="p-2 text-slate-400">✗ (10/10)</td>
+                                        <td class="p-2 text-emerald-700 font-bold">✓ (8/10)</td>
+                                        <td class="p-2 text-purple-700 font-bold">✓ (8/10)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2 font-semibold">群組效應 (共線同進退)</td>
+                                        <td class="p-2 text-slate-400">✗ (正負抵消)</td>
+                                        <td class="p-2 text-sky-700 font-bold">✓ (平分但非零)</td>
+                                        <td class="p-2 text-rose-600">✗ (隨機選一)</td>
+                                        <td class="p-2 text-purple-700 font-bold">✓ (稀疏+同進退)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2 font-semibold">$p > n$ 選取特徵上限</td>
+                                        <td class="p-2 text-rose-600">無法求解</td>
+                                        <td class="p-2">全部 $p$ 個</td>
+                                        <td class="p-2 text-amber-700">最多 $n$ 個</td>
+                                        <td class="p-2 text-purple-700 font-bold">突破 $n$ 個限制</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2 font-semibold">講義測試集 $R^2$ / RMSE</td>
+                                        <td class="p-2 font-mono-code">0.8555 / 3.27</td>
+                                        <td class="p-2 font-mono-code">0.8555 / 3.27</td>
+                                        <td class="p-2 font-mono-code">0.8583 / 3.24</td>
+                                        <td class="p-2 font-mono-code font-bold text-purple-700">0.8580 / 3.24</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2 font-semibold">特徵標準化 (Z-score)</td>
+                                        <td class="p-2 text-slate-500">選用</td>
+                                        <td class="p-2 text-rose-600 font-bold">⚠️ 必須</td>
+                                        <td class="p-2 text-rose-600 font-bold">⚠️ 必須</td>
+                                        <td class="p-2 text-rose-600 font-bold">⚠️ 必須</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 頁尾隨堂檢測 Quiz (4 題核心觀念自我檢核) ==================== -->
+        <section class="mb-8 bg-slate-900 text-white rounded-2xl shadow-xl p-6 md:p-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-5 pb-4 border-b border-slate-700">
+                <div>
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-purple-300 bg-purple-900/60 border border-purple-500/40 px-2.5 py-0.5 rounded-full">
+                        Self-Assessment Quiz · 觀念隨堂檢測
+                    </span>
+                    <h2 class="text-xl md:text-2xl font-bold mt-1">
+                        🏆 Elastic Net 彈性網路回歸 4 大核心觀念即測即評
+                    </h2>
+                </div>
+                <div id="quizScoreBadge" class="text-sm font-mono-code font-bold bg-slate-800 border border-slate-600 px-3.5 py-1.5 rounded-xl text-amber-300">
+                    答對題數：0 / 4
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <!-- Q1 -->
+                <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+                    <div class="font-bold text-sm text-purple-200 mb-2">
+                        Q1. 在 Elastic Net 中，當超參數 <code>l1_ratio</code> ($\rho$) 設定為 <code>0.7</code> 時，代表正則化懲罰如何組成？
+                    </div>
+                    <div class="space-y-1.5">
+                        <button id="q1_A" onclick="checkQuiz(1, 'A')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (A) 30% L1 (Lasso) 懲罰 + 70% L2 (Ridge) 懲罰
+                        </button>
+                        <button id="q1_B" onclick="checkQuiz(1, 'B')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (B) 70% L1 (Lasso) 懲罰 + 30% L2 (Ridge) 懲罰
+                        </button>
+                        <button id="q1_C" onclick="checkQuiz(1, 'C')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (C) 總正則化強度 $\alpha = 0.7$，只使用純 L2 懲罰
+                        </button>
+                    </div>
+                    <div id="q1_feedback" class="hidden"></div>
+                </div>
+
+                <!-- Q2 -->
+                <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+                    <div class="font-bold text-sm text-purple-200 mb-2">
+                        Q2. 為什麼 Elastic Net 的「膨脹菱形」約束區能同時擁有特徵選擇與共線性穩定的優點？
+                    </div>
+                    <div class="space-y-1.5">
+                        <button id="q2_A" onclick="checkQuiz(2, 'A')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (A) 因為它變成了完全光滑的圓形，沒有任何尖角
+                        </button>
+                        <button id="q2_B" onclick="checkQuiz(2, 'B')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (B) 座標軸上保留了 L1 的尖角（可歸零），且四邊因 L2 向外弧形鼓出（嚴格凸性，促使共線特徵同進同出）
+                        </button>
+                        <button id="q2_C" onclick="checkQuiz(2, 'C')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (C) 因為它不對任何回歸係數施加懲罰
+                        </button>
+                    </div>
+                    <div id="q2_feedback" class="hidden"></div>
+                </div>
+
+                <!-- Q3 -->
+                <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+                    <div class="font-bold text-sm text-purple-200 mb-2">
+                        Q3. 當反應器的入口溫度 <code>T1_inlet</code> 與出口溫度 <code>T2_outlet</code> 高度相關 ($r = 0.97$) 且對產率都很重要時，純 Lasso 與 Elastic Net 的行為差異為何？
+                    </div>
+                    <div class="space-y-1.5">
+                        <button id="q3_A" onclick="checkQuiz(3, 'A')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (A) 純 Lasso 會隨訓練集抽樣隨機挑一個保留；Elastic Net 具「群組效應」會傾向將兩者一起保留並給予相近權重
+                        </button>
+                        <button id="q3_B" onclick="checkQuiz(3, 'B')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (B) 純 Lasso 會把兩個特徵都保留且係數永遠相等；Elastic Net 一定會把兩個都砍成 0
+                        </button>
+                        <button id="q3_C" onclick="checkQuiz(3, 'C')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (C) 兩者行為完全相同，都不需要做特徵標準化
+                        </button>
+                    </div>
+                    <div id="q3_feedback" class="hidden"></div>
+                </div>
+
+                <!-- Q4 -->
+                <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+                    <div class="font-bold text-sm text-purple-200 mb-2">
+                        Q4. 在高維近紅外光譜 (NIR) 分析中，若波長特徵數 $p = 500$、樣本數僅 $n = 80$ ($p \gg n$)，為什麼 Elastic Net 明顯優於純 Lasso？
+                    </div>
+                    <div class="space-y-1.5">
+                        <button id="q4_A" onclick="checkQuiz(4, 'A')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (A) 純 Lasso 最多只能選出 $n = 80$ 個波長；Elastic Net 突破了最多選 $n$ 個特徵的限制，且能整段選出共線吸收波段
+                        </button>
+                        <button id="q4_B" onclick="checkQuiz(4, 'B')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (B) 因為 Elastic Net 具有解析公式解，不需要數值迭代
+                        </button>
+                        <button id="q4_C" onclick="checkQuiz(4, 'C')" class="w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition">
+                            (C) 因為 Elastic Net 不需要調整任何超參數
+                        </button>
+                    </div>
+                    <div id="q4_feedback" class="hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 頁尾課程與版權資訊 ==================== -->
+        <footer class="mt-8 pt-5 border-t border-slate-200 text-xs text-slate-500 flex flex-col md:flex-row items-center justify-between gap-2">
+            <div>
+                <span class="font-bold text-slate-700">課程資訊：</span>AI 在化工上之應用 (ChemE 3590) ｜ Unit 10 Elastic Net Regression 彈性網路回歸互動教材
+            </div>
+            <div>
+                逢甲大學 化工系 智慧程序系統工程實驗室 · 授課教師：莊曜禎 助理教授 ｜ <span class="text-slate-600 font-medium">CC BY-NC-SA 4.0</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- ==================== 互動邏輯與繪圖引擎 ==================== -->
+    <script>
+        // ==================== 導覽與分頁控制 ====================
+        let currentStage = 0;
+        let isViewAll = false;
+
+        function switchStage(stage) {
+            if (stage !== 0 && s0OrbitTimer) {
+                stopStage0Orbit();
+            }
+            currentStage = stage;
+            isViewAll = false;
+            const btnViewAll = document.getElementById('btnViewAll');
+            if (btnViewAll) btnViewAll.textContent = '📖 展開全部單元';
+
+            for (let i = 0; i <= 5; i++) {
+                const sec = document.getElementById('stage' + i);
+                const btn = document.getElementById('tabBtn' + i);
+                if (!sec || !btn) continue;
+                const badge = btn.querySelector('span');
+                if (i === stage) {
+                    sec.classList.remove('hidden');
+                    btn.className = 'step-tab-active flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all';
+                    if (badge) badge.className = 'w-6 h-6 rounded-full bg-white/20 text-xs font-extrabold flex items-center justify-center shrink-0';
+                } else {
+                    sec.classList.add('hidden');
+                    btn.className = 'bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-2 px-2.5 py-2.5 rounded-lg border border-slate-200 text-left transition-all';
+                    if (badge) badge.className = 'w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0';
+                }
+            }
+            renderAllStages();
+        }
+
+        function toggleViewAll() {
+            isViewAll = !isViewAll;
+            const btnViewAll = document.getElementById('btnViewAll');
+            if (isViewAll) {
+                btnViewAll.textContent = '📑 返回單頁分步模式';
+                for (let i = 0; i <= 5; i++) {
+                    const sec = document.getElementById('stage' + i);
+                    if (sec) sec.classList.remove('hidden');
+                }
+            } else {
+                switchStage(currentStage);
+            }
+            renderAllStages();
+        }
+
+        function setupHiDPICanvas(canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const w = Math.max(rect.width, 260);
+            const h = Math.max(rect.height, 200);
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { ctx, w, h };
+        }
+
+        // ==================== STEP 0: 誤差等高線的由來 (數據殘差、3D 誤差碗、2D 等高線三聯動) ====================
+        const S0_OLS_B1 = 2.30;
+        const S0_OLS_B2 = 1.05;
+        const S0_RSS_MIN = 10.00;
+        const S0_ANGLE_DEG = 28;
+        const S0_LAMBDA1 = 15.0;
+        const S0_LAMBDA2 = 6.5;
+
+        let s0B1 = 1.25;
+        let s0B2 = 0.45;
+        let s0OrbitTimer = null;
+        let s0OrbitAngle = 0;
+        let s0OrbitLossDelta = 21.42;
+
+        const s0SamplePoints = [
+            { x1: -1.45, x2: -1.10, noise: 0.42 },
+            { x1: -1.05, x2: -0.60, noise: -0.55 },
+            { x1: -0.60, x2: -0.85, noise: 0.35 },
+            { x1: -0.20, x2: 0.15, noise: -0.38 },
+            { x1: 0.25, x2: -0.10, noise: 0.48 },
+            { x1: 0.65, x2: 0.55, noise: -0.45 },
+            { x1: 1.10, x2: 0.80, noise: 0.32 },
+            { x1: 1.50, x2: 1.25, noise: -0.19 }
+        ];
+
+        function evalStage0RSS(b1, b2) {
+            const dx = b1 - S0_OLS_B1;
+            const dy = b2 - S0_OLS_B2;
+            const rad = (S0_ANGLE_DEG * Math.PI) / 180;
+            const cosA = Math.cos(rad);
+            const sinA = Math.sin(rad);
+            const u = dx * cosA + dy * sinA;
+            const v = -dx * sinA + dy * cosA;
+            const delta = S0_LAMBDA1 * u * u + S0_LAMBDA2 * v * v;
+            return { delta, total: S0_RSS_MIN + delta };
+        }
+
+        function getStage0PointOnContour(deltaRSS, thetaRad) {
+            const d = Math.max(0.001, deltaRSS);
+            const u = Math.sqrt(d / S0_LAMBDA1) * Math.cos(thetaRad);
+            const v = Math.sqrt(d / S0_LAMBDA2) * Math.sin(thetaRad);
+            const rad = (S0_ANGLE_DEG * Math.PI) / 180;
+            const cosA = Math.cos(rad);
+            const sinA = Math.sin(rad);
+            const dx = u * cosA - v * sinA;
+            const dy = u * sinA + v * cosA;
+            return {
+                b1: S0_OLS_B1 + dx,
+                b2: S0_OLS_B2 + dy
+            };
+        }
+
+        function updateStage0FromSliders() {
+            stopStage0Orbit();
+            s0B1 = parseFloat(document.getElementById('s0Beta1Slider').value);
+            s0B2 = parseFloat(document.getElementById('s0Beta2Slider').value);
+            updateStage0AllViews();
+        }
+
+        function setStage0ToOLS() {
+            stopStage0Orbit();
+            s0B1 = S0_OLS_B1;
+            s0B2 = S0_OLS_B2;
+            document.getElementById('s0Beta1Slider').value = s0B1.toFixed(2);
+            document.getElementById('s0Beta2Slider').value = s0B2.toFixed(2);
+            updateStage0AllViews();
+        }
+
+        function toggleStage0Orbit() {
+            if (s0OrbitTimer) {
+                stopStage0Orbit();
+                return;
+            }
+            const cur = evalStage0RSS(s0B1, s0B2);
+            s0OrbitLossDelta = cur.delta < 2.0 ? 20.0 : cur.delta;
+
+            const dx = s0B1 - S0_OLS_B1;
+            const dy = s0B2 - S0_OLS_B2;
+            const rad = (S0_ANGLE_DEG * Math.PI) / 180;
+            const u = dx * Math.cos(rad) + dy * Math.sin(rad);
+            const v = -dx * Math.sin(rad) + dy * Math.cos(rad);
+            s0OrbitAngle = Math.atan2(v * Math.sqrt(S0_LAMBDA2), u * Math.sqrt(S0_LAMBDA1));
+
+            const btn = document.getElementById('s0BtnOrbit');
+            if (btn) {
+                btn.innerHTML = '<span>⏸️ 暫停繞行 (觀察總誤差恆定!)</span>';
+                btn.className = 'px-3 py-2 rounded-lg text-xs font-extrabold bg-rose-600 hover:bg-rose-700 text-white shadow transition flex items-center justify-center gap-1.5';
+            }
+
+            s0OrbitTimer = setInterval(() => {
+                s0OrbitAngle += 0.055;
+                const pt = getStage0PointOnContour(s0OrbitLossDelta, s0OrbitAngle);
+                s0B1 = pt.b1;
+                s0B2 = pt.b2;
+                document.getElementById('s0Beta1Slider').value = Math.max(0, Math.min(4, s0B1)).toFixed(2);
+                document.getElementById('s0Beta2Slider').value = Math.max(-1, Math.min(3, s0B2)).toFixed(2);
+                updateStage0AllViews();
+            }, 40);
+        }
+
+        function stopStage0Orbit() {
+            if (s0OrbitTimer) {
+                clearInterval(s0OrbitTimer);
+                s0OrbitTimer = null;
+            }
+            const btn = document.getElementById('s0BtnOrbit');
+            if (btn) {
+                btn.innerHTML = '<span>🔄 沿當前等高線繞一圈</span>';
+                btn.className = 'px-3 py-2 rounded-lg text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow transition flex items-center justify-center gap-1.5';
+            }
+        }
+
+        function updateStage0AllViews() {
+            const rss = evalStage0RSS(s0B1, s0B2);
+            document.getElementById('s0Beta1Badge').textContent = `β₁ = ${s0B1.toFixed(2)}`;
+            document.getElementById('s0Beta2Badge').textContent = `β₂ = ${s0B2.toFixed(2)}`;
+            document.getElementById('s0DeltaRSS').textContent = `+${rss.delta.toFixed(2)}`;
+            document.getElementById('s0TotalRSS').textContent = `${rss.total.toFixed(2)}`;
+
+            const badge = document.getElementById('s0StatusBadge');
+            const text = document.getElementById('s0StatusText');
+
+            if (rss.delta < 0.15) {
+                badge.textContent = `🎯 正中碗底最低點 OLS：(β₁=${s0B1.toFixed(2)}, β₂=${s0B2.toFixed(2)})`;
+                badge.className = 'px-2.5 py-1 rounded bg-rose-500/30 border border-rose-400 text-rose-200 font-mono-code text-xs font-bold shrink-0';
+                text.innerHTML = `當前係數正好位於 <strong>3D 誤差碗的碗底最低點 $\\hat{\\boldsymbol{\\beta}}^{\\text{OLS}} = (2.30, 1.05)$</strong>！左圖的殘差平方和達到理論最小值 $\\text{RSS}_{\\min} = 10.00$，等高線縮為中心一點。`;
+            } else if (s0OrbitTimer) {
+                badge.textContent = `🔄 沿等高線巡航中：(β₁=${s0B1.toFixed(2)}, β₂=${s0B2.toFixed(2)})`;
+                badge.className = 'px-2.5 py-1 rounded bg-emerald-500/30 border border-emerald-400 text-emerald-200 font-mono-code text-xs font-bold shrink-0';
+                text.innerHTML = `注意看！雖然左圖的預測線斜率與各點殘差不斷改變，但加總起來的<strong>總誤差恆定為 $\\text{RSS} = ${rss.total.toFixed(2)}$</strong>（中圖高度不變）！這就是「<strong>等高線 (Contour)</strong>」的定義！`;
+            } else {
+                badge.textContent = `🟡 當前探針位置：(β₁=${s0B1.toFixed(2)}, β₂=${s0B2.toFixed(2)})`;
+                badge.className = 'px-2.5 py-1 rounded bg-amber-500/25 border border-amber-400 text-amber-300 font-mono-code text-xs font-bold shrink-0';
+                text.innerHTML = `偏離碗底 OLS $(2.30, 1.05)$ 時，左圖的紅色殘差柱增長，對應到中圖 3D 誤差碗爬升至高度 <strong>$\\text{RSS} = ${rss.total.toFixed(2)}$</strong>，在右圖則精準切出 <strong>$\\text{RSS} = ${rss.total.toFixed(2)}$ 的亮黃色等高線橢圓</strong>！`;
+            }
+
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(text, {
+                    delimiters: [{ left: '$', right: '$', display: false }],
+                    throwOnError: false
+                });
+            }
+
+            drawStage0DataCanvas(rss);
+            drawStage0BowlCanvas(rss);
+            drawStage0ContourCanvas(rss);
+        }
+
+        function drawStage0DataCanvas(rss) {
+            const canvas = document.getElementById('stage0DataCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 42, right: 18, top: 24, bottom: 34 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const minX = -2.0, maxX = 2.0;
+            const minY = -7.0, maxY = 7.0;
+            const toPxX = x => pad.left + ((x - minX) / (maxX - minX)) * plotW;
+            const toPxY = y => pad.top + plotH - ((y - minY) / (maxY - minY)) * plotH;
+
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#64748b';
+            for (let x = -2; x <= 2; x += 1) {
+                const px = toPxX(x);
+                ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + plotH); ctx.stroke();
+                ctx.textAlign = 'center';
+                ctx.fillText(`${x}`, px, pad.top + plotH + 14);
+            }
+            for (let y = -6; y <= 6; y += 3) {
+                const py = toPxY(y);
+                ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + plotW, py); ctx.stroke();
+                ctx.textAlign = 'right';
+                ctx.fillText(`${y}`, pad.left - 6, py + 3);
+            }
+
+            const olsY = x => (S0_OLS_B1 + 0.72 * S0_OLS_B2) * x;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.55)';
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath();
+            ctx.moveTo(toPxX(minX), toPxY(olsY(minX)));
+            ctx.lineTo(toPxX(maxX), toPxY(olsY(maxX)));
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.6;
+            ctx.beginPath();
+            const curLineY = x => (s0B1 + 0.72 * s0B2) * x + (s0B2 - S0_OLS_B2) * 0.65;
+            ctx.moveTo(toPxX(minX), toPxY(curLineY(minX)));
+            ctx.lineTo(toPxX(maxX), toPxY(curLineY(maxX)));
+            ctx.stroke();
+            ctx.restore();
+
+            for (const pt of s0SamplePoints) {
+                const trueY = S0_OLS_B1 * pt.x1 + S0_OLS_B2 * pt.x2 + pt.noise * 1.4;
+                const predY = s0B1 * pt.x1 + s0B2 * pt.x2;
+                const px = toPxX(pt.x1);
+                const pyTrue = toPxY(trueY);
+                const pyPred = toPxY(predY);
+                const errPx = Math.abs(pyTrue - pyPred);
+
+                if (errPx > 2) {
+                    const sqSize = Math.min(48, errPx);
+                    ctx.fillStyle = 'rgba(244, 63, 94, 0.16)';
+                    ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+                    ctx.lineWidth = 1;
+                    const topY = Math.min(pyTrue, pyPred);
+                    ctx.fillRect(px, topY, sqSize, errPx);
+                    ctx.strokeRect(px, topY, sqSize, errPx);
+                }
+
+                ctx.strokeStyle = '#f43f5e';
+                ctx.lineWidth = 2.0;
+                ctx.beginPath();
+                ctx.moveTo(px, pyTrue);
+                ctx.lineTo(px, pyPred);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(px, pyTrue, 4.5, 0, Math.PI * 2);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.fillRect(pad.left + 6, pad.top + 6, 178, 24);
+            ctx.strokeStyle = '#f43f5e';
+            ctx.strokeRect(pad.left + 6, pad.top + 6, 178, 24);
+            ctx.fillStyle = '#fda4af';
+            ctx.font = 'bold 11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`總誤差 RSS = ${rss.total.toFixed(2)}`, pad.left + 14, pad.top + 22);
+
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = 'bold 10.5px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('標準化特徵 X (藍點=真實產率 y_i, 黃線=當前預測 ŷ_i)', pad.left + plotW / 2, h - 7);
+        }
+
+        function drawStage0BowlCanvas(rss) {
+            const canvas = document.getElementById('stage0BowlCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const cx = w * 0.50;
+            const baseFloorY = h * 0.83;
+            const scaleXY = Math.min(w, h) * 0.22;
+            const scaleZ = (h * 0.54) / 70.0;
+
+            const project3D = (b1, b2, zVal) => {
+                const dx = b1 - S0_OLS_B1;
+                const dy = b2 - S0_OLS_B2;
+                const az = (-32 * Math.PI) / 180;
+                const rx = dx * Math.cos(az) - dy * Math.sin(az);
+                const ry = dx * Math.sin(az) + dy * Math.cos(az);
+                const px = cx + rx * scaleXY;
+                const py = baseFloorY - ry * scaleXY * 0.42 - zVal * scaleZ;
+                return { x: px, y: py };
+            };
+
+            const floorLevels = [15, 25, 40, 58];
+            for (const lv of floorLevels) {
+                const d = lv - S0_RSS_MIN;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.24)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let s = 0; s <= 64; s++) {
+                    const ang = (s / 64) * Math.PI * 2;
+                    const pt = getStage0PointOnContour(d, ang);
+                    const p2 = project3D(pt.b1, pt.b2, 0);
+                    if (s === 0) ctx.moveTo(p2.x, p2.y);
+                    else ctx.lineTo(p2.x, p2.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const bowlLevels = [15, 25, 40, 58];
+            for (const lv of bowlLevels) {
+                const d = lv - S0_RSS_MIN;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.30)';
+                ctx.lineWidth = 1.1;
+                ctx.beginPath();
+                for (let s = 0; s <= 64; s++) {
+                    const ang = (s / 64) * Math.PI * 2;
+                    const pt = getStage0PointOnContour(d, ang);
+                    const p3 = project3D(pt.b1, pt.b2, lv);
+                    if (s === 0) ctx.moveTo(p3.x, p3.y);
+                    else ctx.lineTo(p3.x, p3.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            for (let k = 0; k < 12; k++) {
+                const ang = (k / 12) * Math.PI * 2;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(168, 85, 247, 0.28)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let step = 0; step <= 25; step++) {
+                    const d = (step / 25) * 52.0;
+                    const pt = getStage0PointOnContour(d, ang);
+                    const p3 = project3D(pt.b1, pt.b2, S0_RSS_MIN + d);
+                    if (step === 0) ctx.moveTo(p3.x, p3.y);
+                    else ctx.lineTo(p3.x, p3.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const curDelta = Math.min(58, Math.max(0.05, rss.delta));
+            const curTotal = S0_RSS_MIN + curDelta;
+
+            ctx.save();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            for (let s = 0; s <= 72; s++) {
+                const ang = (s / 72) * Math.PI * 2;
+                const pt = getStage0PointOnContour(curDelta, ang);
+                const pFloor = project3D(pt.b1, pt.b2, 0);
+                if (s === 0) ctx.moveTo(pFloor.x, pFloor.y);
+                else ctx.lineTo(pFloor.x, pFloor.y);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(52, 211, 153, 0.45)';
+            ctx.lineWidth = 1.1;
+            ctx.setLineDash([3, 3]);
+            for (let k = 0; k < 4; k++) {
+                const ang = (k / 4) * Math.PI * 2 + 0.4;
+                const pt = getStage0PointOnContour(curDelta, ang);
+                const pTop = project3D(pt.b1, pt.b2, curTotal);
+                const pBot = project3D(pt.b1, pt.b2, 0);
+                ctx.beginPath();
+                ctx.moveTo(pTop.x, pTop.y);
+                ctx.lineTo(pBot.x, pBot.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.14)';
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let s = 0; s <= 72; s++) {
+                const ang = (s / 72) * Math.PI * 2;
+                const pt = getStage0PointOnContour(curDelta, ang);
+                const pBowl = project3D(pt.b1, pt.b2, curTotal);
+                if (s === 0) ctx.moveTo(pBowl.x, pBowl.y);
+                else ctx.lineTo(pBowl.x, pBowl.y);
+            }
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            const pOlsBowl = project3D(S0_OLS_B1, S0_OLS_B2, S0_RSS_MIN);
+            const pOlsFloor = project3D(S0_OLS_B1, S0_OLS_B2, 0);
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.5)';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(pOlsBowl.x, pOlsBowl.y); ctx.lineTo(pOlsFloor.x, pOlsFloor.y); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.arc(pOlsBowl.x, pOlsBowl.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#f43f5e';
+            ctx.fill();
+
+            const pCurBowl = project3D(s0B1, s0B2, curTotal);
+            const pCurFloor = project3D(s0B1, s0B2, 0);
+
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.8;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.moveTo(pCurBowl.x, pCurBowl.y);
+            ctx.lineTo(pCurFloor.x, pCurFloor.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.arc(pCurFloor.x, pCurFloor.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(pCurBowl.x, pCurBowl.y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#fde68a';
+            ctx.font = 'bold 10.5px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`水平切面高 RSS=${rss.total.toFixed(1)}`, 12, 22);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 10.5px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('↓ 垂直向下投影至底部 (β₁, β₂) 地板即形成等高線 ↓', w / 2, h - 7);
+        }
+
+        function drawStage0ContourCanvas(rss) {
+            const canvas = document.getElementById('stage0ContourCanvas');
+            if (!canvas) return;
+            const { ctx, w, h } = setupHiDPICanvas(canvas);
+            ctx.clearRect(0, 0, w, h);
+
+            const pad = { left: 42, right: 20, top: 22, bottom: 34 };
+            const plotW = w - pad.left - pad.right;
+            const plotH = h - pad.top - pad.bottom;
+
+            const span = 1.85;
+            const minB1 = S0_OLS_B1 - span, maxB1 = S0_OLS_B1 + span;
+            const minB2 = S0_OLS_B2 - span, maxB2 = S0_OLS_B2 + span;
+
+            const toPxX = b1 => pad.left + ((b1 - minB1) / (maxB1 - minB1)) * plotW;
+            const toPxY = b2 => pad.top + plotH - ((b2 - minB2) / (maxB2 - minB2)) * plotH;
+
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#64748b';
+            for (let b1 = 1; b1 <= 4; b1 += 1) {
+                const px = toPxX(b1);
+                ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + plotH); ctx.stroke();
+                ctx.textAlign = 'center';
+                ctx.fillText(`${b1.toFixed(0)}`, px, pad.top + plotH + 14);
+            }
+            for (let b2 = 0; b2 <= 2; b2 += 1) {
+                const py = toPxY(b2);
+                ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + plotW, py); ctx.stroke();
+                ctx.textAlign = 'right';
+                ctx.fillText(`${b2.toFixed(0)}`, pad.left - 6, py + 3);
+            }
+
+            const fixedLevels = [15, 25, 40, 58];
+            for (const lv of fixedLevels) {
+                const d = lv - S0_RSS_MIN;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(244, 63, 94, 0.35)';
+                ctx.lineWidth = 1.3;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                for (let s = 0; s <= 80; s++) {
+                    const ang = (s / 80) * Math.PI * 2;
+                    const pt = getStage0PointOnContour(d, ang);
+                    const px = toPxX(pt.b1), py = toPxY(pt.b2);
+                    if (s === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+
+                const labelPt = getStage0PointOnContour(d, 0.55);
+                ctx.fillStyle = 'rgba(253, 164, 175, 0.78)';
+                ctx.font = '10px "JetBrains Mono", monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`RSS=${lv}`, toPxX(labelPt.b1) + 2, toPxY(labelPt.b2));
+            }
+
+            if (rss.delta > 0.05) {
+                ctx.save();
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 2.6;
+                ctx.beginPath();
+                for (let s = 0; s <= 90; s++) {
+                    const ang = (s / 90) * Math.PI * 2;
+                    const pt = getStage0PointOnContour(rss.delta, ang);
+                    const px = toPxX(pt.b1), py = toPxY(pt.b2);
+                    if (s === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const olsPx = toPxX(S0_OLS_B1);
+            const olsPy = toPxY(S0_OLS_B2);
+            ctx.beginPath();
+            ctx.arc(olsPx, olsPy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#f43f5e';
+            ctx.fill();
+            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#fda4af';
+            ctx.font = 'bold 10px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('碗底 OLS(2.30,1.05)', olsPx, olsPy + 16);
+
+            const curPx = toPxX(s0B1);
+            const curPy = toPxY(s0B2);
+            ctx.beginPath();
+            ctx.arc(curPx, curPy, 13, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.25)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(curPx, curPy, 7.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#fde68a';
+            ctx.font = 'bold 10.5px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`(${s0B1.toFixed(2)}, ${s0B2.toFixed(2)})`, curPx, curPy - 12);
+
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = 'bold 10.5px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('係數 β₁ (拖曳黃點體驗等高線地形)', pad.left + plotW / 2, h - 7);
+        }
+
+        function bindStage0ContourDrag() {
+            const canvas = document.getElementById('stage0ContourCanvas');
+            if (!canvas) return;
+            let dragging = false;
+
+            const updateFromPointer = (clientX, clientY) => {
+                stopStage0Orbit();
+                const rect = canvas.getBoundingClientRect();
+                const pad = { left: 42, right: 20, top: 22, bottom: 34 };
+                const plotW = rect.width - pad.left - pad.right;
+                const plotH = rect.height - pad.top - pad.bottom;
+                const span = 1.85;
+                const minB1 = S0_OLS_B1 - span, maxB1 = S0_OLS_B1 + span;
+                const minB2 = S0_OLS_B2 - span, maxB2 = S0_OLS_B2 + span;
+
+                const fx = Math.max(0, Math.min(1, (clientX - rect.left - pad.left) / plotW));
+                const fy = Math.max(0, Math.min(1, (clientY - rect.top - pad.top) / plotH));
+
+                s0B1 = minB1 + fx * (maxB1 - minB1);
+                s0B2 = maxB2 - fy * (maxB2 - minB2);
+
+                document.getElementById('s0Beta1Slider').value = Math.max(0, Math.min(4, s0B1)).toFixed(2);
+                document.getElementById('s0Beta2Slider').value = Math.max(-1, Math.min(3, s0B2)).toFixed(2);
+                updateStage0AllViews();
+            };
+
+            canvas.addEventListener('mousedown', e => { dragging = true; updateFromPointer(e.clientX, e.clientY); });
+            window.addEventListener('mousemove', e => { if (dragging) updateFromPointer(e.clientX, e.clientY); });
+            window.addEventListener('mouseup', () => { dragging = false; });
+
+            canvas.addEventListener('touchstart', e => {
+                if (e.touches.length > 0) { dragging = true; updateFromPointer(e.touches[0].clientX, e.touches[0].clientY); }
+            }, { passive: true });
+            canvas.addEventListener('touchmove', e => {
+                if (dragging && e.touches.length > 0) updateFromPointer(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+            window.addEventListener('touchend', () => { dragging = false; });
+        }
+
+        // ==================== STEP 1: 膨脹菱形與約束幾何 (2D Beta Space) ====================
+        let geomScenario = 'sparse'; // 'sparse' or 'collinear'
+
+        function setGeomPreset(rhoVal, tVal) {
+            if (rhoVal !== null) {
+                document.getElementById('sliderGeomRho').value = rhoVal;
+            }
+            if (tVal !== null) {
+                document.getElementById('sliderGeomT').value = tVal;
+            }
+            updateStage1();
+        }
+
+        function setGeomScenario(mode) {
+            geomScenario = mode;
+            const btnSparse = document.getElementById('btnGeomSparse');
+            const btnCol = document.getElementById('btnGeomCollinear');
+            if (mode === 'sparse') {
+                btnSparse.className = 'text-xs font-bold py-2 px-3 rounded-lg border-2 border-purple-600 bg-purple-50 text-purple-800 transition';
+                btnCol.className = 'text-xs font-bold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition';
+            } else {
+                btnCol.className = 'text-xs font-bold py-2 px-3 rounded-lg border-2 border-purple-600 bg-purple-50 text-purple-800 transition';
+                btnSparse.className = 'text-xs font-bold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition';
+            }
+            updateStage1();
+        }
+
+        // 給定方向角 theta 與軸頂點半徑 R，求滿足 rho*(|b1|+|b2|) + (1-rho)/2*(b1^2+b2^2) = C 的半徑 r(theta)
+        // 其中在座標軸上 (|b1|=R, b2=0)，C = rho*R + 0.5*(1-rho)*R^2
+        function getENBoundaryRadius(theta, rho, R) {
+            const u = Math.abs(Math.cos(theta)) + Math.abs(Math.sin(theta)); // L1 unit factor in [1, sqrt(2)]
+            const C = rho * R + 0.5 * (1 - rho) * R * R;
+            if (Math.abs(1 - rho) < 1e-6) {
+                // Pure Lasso: R / u
+                return R / u;
+            }
+            const a = 0.5 * (1 - rho);
+            const b = rho * u;
+            // a * r^2 + b * r - C = 0
+            return (-b + Math.sqrt(b * b + 4 * a * C)) / (2 * a);
+        }
+
+        // 二次損失函數 Loss(b1, b2)
+        function evalQuadraticLoss(b1, b2, ols1, ols2, q11, q22, q12) {
+            const d1 = b1 - ols1;
+            const d2 = b2 - ols2;
+            return q11 * d1 * d1 + q22 * d2 * d2 + 2 * q12 * d1 * d2;
+        }
+
+        // 在約束區域內（含邊界與軸頂點）搜尋最小化二次損失的解 (b1, b2)
+        function solveConstrained2D(rho, R, ols1, ols2, q11, q22, q12) {
+            const C = rho * R + 0.5 * (1 - rho) * R * R;
+            const olsConstraint = rho * (Math.abs(ols1) + Math.abs(ols2)) + 0.5 * (1 - rho) * (ols1 * ols1 + ols2 * ols2);
+            if (olsConstraint <= C) {
+                return { b1: ols1, b2: ols2, loss: 0 };
+            }
+
+            // 高密度角度搜尋 + 精確檢查四個座標軸頂點
+            let bestB1 = R, bestB2 = 0;
+            let bestLoss = evalQuadraticLoss(R, 0, ols1, ols2, q11, q22, q12);
+
+            const corners = [
+                [R, 0], [-R, 0], [0, R], [0, -R]
+            ];
+            for (const [cb1, cb2] of corners) {
+                const l = evalQuadraticLoss(cb1, cb2, ols1, ols2, q11, q22, q12);
+                if (l < bestLoss) {
+                    bestLoss = l;
+                    bestB1 = cb1;
+                    bestB2 = cb2;
+                }
+            }
+
+            const N = 720;
+            for (let i = 0; i < N; i++) {
+                const theta = (2 * Math.PI * i) / N;
+                const r = getENBoundaryRadius(theta, rho, R);
+                const b1 = r * Math.cos(theta);
+                const b2 = r * Math.sin(theta);
+                const l = evalQuadraticLoss(b1, b2, ols1, ols2, q11, q22, q12);
+                if (l < bestLoss - 1e-7) {
+                    bestLoss = l;
+                    bestB1 = b1;
+                    bestB2 = b2;
+                }
+            }
+
+            // 若極接近座標軸頂點則吸附歸零
+            if (Math.abs(bestB2) < 0.025 && rho > 0.04) {
+                bestB2 = 0;
+                bestB1 = Math.sign(bestB1) * R;
+                bestLoss = evalQuadraticLoss(bestB1, bestB2, ols1, ols2, q11, q22, q12);
+            }
+            if (Math.abs(bestB1) < 0.025 && rho > 0.04) {
+                bestB1 = 0;
+                bestB2 = Math.sign(bestB2) * R;
+                bestLoss = evalQuadraticLoss(bestB1, bestB2, ols1, ols2, q11, q22, q12);
+            }
+
+            return { b1: bestB1, b2: bestB2, loss: bestLoss };
+        }
+
+        function updateStage1() {
+            const canvas = document.getElementById('geomCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const rho = parseFloat(document.getElementById('sliderGeomRho').value);
+            const R = parseFloat(document.getElementById('sliderGeomT').value);
+
+            const l1Pct = Math.round(rho * 100);
+            const l2Pct = 100 - l1Pct;
+            document.getElementById('lblGeomRho').textContent = `ρ = ${rho.toFixed(2)} (${l1Pct}% L1 + ${l2Pct}% L2)`;
+            document.getElementById('lblGeomT').textContent = `t = ${R.toFixed(2)} (${R < 1.1 ? '強正則化 高 α' : R < 2.2 ? '中等 α' : '弱正則化 低 α'})`;
+
+            const badge = document.getElementById('geomStatusBadge');
+            if (rho === 0) {
+                badge.textContent = '🔵 純 Ridge 模式 (ρ = 0.00)';
+                badge.className = 'text-xs font-extrabold px-2.5 py-1 rounded-full bg-sky-100 text-sky-800';
+            } else if (rho === 1) {
+                badge.textContent = '💎 純 Lasso 模式 (ρ = 1.00)';
+                badge.className = 'text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800';
+            } else {
+                badge.textContent = `🧬 Elastic Net 混合 (ρ = ${rho.toFixed(2)})`;
+                badge.className = 'text-xs font-extrabold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800';
+            }
+
+            // 設定 OLS 中心點與二次型矩陣 Q
+            let ols1, ols2, q11, q22, q12;
+            if (geomScenario === 'sparse') {
+                // 情境 A：beta_1 是核心特徵 (2.35)，beta_2 是次要特徵 (0.65)
+                ols1 = 2.35;
+                ols2 = 0.65;
+                q11 = 1.0;
+                q22 = 1.35;
+                q12 = -0.25;
+            } else {
+                // 情境 B：X1, X2 高度共線，等高線沿 b1 + b2 = const 狹長延伸，OLS 稍微偏向 b1
+                ols1 = 1.85;
+                ols2 = 1.35;
+                q11 = 1.0;
+                q22 = 1.0;
+                q12 = 0.84; // 高共線性使 (b1+b2) 方向曲率大，(b1-b2) 方向曲率極小（扁平橢圓）
+            }
+
+            // 求三種模型在半徑 R 下的最佳解
+            const solEN = solveConstrained2D(rho, R, ols1, ols2, q11, q22, q12);
+            const solLasso = solveConstrained2D(1.0, R, ols1, ols2, q11, q22, q12);
+            const solRidge = solveConstrained2D(0.0, R, ols1, ols2, q11, q22, q12);
+
+            // 更新右側數值面板
+            document.getElementById('valEN1').textContent = solEN.b1.toFixed(2);
+            document.getElementById('valEN2').textContent = solEN.b2.toFixed(2);
+            document.getElementById('valLasso1').textContent = solLasso.b1.toFixed(2);
+            document.getElementById('valLasso2').textContent = solLasso.b2.toFixed(2);
+            document.getElementById('valRidge1').textContent = solRidge.b1.toFixed(2);
+            document.getElementById('valRidge2').textContent = solRidge.b2.toFixed(2);
+
+            const noteEN = document.getElementById('noteEN');
+            const noteLasso = document.getElementById('noteLasso');
+            const noteRidge = document.getElementById('noteRidge');
+
+            if (geomScenario === 'sparse') {
+                if (solEN.b2 === 0) {
+                    noteEN.textContent = '✓ 撞上軸尖角 (β₂=0)';
+                    noteEN.className = 'text-[11px] text-purple-700 font-semibold mt-1';
+                } else {
+                    noteEN.textContent = rho === 0 ? '✗ 無尖角無法歸零' : '△ 尚未收縮至尖角';
+                    noteEN.className = 'text-[11px] text-amber-700 font-semibold mt-1';
+                }
+                noteLasso.textContent = solLasso.b2 === 0 ? '✓ 尖角歸零 (β₂=0)' : '△ 弱正則化未歸零';
+                noteRidge.textContent = '✗ 圓滑邊界永不為 0';
+            } else {
+                const diffEN = Math.abs(solEN.b1 - solEN.b2);
+                const diffLasso = Math.abs(solLasso.b1 - solLasso.b2);
+                noteEN.textContent = `|β₁-β₂| = ${diffEN.toFixed(2)} (群組同進)`;
+                noteEN.className = 'text-[11px] text-purple-700 font-semibold mt-1';
+                noteLasso.textContent = solLasso.b2 === 0 ? '⚠️ 獨押 β₁ (砍掉 β₂)' : `|β₁-β₂| = ${diffLasso.toFixed(2)}`;
+                noteLasso.className = 'text-[11px] text-rose-600 font-semibold mt-1';
+                noteRidge.textContent = `|β₁-β₂| = ${Math.abs(solRidge.b1 - solRidge.b2).toFixed(2)} (均分)`;
+            }
+
+            // 繪製 Canvas
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // 座標轉換：中心偏左下以凸顯第一象限
+            const originX = 195;
+            const originY = 275;
+            const scale = 88; // 1 unit = 88 px
+
+            const toX = (b1) => originX + b1 * scale;
+            const toY = (b2) => originY - b2 * scale;
+
+            // 背景網格
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let g = -2; g <= 4; g += 0.5) {
+                ctx.beginPath();
+                ctx.moveTo(toX(g), 0);
+                ctx.lineTo(toX(g), H);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, toY(g));
+                ctx.lineTo(W, toY(g));
+                ctx.stroke();
+            }
+
+            // 座標軸
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(0, originY);
+            ctx.lineTo(W, originY);
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, H);
+            ctx.stroke();
+
+            // 對角線 beta_1 = beta_2 輔助線 (群組效應參考線)
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(toX(-1.5), toY(-1.5));
+            ctx.lineTo(toX(3.5), toY(3.5));
+            ctx.stroke();
+            ctx.restore();
+            ctx.fillStyle = '#64748b';
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.fillText('Group Line (β₁ = β₂)', toX(2.45), toY(2.62));
+
+            // 軸刻度標籤
+            ctx.fillStyle = '#334155';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText('β₁ (Feature 1 Coefficient)', W - 175, originY + 20);
+            ctx.fillText('β₂ (Feature 2 Coefficient)', originX + 10, 22);
+            for (let v = -1; v <= 3; v++) {
+                if (v === 0) continue;
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.fillStyle = '#64748b';
+                ctx.fillText(v.toString(), toX(v) - 5, originY + 16);
+                ctx.fillText(v.toString(), originX - 20, toY(v) + 4);
+            }
+
+            // 1. 繪製純 Ridge 圓形參考虛線 (rho = 0)
+            ctx.save();
+            ctx.setLineDash([5, 4]);
+            ctx.strokeStyle = 'rgba(14, 165, 233, 0.65)';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(originX, originY, R * scale, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. 繪製純 Lasso 菱形參考虛線 (rho = 1)
+            ctx.save();
+            ctx.setLineDash([5, 4]);
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.75)';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(toX(R), toY(0));
+            ctx.lineTo(toX(0), toY(R));
+            ctx.lineTo(toX(-R), toY(0));
+            ctx.lineTo(toX(0), toY(-R));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+
+            // 3. 繪製 Elastic Net 膨脹菱形約束區 (實心填色 + 紫框)
+            ctx.save();
+            ctx.beginPath();
+            const steps = 360;
+            for (let i = 0; i <= steps; i++) {
+                const th = (2 * Math.PI * i) / steps;
+                const r = getENBoundaryRadius(th, rho, R);
+                const px = toX(r * Math.cos(th));
+                const py = toY(r * Math.sin(th));
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(124, 58, 237, 0.16)';
+            ctx.fill();
+            ctx.strokeStyle = '#7c3aed';
+            ctx.lineWidth = 2.8;
+            ctx.stroke();
+            ctx.restore();
+
+            // 標出四個軸上尖頂點 (若 rho > 0)
+            if (rho > 0) {
+                const axisCorners = [[R, 0], [-R, 0], [0, R], [0, -R]];
+                for (const [cx, cy] of axisCorners) {
+                    ctx.beginPath();
+                    ctx.arc(toX(cx), toY(cy), 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#7c3aed';
+                    ctx.fill();
+                }
+            }
+
+            // 4. 繪製 RSS 二次損失等高線 (包含切過 Elastic Net 解的那條主等高線)
+            const targetLoss = Math.max(0.05, solEN.loss);
+            const contourLevels = [targetLoss * 0.25, targetLoss * 0.6, targetLoss, targetLoss * 1.55];
+
+            // 利用角度掃描繪製橢圓等高線: d1 = r*cos(t), d2 = r*sin(t) => r^2*(q11*cos^2 + q22*sin^2 + 2*q12*cos*sin) = L
+            contourLevels.forEach((L, idx) => {
+                const isTouching = (idx === 2);
+                ctx.save();
+                ctx.beginPath();
+                for (let i = 0; i <= 360; i++) {
+                    const a = (2 * Math.PI * i) / 360;
+                    const c = Math.cos(a);
+                    const s = Math.sin(a);
+                    const denom = q11 * c * c + q22 * s * s + 2 * q12 * c * s;
+                    const rad = Math.sqrt(L / Math.max(0.05, denom));
+                    const px = toX(ols1 + rad * c);
+                    const py = toY(ols2 + rad * s);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                if (isTouching) {
+                    ctx.strokeStyle = '#e11d48';
+                    ctx.lineWidth = 2.4;
+                } else {
+                    ctx.strokeStyle = 'rgba(225, 29, 72, 0.35)';
+                    ctx.lineWidth = 1.3;
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // 5. 標示 OLS 無約束解中心點
+            ctx.beginPath();
+            ctx.arc(toX(ols1), toY(ols2), 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText(`OLS (${ols1.toFixed(2)}, ${ols2.toFixed(2)})`, toX(ols1) + 10, toY(ols2) - 8);
+
+            // 6. 標示 Ridge 與 Lasso 參考解小圓點
+            // Ridge 點
+            ctx.beginPath();
+            ctx.arc(toX(solRidge.b1), toY(solRidge.b2), 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0284c7';
+            ctx.fill();
+            // Lasso 點
+            ctx.beginPath();
+            ctx.arc(toX(solLasso.b1), toY(solLasso.b2), 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#059669';
+            ctx.fill();
+
+            // 7. 標示 Elastic Net 當前最佳解大圓點
+            const ex = toX(solEN.b1);
+            const ey = toY(solEN.b2);
+            ctx.beginPath();
+            ctx.arc(ex, ey, 11, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(124, 58, 237, 0.25)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(ex, ey, 6.5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#7c3aed';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#5b21b6';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText(`Elastic Net (${solEN.b1.toFixed(2)}, ${solEN.b2.toFixed(2)})`, ex + 12, ey + 18);
+        }
+
+        // ==================== STEP 2: 雙重收縮軟閾值算子 ====================
+        function softThreshold(z, lambda1) {
+            if (z > lambda1) return z - lambda1;
+            if (z < -lambda1) return z + lambda1;
+            return 0;
+        }
+
+        function elasticNet1D(z, alpha, rho) {
+            const lambda1 = alpha * rho;
+            const lambda2 = alpha * (1 - rho);
+            return softThreshold(z, lambda1) / (1 + lambda2);
+        }
+
+        function updateStage2() {
+            const canvas = document.getElementById('softCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const alpha = parseFloat(document.getElementById('sliderSoftAlpha').value);
+            const rho = parseFloat(document.getElementById('sliderSoftRho').value);
+            const z = parseFloat(document.getElementById('sliderSoftZ').value);
+
+            const lambda1 = alpha * rho;
+            const lambda2 = alpha * (1 - rho);
+
+            document.getElementById('lblSoftAlpha').textContent = `α = ${alpha.toFixed(2)}`;
+            document.getElementById('lblSoftRho').textContent = `ρ = ${rho.toFixed(2)}`;
+            document.getElementById('lblSoftZ').textContent = `z_j = ${z.toFixed(2)}`;
+
+            const stepA = softThreshold(z, lambda1);
+            const valEN = stepA / (1 + lambda2);
+            const valLasso = softThreshold(z, alpha);
+            const valRidge = z / (1 + alpha);
+
+            document.getElementById('calcLambda1').textContent = lambda1.toFixed(3);
+            document.getElementById('calcLambda2').textContent = lambda2.toFixed(3);
+            document.getElementById('calcStepA').textContent = stepA.toFixed(3);
+            document.getElementById('calcStepB').textContent = valEN.toFixed(3);
+
+            document.getElementById('outSoftOLS').textContent = z.toFixed(3);
+            document.getElementById('outSoftRidge').textContent = valRidge.toFixed(3);
+            document.getElementById('outSoftLasso').textContent = valLasso.toFixed(3);
+            document.getElementById('outSoftEN').textContent = valEN.toFixed(3);
+
+            const alertBox = document.getElementById('softZoneAlert');
+            if (Math.abs(z) <= lambda1 && lambda1 > 0) {
+                alertBox.textContent = `🎯 進入 L1 歸零死區 (|z_j| ≤ α·ρ = ${lambda1.toFixed(2)})：Elastic Net 直接將此特徵係數砍為 0！`;
+                alertBox.className = 'mt-1 p-2 rounded-lg bg-emerald-100 text-emerald-900 font-bold text-center';
+            } else {
+                alertBox.textContent = `✓ 特徵保留 (|z_j| > α·ρ = ${lambda1.toFixed(2)})：先扣除 L1 門檻 ${lambda1.toFixed(2)}，再除以 (1+${lambda2.toFixed(2)}) 雙重收縮。`;
+                alertBox.className = 'mt-1 p-2 rounded-lg bg-purple-100 text-purple-900 font-medium text-center';
+            }
+
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const cx = W / 2;
+            const cy = H / 2;
+            const scale = 68; // [-4, 4]
+
+            const toX = (v) => cx + v * scale;
+            const toY = (v) => cy - v * scale;
+
+            // 繪製 L1 歸零死區淡紫色背景帶 [-lambda1, +lambda1]
+            if (lambda1 > 0.01) {
+                ctx.fillStyle = 'rgba(124, 58, 237, 0.10)';
+                ctx.fillRect(toX(-lambda1), 20, (2 * lambda1) * scale, H - 40);
+                ctx.strokeStyle = 'rgba(124, 58, 237, 0.35)';
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(toX(-lambda1), 20);
+                ctx.lineTo(toX(-lambda1), H - 20);
+                ctx.moveTo(toX(lambda1), 20);
+                ctx.lineTo(toX(lambda1), H - 20);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#6d28d9';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.fillText(`Dead Zone [-αρ, +αρ] = [±${lambda1.toFixed(2)}]`, toX(-lambda1) + 6, 36);
+            }
+
+            // 網格線
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let g = -4; g <= 4; g++) {
+                ctx.beginPath();
+                ctx.moveTo(toX(g), 0);
+                ctx.lineTo(toX(g), H);
+                ctx.moveTo(0, toY(g));
+                ctx.lineTo(W, toY(g));
+                ctx.stroke();
+            }
+
+            // 座標軸
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(0, cy);
+            ctx.lineTo(W, cy);
+            ctx.moveTo(cx, 0);
+            ctx.lineTo(cx, H);
+            ctx.stroke();
+
+            ctx.fillStyle = '#334155';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText('OLS Unregularized Estimate z_j', W - 205, cy - 8);
+            ctx.fillText('Shrunk Coefficient β̂_j', cx + 10, 18);
+
+            // 1. OLS 45 度基準線
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(toX(-4), toY(-4));
+            ctx.lineTo(toX(4), toY(4));
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. 純 Ridge 線 (rho = 0): z / (1 + alpha)
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(toX(-4), toY(-4 / (1 + alpha)));
+            ctx.lineTo(toX(4), toY(4 / (1 + alpha)));
+            ctx.stroke();
+
+            // 3. 純 Lasso 線 (rho = 1): S(z, alpha)
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let xv = -4; xv <= 4; xv += 0.05) {
+                const yv = softThreshold(xv, alpha);
+                if (xv === -4) ctx.moveTo(toX(xv), toY(yv));
+                else ctx.lineTo(toX(xv), toY(yv));
+            }
+            ctx.stroke();
+
+            // 4. Elastic Net 曲線: S(z, alpha*rho) / (1 + alpha*(1-rho))
+            ctx.strokeStyle = '#7c3aed';
+            ctx.lineWidth = 3.2;
+            ctx.beginPath();
+            for (let xv = -4; xv <= 4; xv += 0.02) {
+                const yv = elasticNet1D(xv, alpha, rho);
+                if (xv === -4) ctx.moveTo(toX(xv), toY(yv));
+                else ctx.lineTo(toX(xv), toY(yv));
+            }
+            ctx.stroke();
+
+            // 5. 繪製當前測試點 z_j 的垂直投影與三個模型對應點
+            ctx.save();
+            ctx.setLineDash([3, 3]);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(toX(z), toY(-3.8));
+            ctx.lineTo(toX(z), toY(3.8));
+            ctx.stroke();
+            ctx.restore();
+
+            // Ridge 圓點
+            ctx.beginPath();
+            ctx.arc(toX(z), toY(valRidge), 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0ea5e9';
+            ctx.fill();
+
+            // Lasso 圓點
+            ctx.beginPath();
+            ctx.arc(toX(z), toY(valLasso), 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#10b981';
+            ctx.fill();
+
+            // Elastic Net 主圓點
+            ctx.beginPath();
+            ctx.arc(toX(z), toY(valEN), 7.5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#7c3aed';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#5b21b6';
+            ctx.font = 'bold 12px JetBrains Mono, monospace';
+            ctx.fillText(`EN(${z.toFixed(2)}) = ${valEN.toFixed(2)}`, toX(z) + 10, toY(valEN) - 10);
+        }
+
+        // ==================== STEP 3: 群組效應實驗室 (Grouping Effect vs Lasso Instability) ====================
+        let currentTrial = 1;
+        // 10 個抽樣批次的微小相關擾動因子 (模擬講義 7.10 節 10 Trials 隨機切分)
+        const trialNoiseTable = [
+            { dt: +0.06, dp: +0.02 },
+            { dt: -0.08, dp: -0.03 },
+            { dt: +0.11, dp: -0.02 },
+            { dt: -0.09, dp: +0.04 },
+            { dt: +0.07, dp: +0.01 },
+            { dt: -0.12, dp: -0.04 },
+            { dt: +0.09, dp: +0.03 },
+            { dt: -0.07, dp: -0.01 },
+            { dt: +0.10, dp: -0.02 },
+            { dt: -0.11, dp: +0.02 }
+        ];
+
+        function triggerNextTrial() {
+            currentTrial = (currentTrial % 10) + 1;
+            document.getElementById('lblTrialBadge').textContent = `Trial #${currentTrial} / 10`;
+            updateStage3();
+        }
+
+        function resetTrial() {
+            currentTrial = 1;
+            document.getElementById('lblTrialBadge').textContent = `Trial #1 / 10`;
+            document.getElementById('sliderGroupR').value = 0.97;
+            document.getElementById('sliderGroupRho').value = 0.50;
+            updateStage3();
+        }
+
+        // 二元共線特徵組精確座標下降求解器：
+        // 最小化 0.5 * (b1^2 + b2^2 + 2*r*b1*b2) - (c1*b1 + c2*b2) + l1*(|b1|+|b2|) + 0.5*l2*(b1^2+b2^2)
+        function solveCollinearPair(c1, c2, r, alpha, rho) {
+            const l1 = alpha * rho;
+            const l2 = alpha * (1 - rho);
+            let b1 = 0, b2 = 0;
+            for (let iter = 0; iter < 160; iter++) {
+                b1 = softThreshold(c1 - r * b2, l1) / (1 + l2);
+                b2 = softThreshold(c2 - r * b1, l1) / (1 + l2);
+            }
+            return [b1, b2];
+        }
+
+        function updateStage3() {
+            const canvas = document.getElementById('groupCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const r = parseFloat(document.getElementById('sliderGroupR').value);
+            const rho = parseFloat(document.getElementById('sliderGroupRho').value);
+            const noise = trialNoiseTable[currentTrial - 1];
+
+            document.getElementById('lblGroupR').textContent = `r = ${r.toFixed(2)} (${r >= 0.9 ? '極高共線性' : r >= 0.75 ? '中高度共線' : '一般相關'})`;
+            document.getElementById('lblGroupRho').textContent = `ρ = ${rho.toFixed(2)} (${Math.round(rho * 100)}% L1 + ${Math.round((1 - rho) * 100)}% L2)`;
+
+            // Group 1: 重要溫度測點組 (T1_inlet, T2_outlet)，真實總效應高，隨抽樣有微小偏置 noise.dt
+            const cT1 = 1.48 + noise.dt;
+            const cT2 = 1.42 - noise.dt;
+            const alphaGroup = 0.16;
+
+            const ridgeT = solveCollinearPair(cT1, cT2, r, alphaGroup, 0.0);
+            const enT = solveCollinearPair(cT1, cT2, r, alphaGroup, rho);
+            const lassoT = solveCollinearPair(cT1, cT2, r, alphaGroup, 1.0);
+
+            // Group 2: 次要壓力殘差組 (P1_inlet, P2_outlet)，相關性低於 L1 死區門檻，但 Ridge 會保留非零殘留
+            const cP1 = 0.055 + noise.dp;
+            const cP2 = 0.048 - noise.dp;
+
+            const ridgeP = solveCollinearPair(cP1, cP2, r, alphaGroup, 0.0);
+            const enP = solveCollinearPair(cP1, cP2, r, alphaGroup, rho);
+            const lassoP = solveCollinearPair(cP1, cP2, r, alphaGroup, 1.0);
+
+            // 更新右側診斷文字
+            const diagTemp = document.getElementById('diagTempGroup');
+            const lassoWinner = lassoT[0] >= lassoT[1] ? '獨押 T1_inlet' : '突然跳槽改押 T2_outlet';
+            diagTemp.innerHTML =
+                `• <strong class="text-sky-700">Ridge (ρ=0)</strong>: T1=${ridgeT[0].toFixed(2)}, T2=${ridgeT[1].toFixed(2)} (均分保留)<br>` +
+                `• <strong class="text-purple-700">Elastic Net (ρ=${rho.toFixed(2)})</strong>: T1=${enT[0].toFixed(2)}, T2=${enT[1].toFixed(2)} <span class="text-purple-800 font-bold">[✓ 兩者同進保留，差值僅 ${Math.abs(enT[0] - enT[1]).toFixed(2)}]</span><br>` +
+                `• <strong class="text-emerald-700">Lasso (ρ=1)</strong>: T1=${lassoT[0].toFixed(2)}, T2=${lassoT[1].toFixed(2)} <span class="text-rose-600 font-bold">[⚠️ ${lassoWinner}！]</span>`;
+
+            const diagPress = document.getElementById('diagPressGroup');
+            const enBothZero = (Math.abs(enP[0]) < 1e-4 && Math.abs(enP[1]) < 1e-4);
+            diagPress.innerHTML =
+                `• <strong class="text-sky-700">Ridge (ρ=0)</strong>: P1=${ridgeP[0].toFixed(3)}, P2=${ridgeP[1].toFixed(3)} <span class="text-rose-600">[✗ 無法歸零]</span><br>` +
+                `• <strong class="text-purple-700">Elastic Net (ρ=${rho.toFixed(2)})</strong>: P1=${enP[0].toFixed(3)}, P2=${enP[1].toFixed(3)} <span class="text-emerald-700 font-bold">[${enBothZero ? '✓ 兩者同時歸零剔除' : '△ 微量殘留'}]</span><br>` +
+                `• <strong class="text-emerald-700">Lasso (ρ=1)</strong>: P1=${lassoP[0].toFixed(3)}, P2=${lassoP[1].toFixed(3)} <span class="text-emerald-700">[✓ 歸零剔除]</span>`;
+
+            // 繪製分組長條圖 Canvas
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const padL = 58, padR = 24, padT = 46, padB = 65;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+            const maxVal = 1.65;
+
+            const toY = (v) => padT + plotH - (v / maxVal) * plotH;
+            const zeroY = toY(0);
+
+            // 背景水平網格
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let gv = 0; gv <= 1.5; gv += 0.3) {
+                const py = toY(gv);
+                ctx.beginPath();
+                ctx.moveTo(padL, py);
+                ctx.lineTo(W - padR, py);
+                ctx.stroke();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.fillText(gv.toFixed(1), 24, py + 4);
+            }
+
+            // 頂部標題列 (Trial 與共線性提示)
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 12.5px Inter, sans-serif';
+            ctx.fillText(`Current Sample Split: Trial #${currentTrial}   |   Pairwise Correlation r = ${r.toFixed(2)}`, padL, 26);
+
+            // 分成左右兩大區塊：左區為溫度重要組 (T1, T2)，右區為次要壓力組 (P1, P2)
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.07)';
+            ctx.fillRect(padL + 8, padT, plotW * 0.52 - 14, plotH);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+            ctx.strokeRect(padL + 8, padT, plotW * 0.52 - 14, plotH);
+
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.06)';
+            ctx.fillRect(padL + plotW * 0.52 + 6, padT, plotW * 0.48 - 14, plotH);
+            ctx.strokeStyle = 'rgba(14, 165, 233, 0.35)';
+            ctx.strokeRect(padL + plotW * 0.52 + 6, padT, plotW * 0.48 - 14, plotH);
+
+            ctx.fillStyle = '#b45309';
+            ctx.font = 'bold 11.5px Inter, sans-serif';
+            ctx.fillText('🔥 Important Correlated Group: (T1_inlet, T2_outlet)', padL + 18, padT + 18);
+
+            ctx.fillStyle = '#0369a1';
+            ctx.fillText('💤 Redundant Correlated Group: (P1_inlet, P2_outlet)', padL + plotW * 0.52 + 16, padT + 18);
+
+            const features = [
+                { label: 'T1_inlet', vals: [ridgeT[0], enT[0], lassoT[0]], cx: padL + plotW * 0.14 },
+                { label: 'T2_outlet', vals: [ridgeT[1], enT[1], lassoT[1]], cx: padL + plotW * 0.38 },
+                { label: 'P1_inlet', vals: [ridgeP[0], enP[0], lassoP[0]], cx: padL + plotW * 0.65 },
+                { label: 'P2_outlet', vals: [ridgeP[1], enP[1], lassoP[1]], cx: padL + plotW * 0.87 }
+            ];
+
+            const colors = ['#0ea5e9', '#7c3aed', '#10b981'];
+            const barW = 24;
+
+            features.forEach((f) => {
+                f.vals.forEach((v, mIdx) => {
+                    const bx = f.cx + (mIdx - 1.5) * (barW + 4);
+                    const by = toY(Math.max(0, v));
+                    const bh = Math.max(2, zeroY - by);
+
+                    ctx.fillStyle = colors[mIdx];
+                    ctx.fillRect(bx, by, barW, bh);
+
+                    // 數值標註
+                    ctx.fillStyle = v < 0.005 ? '#94a3b8' : colors[mIdx];
+                    ctx.font = 'bold 10.5px JetBrains Mono, monospace';
+                    const txt = v < 0.005 ? '0.00' : v.toFixed(2);
+                    ctx.fillText(txt, bx - 1, by - 6);
+                });
+
+                // X 軸特徵名稱
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 12px JetBrains Mono, monospace';
+                ctx.fillText(f.label, f.cx - 28, zeroY + 22);
+            });
+
+            // 底線
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(padL, zeroY);
+            ctx.lineTo(W - padR, zeroY);
+            ctx.stroke();
+
+            // 底部群組效應總結標籤
+            ctx.fillStyle = '#5b21b6';
+            ctx.font = 'bold 11.5px Inter, sans-serif';
+            ctx.fillText('✓ Elastic Net: Keeps BOTH (T1, T2) with balanced weights!', padL + 16, H - 14);
+            ctx.fillStyle = '#047857';
+            ctx.fillText('✓ Elastic Net: Drops BOTH (P1, P2) to exact 0.00!', padL + plotW * 0.52 + 16, H - 14);
+        }
+
+        // ==================== STEP 4: 化工反應器 10 特徵正則化路徑 (Unit 10 Section 7) ====================
+        // 定義講義 Section 7 的 10 個反應器特徵及其物理分組與基準係數
+        const reactorFeatures = [
+            { name: 'Temperature_C', group: 'core', groupLabel: '核心特徵', color: '#059669', ols: 5.662, enRef: 5.413, thresh: 3.20 },
+            { name: 'Pressure_bar', group: 'core', groupLabel: '核心特徵', color: '#10b981', ols: 5.150, enRef: 4.044, thresh: 2.80 },
+            { name: 'Time_min', group: 'core', groupLabel: '核心特徵', color: '#0d9488', ols: 3.651, enRef: 3.575, thresh: 2.35 },
+            { name: 'Catalyst_wt%', group: 'core', groupLabel: '核心特徵', color: '#14b8a6', ols: 3.124, enRef: 3.079, thresh: 2.05 },
+            { name: 'T1_inlet_C', group: 'temp', groupLabel: '溫度共線組', color: '#d97706', ols: 1.050, enRef: 0.990, thresh: 0.85 },
+            { name: 'T2_outlet_C', group: 'temp', groupLabel: '溫度共線組', color: '#f59e0b', ols: 0.620, enRef: 0.550, thresh: 0.58 },
+            { name: 'pH', group: 'noise', groupLabel: '冗餘特徵', color: '#64748b', ols: -0.222, enRef: -0.163, thresh: 0.14 },
+            { name: 'Stirring_Speed_rpm', group: 'noise', groupLabel: '冗餘特徵', color: '#94a3b8', ols: 0.139, enRef: 0.050, thresh: 0.085 },
+            { name: 'P1_inlet_bar', group: 'press', groupLabel: '壓力共線組', color: '#0284c7', ols: -0.450, enRef: 0.000, thresh: 0.032 },
+            { name: 'P2_outlet_bar', group: 'press', groupLabel: '壓力共線組', color: '#38bdf8', ols: -0.380, enRef: 0.000, thresh: 0.028 }
+        ];
+
+        // 根據 alpha 與 l1_ratio (rho) 計算第 idx 個特徵在正則化路徑上的係數 (忠實重現講義 α=0.0475, ρ=0.99 時的精確係數與群組收斂特性)
+        function computeReactorCoef(f, alpha, rho) {
+            const l1Eff = alpha * rho;
+            const l2Eff = alpha * (1 - rho);
+
+            // 針對共線組：當 rho 越低 (L2 比例越高)，T1 與 T2 的係數越向組平均靠攏 (群組效應)
+            let baseTarget = f.enRef;
+            if (f.group === 'temp') {
+                const avgTemp = 0.770;
+                baseTarget = f.enRef * rho + avgTemp * (1 - rho);
+            }
+
+            // 在講義最佳點 alpha_opt = 0.047508, rho = 0.99 時，對齊講義實測值 f.enRef
+            const sign = f.ols >= 0 ? 1 : -1;
+            const absAnchor = Math.abs(baseTarget) + 0.047508 * 0.99 * (f.enRef !== 0 ? 1.25 : 0);
+
+            // 對極小 alpha 時平滑過渡至 OLS (含 P1, P2 在低 alpha 時的負補償係數)
+            if (f.group === 'press') {
+                const cutAlpha = f.thresh / Math.max(0.08, rho);
+                if (alpha >= cutAlpha) return 0.0;
+                const ratio = 1 - alpha / cutAlpha;
+                return (f.ols * Math.pow(ratio, 1.35)) / (1 + 2.5 * l2Eff);
+            }
+
+            // 一般與核心特徵：軟閾值收縮 + L2 比例縮放
+            const rawMag = Math.abs(f.ols) * Math.exp(-0.12 * alpha) * 0.15 + absAnchor * 0.85;
+            const l1Cut = (l1Eff / Math.max(0.15, f.thresh)) * 1.15;
+            const shrunk = Math.max(0, rawMag - l1Cut);
+            return (sign * shrunk) / (1 + 1.8 * l2Eff);
+        }
+
+        function setPathPreset(logAlpha, rhoVal) {
+            document.getElementById('sliderPathAlpha').value = logAlpha;
+            document.getElementById('sliderPathRho').value = rhoVal;
+            updateStage4();
+        }
+
+        function updateStage4() {
+            const canvas = document.getElementById('pathCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const logAlpha = parseFloat(document.getElementById('sliderPathAlpha').value);
+            const alpha = Math.pow(10, logAlpha);
+            const rho = parseFloat(document.getElementById('sliderPathRho').value);
+
+            document.getElementById('lblPathAlpha').textContent = `α = ${alpha < 0.01 ? alpha.toFixed(4) : alpha.toFixed(4)} (log₁₀α = ${logAlpha.toFixed(2)})`;
+            document.getElementById('lblPathRho').textContent = `ρ = ${rho.toFixed(2)} (${Math.round(rho * 100)}% L1 + ${Math.round((1 - rho) * 100)}% L2)`;
+
+            // 計算當前 10 個特徵係數
+            const currentCoefs = reactorFeatures.map(f => computeReactorCoef(f, alpha, rho));
+            const keptCount = currentCoefs.filter(c => Math.abs(c) > 1e-3).length;
+
+            // 模擬對應的測試集 RMSE 與 R2 (在 alpha=0.0475, rho=0.99 處精確對齊講義 RMSE=3.242, R2=0.8580)
+            const distOpt = Math.abs(logAlpha - (-1.323));
+            const overPenalty = logAlpha > -0.6 ? Math.pow(logAlpha + 0.6, 2) * 2.1 : 0;
+            const underPenalty = logAlpha < -1.323 ? Math.pow((-1.323 - logAlpha) / 2.2, 2) * 0.032 : 0;
+            const rmse = 3.242 + underPenalty + overPenalty + 0.025 * Math.min(1, distOpt);
+            const r2 = Math.max(0.15, 0.8580 - (rmse - 3.242) * 0.145);
+
+            document.getElementById('statPathKept').textContent = `${keptCount} / 10`;
+            document.getElementById('statPathRMSE').textContent = rmse.toFixed(3);
+            document.getElementById('statPathR2').textContent = r2.toFixed(4);
+
+            // 渲染右側 10 個特徵橫條清單
+            const container = document.getElementById('featureBarsContainer');
+            let html = '';
+            reactorFeatures.forEach((f, idx) => {
+                const c = currentCoefs[idx];
+                const isZero = Math.abs(c) <= 1e-3;
+                const pct = Math.min(100, (Math.abs(c) / 5.8) * 100);
+                const badgeClass = isZero
+                    ? 'bg-rose-100 text-rose-700'
+                    : (f.group === 'core' ? 'bg-emerald-100 text-emerald-800' : f.group === 'temp' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700');
+                const statusText = isZero ? '✗ 歸零剔除' : '✓ 保留';
+
+                html += `
+                <div class="bg-white px-2.5 py-1.5 rounded-lg border ${isZero ? 'border-slate-200 opacity-60' : 'border-slate-300'} text-xs">
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${f.color}"></span>
+                            <span class="font-mono-code font-bold text-slate-800">${f.name}</span>
+                            <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500">${f.groupLabel}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono-code font-bold ${isZero ? 'text-slate-400' : 'text-slate-800'}">${c >= 0 ? '+' : ''}${c.toFixed(3)}</span>
+                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeClass}">${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full transition-all duration-150" style="width:${pct}%; background:${isZero ? '#cbd5e1' : f.color}"></div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+
+            // 繪製左側正則化路徑 Canvas
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const padL = 54, padR = 24, padT = 26, padB = 46;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+
+            const minLogA = -3.5, maxLogA = 0.8;
+            const minC = -1.0, maxC = 6.2;
+
+            const toX = (la) => padL + ((la - minLogA) / (maxLogA - minLogA)) * plotW;
+            const toY = (cv) => padT + plotH - ((cv - minC) / (maxC - minC)) * plotH;
+
+            // 背景網格
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let la = -3; la <= 0; la++) {
+                ctx.beginPath();
+                ctx.moveTo(toX(la), padT);
+                ctx.lineTo(toX(la), padT + plotH);
+                ctx.stroke();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.fillText(`10^${la}`, toX(la) - 14, padT + plotH + 18);
+            }
+            for (let cv = -1; cv <= 6; cv++) {
+                ctx.beginPath();
+                ctx.moveTo(padL, toY(cv));
+                ctx.lineTo(padL + plotW, toY(cv));
+                ctx.stroke();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.fillText(cv.toFixed(1), 22, toY(cv) + 4);
+            }
+
+            // Y = 0 基準線
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(padL, toY(0));
+            ctx.lineTo(padL + plotW, toY(0));
+            ctx.stroke();
+
+            // 繪製 10 條特徵正則化路徑曲線
+            const numSteps = 120;
+            reactorFeatures.forEach((f) => {
+                ctx.save();
+                ctx.beginPath();
+                if (f.group === 'noise') {
+                    ctx.setLineDash([4, 3]);
+                    ctx.lineWidth = 1.6;
+                } else {
+                    ctx.lineWidth = 2.3;
+                }
+                ctx.strokeStyle = f.color;
+
+                for (let s = 0; s <= numSteps; s++) {
+                    const la = minLogA + (s / numSteps) * (maxLogA - minLogA);
+                    const aVal = Math.pow(10, la);
+                    const cv = computeReactorCoef(f, aVal, rho);
+                    const px = toX(la);
+                    const py = toY(cv);
+                    if (s === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // 標示講義 ElasticNetCV 最佳 alpha = 0.0475 紅色虛線
+            const optLogA = -1.323;
+            ctx.save();
+            ctx.setLineDash([5, 4]);
+            ctx.strokeStyle = '#e11d48';
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(toX(optLogA), padT);
+            ctx.lineTo(toX(optLogA), padT + plotH);
+            ctx.stroke();
+            ctx.restore();
+            ctx.fillStyle = '#be123c';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.fillText('ElasticNetCV Best α = 0.0475', toX(optLogA) + 6, padT + 15);
+
+            // 標示使用者當前選擇的 alpha 垂直紫色實線與交點
+            const curX = toX(logAlpha);
+            ctx.strokeStyle = '#7c3aed';
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(curX, padT);
+            ctx.lineTo(curX, padT + plotH);
+            ctx.stroke();
+
+            reactorFeatures.forEach((f, idx) => {
+                const cy = toY(currentCoefs[idx]);
+                ctx.beginPath();
+                ctx.arc(curX, cy, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = Math.abs(currentCoefs[idx]) <= 1e-3 ? '#ffffff' : f.color;
+                ctx.fill();
+                ctx.strokeStyle = f.color;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            });
+
+            // 軸標題
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText('Regularization Strength α (log scale)', padL + plotW / 2 - 105, H - 8);
+        }
+
+        // ==================== STEP 5: 講義四模型實測係數比較與選型顧問 ====================
+        let compareHighlight = 'all';
+
+        // 講義 7.6 節真實四模型係數表
+        const lectureComparisonData = [
+            { feature: 'Temperature_C', group: 'core', en: 5.413, lasso: 5.609, ridge: 5.604, ols: 5.662 },
+            { feature: 'Pressure_bar', group: 'pressure', en: 4.044, lasso: 4.046, ridge: 8.455, ols: 8.784 },
+            { feature: 'Catalyst_wt%', group: 'core', en: 3.079, lasso: 3.079, ridge: 3.124, ols: 3.124 },
+            { feature: 'Time_min', group: 'core', en: 3.575, lasso: 3.576, ridge: 3.649, ols: 3.651 },
+            { feature: 'T1_inlet_C', group: 'temp', en: 0.990, lasso: 0.893, ridge: 0.876, ols: 0.846 },
+            { feature: 'T2_outlet_C', group: 'temp', en: 0.550, lasso: 0.451, ridge: 0.521, ols: 0.493 },
+            { feature: 'P1_inlet_bar', group: 'pressure', en: 0.000, lasso: 0.000, ridge: -2.350, ols: -2.528 },
+            { feature: 'P2_outlet_bar', group: 'pressure', en: 0.000, lasso: 0.000, ridge: -2.024, ols: -2.175 },
+            { feature: 'Stirring_Speed', group: 'noise', en: 0.050, lasso: 0.051, ridge: 0.136, ols: 0.139 },
+            { feature: 'pH', group: 'noise', en: -0.163, lasso: -0.163, ridge: -0.222, ols: -0.222 }
+        ];
+
+        function setCompareHighlight(mode) {
+            compareHighlight = mode;
+            const ids = ['btnCmpAll', 'btnCmpPress', 'btnCmpTemp'];
+            const modes = ['all', 'pressure', 'temp'];
+            ids.forEach((id, i) => {
+                const el = document.getElementById(id);
+                if (modes[i] === mode) {
+                    el.className = 'px-2 py-0.5 rounded bg-purple-600 text-white font-semibold';
+                } else {
+                    el.className = 'px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold';
+                }
+            });
+            updateStage5();
+        }
+
+        function selectAdvisorScenario(key) {
+            const keys = ['nir', 'reactor', 'sparse', 'indep'];
+            keys.forEach(k => {
+                const btn = document.getElementById('advBtn_' + k);
+                if (k === key) {
+                    btn.className = 'p-2.5 rounded-lg border-2 border-purple-600 bg-purple-50 text-purple-900 font-bold text-left transition';
+                } else {
+                    btn.className = 'p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-left transition';
+                }
+            });
+
+            const box = document.getElementById('advisorResultBox');
+            if (key === 'nir') {
+                box.innerHTML = `
+                    <div class="font-extrabold text-purple-900 text-sm">🎯 推薦模型：Elastic Net (<code>l1_ratio = 0.1 ~ 0.3</code>)</div>
+                    <p class="text-slate-700 leading-relaxed">• <strong>為什麼不用純 Lasso？</strong> 光譜波長數 $p \gg$ 樣本數 $n$，純 Lasso 最多只能選 $n$ 個波長，且會在相鄰高度共線波長間隨機挑一個，導致化學官能基波段破碎。</p>
+                    <p class="text-slate-700 leading-relaxed">• <strong>Elastic Net 優勢：</strong> 較高的 L2 權重 (70%~90%) 能發揮<strong>群組效應</strong>，把整個關鍵吸收波段一起選入，並突破 $n$ 個特徵的上限！</p>`;
+            } else if (key === 'reactor') {
+                box.innerHTML = `
+                    <div class="font-extrabold text-purple-900 text-sm">🎯 推薦模型：ElasticNetCV 自動搜索 (<code>l1_ratio = 0.5 ~ 0.99</code>)</div>
+                    <p class="text-slate-700 leading-relaxed">• <strong>工程特性：</strong> 反應器同時存在核心變數、進出口共線測點群組 $(T_1/T_2, P_1/P_2)$ 與無關冗餘變數。</p>
+                    <p class="text-slate-700 leading-relaxed">• <strong>實務建議：</strong> 使用 <code>ElasticNetCV(l1_ratio=[0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 0.99])</code>，既能把多餘壓力殘差組整組砍成 0，又能穩定保留溫度群組！</p>`;
+            } else if (key === 'sparse') {
+                box.innerHTML = `
+                    <div class="font-extrabold text-emerald-900 text-sm">🎯 推薦模型：高 L1 比例 Elastic Net (<code>l1_ratio = 0.90 ~ 0.99</code>) 或 Lasso</div>
+                    <p class="text-slate-700 leading-relaxed">• <strong>工程特性：</strong> 目標是從數十個候選感測器中篩出最精簡的少數關鍵因子。</p>
+                    <p class="text-slate-700 leading-relaxed">• <strong>實務建議：</strong> 設定 <code>l1_ratio = 0.95 ~ 0.99</code> 可獲得與純 Lasso 相同的稀疏簡潔度，但額外保留 1%~5% 的 L2 項作為「共線性安全氣囊」，防止遇到意外共線特徵時崩潰。</p>`;
+            } else {
+                box.innerHTML = `
+                    <div class="font-extrabold text-sky-900 text-sm">🎯 推薦模型：Ridge 回歸 (<code>l1_ratio = 0</code>) 或 OLS</div>
+                    <p class="text-slate-700 leading-relaxed">• <strong>工程特性：</strong> 經過實驗設計 (DOE) 的少數核心操作變數（如溫度、壓力、催化劑、時間），彼此獨立且每一個都有明確物理意義。</p>
+                    <p class="text-slate-700 leading-relaxed">• <strong>實務建議：</strong> 不需要將任何特徵歸零，直接使用 OLS 或 Ridge 即可，無須耗費計算資源調整兩個超參數。</p>`;
+            }
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(box, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ]
+                });
+            }
+        }
+
+        function updateStage5() {
+            const canvas = document.getElementById('compareCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const W = canvas.width;
+            const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const padL = 50, padR = 18, padT = 36, padB = 74;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+
+            const minY = -3.2, maxY = 9.5;
+            const toY = (v) => padT + plotH - ((v - minY) / (maxY - minY)) * plotH;
+            const zeroY = toY(0);
+
+            // 背景網格
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let yv = -2; yv <= 8; yv += 2) {
+                const py = toY(yv);
+                ctx.beginPath();
+                ctx.moveTo(padL, py);
+                ctx.lineTo(W - padR, py);
+                ctx.stroke();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.fillText(yv.toString(), 22, py + 4);
+            }
+
+            // 圖例列
+            const legends = [
+                { name: 'Elastic Net', color: '#7c3aed' },
+                { name: 'Lasso (L1)', color: '#10b981' },
+                { name: 'Ridge (L2)', color: '#0ea5e9' },
+                { name: 'OLS', color: '#64748b' }
+            ];
+            legends.forEach((lg, idx) => {
+                const lx = padL + idx * 125;
+                ctx.fillStyle = lg.color;
+                ctx.fillRect(lx, 12, 12, 12);
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 11.5px Inter, sans-serif';
+                ctx.fillText(lg.name, lx + 17, 22);
+            });
+
+            const colW = plotW / lectureComparisonData.length;
+            const barW = Math.min(11, (colW - 10) / 4);
+
+            lectureComparisonData.forEach((d, idx) => {
+                const cx = padL + idx * colW + colW / 2;
+                const isDimmed = (compareHighlight !== 'all' && d.group !== compareHighlight);
+
+                // 高亮分組背景框
+                if (compareHighlight === d.group) {
+                    ctx.fillStyle = d.group === 'pressure' ? 'rgba(14, 165, 233, 0.12)' : 'rgba(245, 158, 11, 0.14)';
+                    ctx.fillRect(padL + idx * colW + 1, padT, colW - 2, plotH);
+                }
+
+                const vals = [d.en, d.lasso, d.ridge, d.ols];
+                const colors = ['#7c3aed', '#10b981', '#0ea5e9', '#64748b'];
+
+                vals.forEach((v, mIdx) => {
+                    const bx = cx + (mIdx - 2) * barW;
+                    const yVal = toY(v);
+                    const topY = Math.min(zeroY, yVal);
+                    const bh = Math.max(2, Math.abs(yVal - zeroY));
+
+                    ctx.save();
+                    ctx.globalAlpha = isDimmed ? 0.22 : 1.0;
+                    ctx.fillStyle = colors[mIdx];
+                    ctx.fillRect(bx, topY, barW - 1.5, bh);
+                    ctx.restore();
+                });
+
+                // X 軸旋轉特徵標籤
+                ctx.save();
+                ctx.translate(cx, padT + plotH + 12);
+                ctx.rotate(-0.42);
+                ctx.fillStyle = isDimmed ? '#94a3b8' : '#1e293b';
+                ctx.font = 'bold 10.5px JetBrains Mono, monospace';
+                ctx.textAlign = 'right';
+                ctx.fillText(d.feature, 0, 10);
+                ctx.restore();
+            });
+
+            // Y = 0 實線
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(padL, zeroY);
+            ctx.lineTo(W - padR, zeroY);
+            ctx.stroke();
+        }
+
+        // ==================== 隨堂檢測 Quiz 評分邏輯 ====================
+        const quizState = { 1: false, 2: false, 3: false, 4: false };
+        const quizExplanations = {
+            1: {
+                ans: 'B',
+                ok: '✅ 答對了！l1_ratio (ρ) 代表 L1 懲罰佔總懲罰的比例，因此 ρ = 0.7 代表 70% L1 (Lasso) + 30% L2 (Ridge)！',
+                err: '❌ 再想一下：l1_ratio (ρ) 直接對應 L1 懲罰的權重比例，所以 ρ = 0.7 是 70% L1 + 30% L2 喔！'
+            },
+            2: {
+                ans: 'B',
+                ok: '✅ 完全正確！膨脹菱形在座標軸上仍有尖角（能讓次要特徵歸零），而四邊向外弧形鼓出（嚴格凸性）能將共線特徵托在對角線附近同進同出！',
+                err: '❌ 觀念修正：回頭看看 Step 1 的幾何圖，0 < ρ < 1 時邊界是「帶有座標軸尖角的弧形膨脹菱形」喔！'
+            },
+            3: {
+                ans: 'A',
+                ok: '✅ 答對了！如 Step 3 實驗所示，純 Lasso 面對高度共線特徵會隨機二選一且隨抽樣跳動；Elastic Net 則具有群組效應，能穩定同進同出！',
+                err: '❌ 小心陷阱：純 Lasso 的平坦菱形邊與共線等高線幾乎平行，會隨機只選一個；Elastic Net 才能成組保留喔！'
+            },
+            4: {
+                ans: 'A',
+                ok: '✅ 完全正確！當特徵數 p > 樣本數 n 時，純 Lasso 最多只能選出 n 個特徵，而 Elastic Net 由於加入 L2 正則化，能突破 n 個特徵的上限並成組選出共線波長！',
+                err: '❌ 不對喔！Elastic Net 與 Lasso 一樣需要數值迭代求解，它在 p >> n 時的最大優勢是突破「最多選 n 個特徵」的數學限制並具備群組效應！'
+            }
+        };
+
+        function checkQuiz(qNum, choice) {
+            const info = quizExplanations[qNum];
+            const fb = document.getElementById(`q${qNum}_feedback`);
+            ['A', 'B', 'C'].forEach(opt => {
+                const btn = document.getElementById(`q${qNum}_${opt}`);
+                btn.className = 'w-full text-left p-2.5 rounded-lg bg-slate-700/70 hover:bg-slate-700 border border-slate-600 transition';
+            });
+
+            const clickedBtn = document.getElementById(`q${qNum}_${choice}`);
+            fb.classList.remove('hidden');
+
+            if (choice === info.ans) {
+                quizState[qNum] = true;
+                clickedBtn.className = 'w-full text-left p-2.5 rounded-lg bg-emerald-900/80 border-2 border-emerald-400 text-emerald-100 font-bold transition';
+                fb.className = 'mt-3 text-xs p-2.5 rounded-lg bg-emerald-950/90 border border-emerald-500/50 text-emerald-200';
+                fb.textContent = info.ok;
+            } else {
+                quizState[qNum] = false;
+                clickedBtn.className = 'w-full text-left p-2.5 rounded-lg bg-rose-900/80 border-2 border-rose-400 text-rose-100 font-bold transition';
+                fb.className = 'mt-3 text-xs p-2.5 rounded-lg bg-rose-950/90 border border-rose-500/50 text-rose-200';
+                fb.textContent = info.err;
+            }
+
+            const score = (quizState[1] ? 1 : 0) + (quizState[2] ? 1 : 0) + (quizState[3] ? 1 : 0) + (quizState[4] ? 1 : 0);
+            document.getElementById('quizScoreBadge').textContent = `答對題數：${score} / 4`;
+        }
+
+        function renderAllStages() {
+            updateStage0AllViews();
+            updateStage1();
+            updateStage2();
+            updateStage3();
+            updateStage4();
+            updateStage5();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            bindStage0ContourDrag();
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+            selectAdvisorScenario('nir');
+            renderAllStages();
+        });
+
+        window.addEventListener('resize', () => {
+            renderAllStages();
+        });
+    </script>
+</body>
+
+</html>
